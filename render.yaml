@@ -1,0 +1,14 @@
+# Render Blueprint: New -> Blueprint -> pick this repo, everything else is filled in.
+services:
+  - type: web
+    name: noir-river-poker
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: TRUST_PROXY
+        value: "true"

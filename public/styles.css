@@ -1,0 +1,8 @@
+:root{--accent:#D9B65E}
+html{scroll-behavior:smooth}
+*{box-sizing:border-box}
+body{margin:0;background:#0A0D0C}
+a{color:#D9B65E}a:hover{color:#F0D48A}
+summary{cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+details[open] .faq-plus{transform:rotate(45deg)}
