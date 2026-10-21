@@ -49,8 +49,9 @@
     if (!code) return h('div', { class: 'card back ' + extra, 'aria-label': 'Закрытая карта' });
     const r = code[0] === 'T' ? '10' : code[0];
     const s = code[1];
-    return h('div', { class: `card ${s === 'h' || s === 'd' ? 'red' : ''} ${extra}`, 'aria-label': `${r} ${SUIT_NAMES[s]}` },
-      h('span', { class: 'r' }, r), h('span', { class: 's' }, SUITS[s]));
+    return h('div', { class: `card s-${s}${r === '10' ? ' ten' : ''} ${extra}`, role: 'img', 'aria-label': `${r} ${SUIT_NAMES[s]}` },
+      h('span', { class: 'ci', 'aria-hidden': 'true' }, h('b', null, r), h('i', null, SUITS[s])),
+      h('span', { class: 'cp', 'aria-hidden': 'true' }, SUITS[s]));
   }
 
   /** Replace cards only when they changed; returns the newly added card elements. */
@@ -191,6 +192,23 @@
   };
   $('#sound-btn').addEventListener('click', () => Sound.toggle());
   Sound.init();
+
+  // four-colour deck (♣ green, ♦ blue): easier to tell suits apart at a glance
+  function applyDeck(four) {
+    document.body.classList.toggle('four-color', four);
+    const b = $('#deck-btn');
+    b.setAttribute('aria-pressed', four ? 'true' : 'false');
+    b.setAttribute('aria-label', four ? 'Четырёхцветная колода включена' : 'Двухцветная колода');
+  }
+  let fourColor = true;
+  try { fourColor = localStorage.getItem('nr_4c') !== '0'; } catch (e) { /* ignore */ }
+  applyDeck(fourColor);
+  $('#deck-btn').addEventListener('click', () => {
+    fourColor = !fourColor;
+    try { localStorage.setItem('nr_4c', fourColor ? '1' : '0'); } catch (e) { /* ignore */ }
+    applyDeck(fourColor);
+    toast(fourColor ? 'Четырёхцветная колода: ♣ зелёные, ♦ синие' : 'Классическая двухцветная колода');
+  });
 
   // ================= state =================
   const S = {
@@ -407,7 +425,9 @@
     if (!S.me) return;
     $('#me-balance').textContent = fmt(S.me.balance);
     $('#me-inplay').textContent = S.me.inPlay ? `+ ${fmt(S.me.inPlay)} в игре` : 'на балансе';
-    $('#me-name').textContent = S.me.name;
+    $('#me-name').replaceChildren(
+      h('span', { class: 'avatar sm', style: `--hue:${hueOf(S.me.name)}`, 'aria-hidden': 'true' }, initials(S.me.name)),
+      h('span', { class: 'me-name-text' }, S.me.name));
     $('#bonus-btn').hidden = !S.me.bonusAvailable;
     $('#admin-link').hidden = S.me.role !== 'admin';
     $('#bonus-amount').textContent = fmt(S.me.bonusAmount);
@@ -447,6 +467,18 @@
     else if (tab === 'sng') renderSngList();
     else renderDurakList();
     renderMyTables();
+    const seatedCash = S.tables.reduce((a, t) => a + t.players, 0);
+    const sngWaiting = S.sngs.filter((x) => x.status === 'registering').reduce((a, x) => a + x.players.length, 0);
+    const sngLive = S.sngs.filter((x) => x.status === 'running').length;
+    const durakPlayers = S.durak.reduce((a, t) => a + t.players, 0);
+    $('#cnt-cash').textContent = `${seatedCash} за столами`;
+    $('#cnt-sng').textContent = sngLive ? `${sngLive} идут · ${sngWaiting} ждут` : `${sngWaiting} ждут старта`;
+    $('#cnt-durak').textContent = `${durakPlayers} за столами`;
+    if (S.me) {
+      const hr = new Date().getHours();
+      const part = hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
+      $('#lobby-greet').textContent = `${part}, ${S.me.name}`;
+    }
   }
 
   const DURAK_VARIANTS = { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' };
@@ -458,15 +490,17 @@
     const rows = S.durak.slice().sort((a, b) => a.stake - b.stake || b.players - a.players);
     for (const t of rows) {
       const mine = S.myDurak.has(t.id);
-      list.append(h('div', { class: 'trow' },
-        h('div', { class: 'trow-game dk-badge' }, 'Д', h('small', null, `${t.maxPlayers} игр.`)),
-        h('div', { class: 'trow-name' },
-          h('b', null, t.name, ' ', h('span', { class: 'status ' + (t.status === 'playing' ? 'running' : 'registering') }, DURAK_STATUS[t.status])),
-          h('span', null, `${DURAK_VARIANTS[t.variant]} · колода 36 · банк делят выигравшие`)),
-        h('div', { class: 'trow-stat' }, h('small', null, 'Ставка'), h('b', null, fmt(t.stake))),
-        h('div', { class: 'trow-stat' }, h('small', null, 'Игроки'), h('b', null, `${t.players} / ${t.maxPlayers}`), dots(t.maxPlayers, t.players)),
-        h('a', { class: 'btn ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/durak/${t.id}` }, mine ? 'Вернуться' : 'Открыть'),
-      ));
+      list.append(tcard({
+        mine,
+        badge: 'Д',
+        badgeCls: 'dk-badge',
+        kind: `${DURAK_VARIANTS[t.variant]} · колода 36`,
+        status: { cls: t.status === 'playing' ? 'running' : 'registering', text: DURAK_STATUS[t.status] },
+        title: t.name,
+        stats: [['Ставка', fmt(t.stake)], ['Игроков', `до ${t.maxPlayers}`]],
+        fill: { n: t.players, max: t.maxPlayers, label: `${t.players} из ${t.maxPlayers}` },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/durak/${t.id}` }, mine ? 'Вернуться' : 'Открыть стол'),
+      }));
     }
   }
 
@@ -498,6 +532,22 @@
     $('#announce').hidden = true;
   });
 
+  /** One table/tournament as a card in the lobby grid. */
+  function tcard(o) {
+    const dotsEl = o.fill ? dots(o.fill.max, o.fill.n) : null;
+    return h('article', { class: 'tcard' + (o.mine ? ' mine' : '') },
+      h('div', { class: 'tcard-top' },
+        h('span', { class: 'tcard-badge' + (o.badgeCls ? ' ' + o.badgeCls : '') }, o.badge),
+        h('span', { class: 'tcard-kind' }, o.kind),
+        o.status ? h('span', { class: 'status ' + o.status.cls }, o.status.text) : null),
+      h('h3', { class: 'tcard-title' }, o.title),
+      o.sub ? h('p', { class: 'tcard-sub' }, o.sub) : null,
+      h('dl', { class: 'tcard-stats' }, o.stats.map(([k, v, title]) => h('div', title ? { title } : null, h('dt', null, k), h('dd', null, v)))),
+      o.fill ? h('div', { class: 'tcard-fill' }, dotsEl, h('span', null, o.fill.label)) : null,
+      o.names ? h('p', { class: 'tcard-names', title: o.names }, o.names) : null,
+      h('div', { class: 'tcard-act' }, o.action));
+  }
+
   function renderCashList() {
     const list = $('#table-list');
     const rows = S.tables
@@ -508,15 +558,16 @@
     if (!rows.length) list.append(h('div', { class: 'empty' }, 'Подходящих столов нет — создайте свой.'));
     for (const t of rows) {
       const mine = S.myTables.has(t.id);
-      list.append(h('div', { class: 'trow' },
-        h('div', { class: 'trow-game' }, t.game === 'PLO' ? 'PLO' : 'NLH', h('small', null, `${t.maxSeats}-max`)),
-        h('div', { class: 'trow-name' }, h('b', null, t.name),
-          h('span', null, GAME_NAMES[t.game], t.blindsEvery ? ` · блайнды растут каждые ${t.blindsEvery} раздач` : '')),
-        h('div', { class: 'trow-stat' }, h('small', null, 'Блайнды'), h('b', null, `${fmt(t.sb)} / ${fmt(t.bb)}`)),
-        h('div', { class: 'trow-stat' }, h('small', null, 'Бай-ин'), h('b', null, `${fmt(t.minBuyIn)}–${fmt(t.maxBuyIn)}`)),
-        h('div', { class: 'trow-stat' }, h('small', null, 'Игроки'), h('b', null, `${t.players} / ${t.maxSeats}`), dots(t.maxSeats, t.players)),
-        h('a', { class: 'btn ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/table/${t.id}` }, mine ? 'Вернуться' : 'Открыть'),
-      ));
+      list.append(tcard({
+        mine,
+        badge: t.game === 'PLO' ? 'PLO' : 'NLH',
+        kind: `${GAME_NAMES[t.game]} · ${t.maxSeats}-max`,
+        status: t.blindsEvery ? { cls: 'registering', text: `↑ каждые ${t.blindsEvery}` } : null,
+        title: t.name,
+        stats: [['Блайнды', `${fmt(t.sb)}/${fmt(t.bb)}`], ['Бай-ин', `${fmt(t.minBuyIn)}–${fmt(t.maxBuyIn)}`]],
+        fill: { n: t.players, max: t.maxSeats, label: `${t.players} из ${t.maxSeats}` },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/table/${t.id}` }, mine ? 'Вернуться за стол' : t.players >= t.maxSeats ? 'Смотреть' : 'Открыть стол'),
+      }));
     }
   }
 
@@ -533,28 +584,27 @@
       let action;
       if (x.status === 'registering') {
         action = registered
-          ? h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => sngAction('sng:unregister', x) }, 'Отменить')
-          : h('button', { type: 'button', class: 'btn btn-gold', onclick: () => sngAction('sng:register', x) }, `Играть · ${fmt(x.buyIn)}`);
+          ? h('button', { type: 'button', class: 'btn btn-block btn-ghost', onclick: () => sngAction('sng:unregister', x) }, 'Отменить регистрацию')
+          : h('button', { type: 'button', class: 'btn btn-block btn-gold', onclick: () => sngAction('sng:register', x) }, `Играть · ${fmt(x.buyIn)}`);
       } else if (x.status === 'running') {
         const mine = registered || S.myTables.has(x.tableId);
-        action = h('a', { class: 'btn ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/table/${x.tableId}` }, mine ? 'К столу' : 'Смотреть');
+        action = h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/table/${x.tableId}` }, mine ? 'К столу' : 'Смотреть');
       } else {
-        action = h('span', { class: 'muted' }, x.winner ? `Победитель: ${x.winner}` : 'Завершён');
+        action = h('span', { class: 'tcard-done' }, x.winner ? `Победитель: ${x.winner}` : 'Завершён');
       }
-      const prizes = x.payouts.map((p, i) => `${i + 1} — ${fmt(p)}`).join(' · ');
-      list.append(h('div', { class: 'trow' },
-        h('div', { class: 'trow-game' }, x.game === 'PLO' ? 'PLO' : 'NLH', h('small', null, `${x.seats}-max`)),
-        h('div', { class: 'trow-name' },
-          h('b', null, x.name, ' ', h('span', { class: 'status ' + x.status }, x.status === 'running' ? `Уровень ${x.level}` : STATUS_NAMES[x.status])),
-          h('span', null, `${GAME_NAMES[x.game]} · стек ${fmt(x.startStack)} · блайнды растут каждые ${x.levelHands} раздач`),
-          x.players.length ? h('span', { class: 'reg-names', title: x.players.join(', ') }, x.players.join(', ')) : null),
-        h('div', { class: 'trow-stat' }, h('small', null, 'Бай-ин'), h('b', null, fmt(x.buyIn))),
-        h('div', { class: 'trow-stat' }, h('small', null, 'Призовые'), h('b', { title: prizes }, fmt(x.prizePool)), h('span', { class: 'muted small' }, prizes)),
-        h('div', { class: 'trow-stat' },
-          h('small', null, x.status === 'running' ? 'В игре' : 'Игроки'),
-          h('b', null, `${count} / ${x.seats}`), dots(x.seats, count)),
+      const prizes = x.payouts.map((pz, i) => `${i + 1} — ${fmt(pz)}`).join(' · ');
+      list.append(tcard({
+        mine: registered,
+        badge: x.game === 'PLO' ? 'PLO' : 'NLH',
+        kind: `Sit & Go · ${x.seats}-max`,
+        status: { cls: x.status, text: x.status === 'running' ? `Уровень ${x.level}` : STATUS_NAMES[x.status] },
+        title: x.name,
+        sub: `Стек ${fmt(x.startStack)} · блайнды растут каждые ${x.levelHands} раздач`,
+        stats: [['Бай-ин', fmt(x.buyIn)], ['Призовые', fmt(x.prizePool), prizes]],
+        fill: { n: count, max: x.seats, label: x.status === 'running' ? `в игре ${count} из ${x.seats}` : `${count} из ${x.seats}` },
+        names: x.players.length ? x.players.join(', ') : null,
         action,
-      ));
+      }));
     }
   }
 
@@ -1002,7 +1052,7 @@
       // cash table with rising blinds
       const b = t.blinds;
       bar.hidden = false;
-      bar.replaceChildren(
+      bar.replaceChildren(...[
         h('span', null, h('span', { class: 'tb-label' }, 'Блайнды '), h('b', null, `${fmt(t.sb)}/${fmt(t.bb)}`)),
         sep(),
         h('span', null, h('span', { class: 'tb-label' }, 'Уровень '), h('b', null, b.level)),
@@ -1010,13 +1060,13 @@
         b.next ? h('span', null, h('span', { class: 'tb-label' }, `Далее ${fmt(b.next.sb)}/${fmt(b.next.bb)} с раздачи `), h('b', null, `#${b.nextAtHand}`)) : null,
         sep(),
         h('span', { class: 'tb-label' }, `Растут каждые ${b.every} раздач`),
-      );
+      ].filter(Boolean));
       return;
     }
     if (!t.tournament || !info) { bar.hidden = true; return; }
     bar.hidden = false;
     const prizes = info.payouts.map((p, i) => `${i + 1} — ${fmt(p)}`).join(' · ');
-    bar.replaceChildren(
+    bar.replaceChildren(...[
       h('span', null, h('span', { class: 'tb-label' }, 'Уровень '), h('b', null, info.level)),
       sep(),
       h('span', null, h('span', { class: 'tb-label' }, 'Блайнды '), h('b', null, `${fmt(info.sb)}/${fmt(info.bb)}`)),
@@ -1028,7 +1078,7 @@
       h('span', null, h('span', { class: 'tb-label' }, 'Игроков '), h('b', null, `${info.alive} / ${info.total}`)),
       sep(),
       h('span', null, h('span', { class: 'tb-label' }, 'Призы: '), h('b', null, prizes)),
-    );
+    ].filter(Boolean));
   }
 
   // ================= controls =================
@@ -1363,9 +1413,14 @@
         const left = Math.max(0, t.turnRemaining - elapsed);
         const frac = left / t.actionTime;
         $$('[data-timer]').forEach((bar) => {
-          if (bar.offsetParent === null) return;
           bar.style.transform = `scaleX(${frac})`;
           bar.classList.toggle('low', frac < 0.3);
+          // the same countdown drawn as a ring around the avatar
+          const av = bar.closest('.seat') && bar.closest('.seat').querySelector('.avatar');
+          if (av) {
+            av.style.setProperty('--p', frac.toFixed(3));
+            av.style.setProperty('--ring', frac < 0.3 ? 'var(--red-soft)' : 'var(--gold)');
+          }
         });
         // soft ticking during my last 5 seconds
         if (t.you && t.you.turn && left < 5000 && left > 0) {

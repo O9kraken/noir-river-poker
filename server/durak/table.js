@@ -29,6 +29,10 @@ class DurakTable {
     this.awayTime = opts.awayTime ?? 6000;
     this.countdownMs = opts.countdown ?? 3000;
     this.resultPause = opts.resultPause ?? 7000;
+    this.roundPause = opts.roundPause ?? 1600; // the finished round stays on the table this long
+    this._roundTimer = null;
+    this.lastMove = null;
+    this.moveNo = 0;
     this.timers = opts.timers || { set: setTimeout, clear: clearTimeout };
     this.now = opts.now || Date.now;
     this.randomInt = opts.randomInt;
@@ -145,7 +149,8 @@ class DurakTable {
     this._nameBySeat = new Map(seats.map((i) => [i, this.seats[i].name]));
     this.pot = this.stake * seats.length;
     this.missed = new Map(seats.map((i) => [i, 0])); // consecutive timeouts per seat
-    this.game = new DurakGame(seats, { variant: this.variant, randomInt: this.randomInt });
+    this.game = new DurakGame(seats, { variant: this.variant, randomInt: this.randomInt, pauseRounds: true });
+    this.lastMove = null;
     this.status = 'playing';
     this.result = null;
     this.gameNo += 1;
@@ -162,6 +167,7 @@ class DurakTable {
     const g = this.game;
     const before = { attacker: g.attacker, defender: g.defender, table: g.table.length };
     if (this.missed) this.missed.set(i, 0);
+    this.lastMove = { seat: i, type, card: ['attack', 'defend', 'transfer'].includes(type) ? String(card) : null, n: ++this.moveNo };
     try {
       switch (type) {
         case 'attack': g.attack(i, String(card)); this._log(`${this._name(i)}: ${before.table ? 'подкидывает' : 'ходит'} ${card}`); break;
@@ -191,6 +197,17 @@ class DurakTable {
       }
     }
     if (g.over) { this._finish(); return; }
+    // round finished: leave the cards on the table for a moment, then clear them
+    if (g.pendingEnd && !this._roundTimer) {
+      this._roundTimer = this.timers.set(() => {
+        this._roundTimer = null;
+        if (!this.game || this.game.over || this.status !== 'playing') return;
+        const b = { table: this.game.table.length };
+        this.game.finishRound();
+        this.lastMove = null;
+        this._after(b);
+      }, this.roundPause);
+    }
     this._armTimer();
     this._update();
   }
@@ -226,6 +243,7 @@ class DurakTable {
     }
     if (w.kind === 'lead') {
       const c = g.autoLead();
+      this.lastMove = { seat: g.attacker, type: 'attack', card: c, n: ++this.moveNo };
       g.attack(g.attacker, c);
       this._log(`${this._name(g.attacker)}: время вышло, ход ${c}`);
     } else if (w.kind === 'defend') {
@@ -241,6 +259,7 @@ class DurakTable {
   _finish(forfeitSeat = null) {
     const g = this.game;
     if (this._timer) { this.timers.clear(this._timer); this._timer = null; }
+    if (this._roundTimer) { this.timers.clear(this._roundTimer); this._roundTimer = null; }
     g.over = true;
     const durak = forfeitSeat != null ? forfeitSeat : g.durak;
     const payouts = [];
@@ -300,6 +319,8 @@ class DurakTable {
 
   destroy() {
     if (this._timer) this.timers.clear(this._timer);
+    if (this._roundTimer) this.timers.clear(this._roundTimer);
+    this._roundTimer = null;
     if (this._flow) this.timers.clear(this._flow);
     this._timer = null;
     this._flow = null;
@@ -353,6 +374,8 @@ class DurakTable {
       table: g ? g.table.map((p) => ({ a: p.a, d: p.d })) : [],
       discard: g ? g.discard : 0,
       taking: !!(g && g.taking),
+      roundEnding: g && !g.over && g.pendingEnd ? { took: g.taking, defender: g.defender } : null,
+      lastMove: this.lastMove,
       waiting: g && !g.over ? g.waitingFor() : { kind: 'none', seats: [] },
       deadlineIn: g && !g.over && this._timer ? Math.max(0, this.deadline - this.now()) : 0,
       actionTime: this.deadlineMs || this.actionTime,

@@ -245,7 +245,7 @@ test('админка и дурак через сокеты', async (t) => {
   const srv = createServer({
     dataFile: path.join(dir, 'users.json'), actionTime: 3000, adminNames: [],
     tableOpts: { startDelay: 30, pauseAfterHand: 40, runoutDelay: 5 },
-    durakOpts: { actionTime: 40, awayTime: 20, countdown: 20, resultPause: 30 },
+    durakOpts: { actionTime: 40, awayTime: 20, countdown: 20, resultPause: 30, roundPause: 10 },
   });
   await new Promise((r) => srv.server.listen(0, r));
   t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });

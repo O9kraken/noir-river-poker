@@ -207,3 +207,36 @@ test('стол дурака: игрок видит только свои кар�
   assert.equal(sd.you.canTake, true);
   assert.equal(t.publicState('stranger').hand.length, 0);
 });
+
+test('стол дурака: после «бито» карты лежат на столе паузу, потом уходят в отбой', () => {
+  const { t, timers } = makeDurak(2);
+  t.setReady('u0', true); t.setReady('u1', true); timers.runOne();
+  const g = t.game;
+  const att = g.attacker === 0 ? 'u0' : 'u1';
+  const def = att === 'u0' ? 'u1' : 'u0';
+  const dSeat = g.defender;
+  // атакуем картой, которую защитник может побить, если такая есть
+  let card = null;
+  let beat = null;
+  for (const c of g.hand(g.attacker)) {
+    const b = g.hand(dSeat).find((d) => require('../server/durak/engine').beats(d, c, g.trump));
+    if (b) { card = c; beat = b; break; }
+  }
+  if (!card) return; // редкая раздача без возможного отбоя
+  t.act(att, 'attack', card);
+  t.act(def, 'defend', beat, 0);
+  // подкинуть больше нечего или атакующий пасует
+  if (!g.pendingEnd) t.act(att, 'pass');
+  assert.equal(g.pendingEnd, true);
+  assert.equal(g.table.length, 1, 'карты ещё на столе');
+  const st = t.publicState(att);
+  assert.deepEqual(st.roundEnding, { took: false, defender: dSeat });
+  assert.equal(st.you.throwable.length, 0, 'во время паузы ходить нельзя');
+  assert.ok(st.lastMove && st.lastMove.type, 'последний ход виден клиенту');
+  // таймер паузы — первый в очереди после таймера хода? запускаем, пока раунд не закроется
+  let guard = 0;
+  while (g.pendingEnd && guard++ < 5) timers.runOne();
+  assert.equal(g.table.length, 0);
+  assert.equal(g.discard, 2, 'бито');
+  assert.equal(t.publicState(att).roundEnding, null);
+});

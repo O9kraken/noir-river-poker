@@ -58,6 +58,10 @@ class DurakGame {
     this.over = false;
     this.durak = null; // seat of the loser (null on a draw)
     this.firstRound = true;
+    // pauseRounds: instead of clearing the table at once, mark the round as finished
+    // and let the caller show it for a moment, then call finishRound()
+    this.pauseRounds = !!opts.pauseRounds;
+    this.pendingEnd = false;
     this.log = [];
 
     for (let k = 0; k < HAND_SIZE; k++) for (const s of seats) this.hands.get(s).push(this.deck.pop());
@@ -122,6 +126,7 @@ class DurakGame {
   // ---------- what a seat may do ----------
 
   canThrow(seat, card) {
+    if (this.pendingEnd) return false;
     if (this.over || seat === this.defender || this.out.includes(seat)) return false;
     if (!this.hand(seat).includes(card)) return false;
     if (this.table.length === 0) return seat === this.attacker;
@@ -131,6 +136,7 @@ class DurakGame {
   }
 
   canDefend(seat, card, idx) {
+    if (this.pendingEnd) return false;
     if (this.over || seat !== this.defender || this.taking) return false;
     const pair = this.table[idx];
     if (!pair || pair.d) return false;
@@ -138,6 +144,7 @@ class DurakGame {
   }
 
   canTransfer(seat, card) {
+    if (this.pendingEnd) return false;
     if (this.over || this.variant !== 'perevodnoy' || seat !== this.defender || this.taking) return false;
     if (!this.table.length || this.table.some((p) => p.d)) return false;
     if (!this.hand(seat).includes(card)) return false;
@@ -149,11 +156,12 @@ class DurakGame {
   }
 
   canTake(seat) {
-    return !this.over && seat === this.defender && !this.taking && this.uncovered() > 0;
+    return !this.pendingEnd && !this.over && seat === this.defender && !this.taking && this.uncovered() > 0;
   }
 
   /** "Бито" / "Пас": only when there is nothing to beat right now (or the defender is taking). */
   canPass(seat) {
+    if (this.pendingEnd) return false;
     if (this.over || seat === this.defender || this.out.includes(seat) || !this.table.length) return false;
     if (this.passed.has(seat)) return false;
     return this.taking || this.uncovered() === 0;
@@ -215,7 +223,17 @@ class DurakGame {
       return;
     }
     const waiting = this.attackers().filter((s) => !this.passed.has(s) && this._canAddAny(s));
-    if (waiting.length === 0) this._endRound();
+    if (waiting.length === 0) {
+      if (this.pauseRounds) this.pendingEnd = true;
+      else this._endRound();
+    }
+  }
+
+  /** Clear a round that was left on the table for display (pauseRounds mode). */
+  finishRound() {
+    if (!this.pendingEnd) return;
+    this.pendingEnd = false;
+    this._endRound();
   }
 
   _endRound() {
@@ -271,6 +289,7 @@ class DurakGame {
   /** Who the game is waiting for right now. */
   waitingFor() {
     if (this.over) return { kind: 'none', seats: [] };
+    if (this.pendingEnd) return { kind: 'pause', seats: [] };
     if (!this.table.length) return { kind: 'lead', seats: [this.attacker] };
     if (this.uncovered() > 0 && !this.taking) return { kind: 'defend', seats: [this.defender] };
     return { kind: 'throw', seats: this.attackers().filter((s) => !this.passed.has(s) && this._canAddAny(s)) };

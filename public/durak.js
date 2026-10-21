@@ -35,8 +35,9 @@
     if (st.mySeat >= 0) S.myDurak.add(st.id); else S.myDurak.delete(st.id);
     if (D.selected && !st.hand.includes(D.selected)) D.selected = null;
     if (st.you && st.you.role !== 'defender') D.selected = null;
+    const snap = capture(D.prev, st); // positions of what is about to disappear
     render();
-    effects();
+    effects(snap);
   }
 
   const act = (type, extra = {}) => call('durak:act', { tableId: D.id, type, ...extra });
@@ -106,7 +107,7 @@
           ? Array.from({ length: Math.min(s.cards, 7) }, () => cardEl(null)) : [];
       const cls = ['seat', 'dk-seat', isMe && 'me', turn && 'turn', s.out && 'out', !s.connected && 'away',
         st.result && st.result.durak && st.result.durak.seat === i && 'durak'].filter(Boolean).join(' ');
-      layer.append(h('div', { class: cls, style },
+      layer.append(h('div', { class: cls, style, 'data-seat': i },
         h('div', { class: 'seat-cards dk-backs' }, backs),
         h('div', { class: 'seat-box' },
           tag ? h('span', { class: tagCls }, tag) : null,
@@ -124,12 +125,12 @@
     deck.replaceChildren();
     if (st.trumpCard) {
       if (st.deck > 0) {
-        deck.append(
+        deck.append(...[
           h('div', { class: 'dk-trump' }, cardEl(st.trumpCard)),
           st.deck > 1 ? h('div', { class: 'dk-stack' }, cardEl(null)) : null,
-          h('span', { class: 'dk-count' }, `${st.deck}`));
+          h('span', { class: 'dk-count' }, `${st.deck}`)].filter(Boolean));
       }
-      deck.append(h('div', { class: 'dk-suit ' + (st.trump === 'h' || st.trump === 'd' ? 'red' : ''), title: `Козырь: ${SUIT_WORDS[st.trump]}` },
+      deck.append(h('div', { class: 'dk-suit s-' + st.trump, title: `Козырь: ${SUIT_WORDS[st.trump]}` },
         h('span', { 'aria-hidden': 'true' }, SUIT_SIGNS[st.trump]), h('small', null, 'козырь')));
     }
 
@@ -148,19 +149,23 @@
       return pair;
     }));
     if (!st.table.length && st.status === 'playing') table.append(h('div', { class: 'dk-empty muted' }, 'Стол пуст'));
-    $('#dk-discard').replaceChildren(
-      st.discard ? h('div', { class: 'dk-stack dk-bito' }, cardEl(null)) : null,
-      st.discard ? h('span', { class: 'dk-count' }, `бито ${st.discard}`) : null);
+    table.classList.toggle('ending', !!st.roundEnding);
+    if (st.roundEnding) {
+      table.append(h('div', { class: 'dk-stamp' + (st.roundEnding.took ? ' took' : ''), role: 'status' }, st.roundEnding.took ? 'Забирает' : 'Бито'));
+    }
+    $('#dk-discard').replaceChildren(...(st.discard
+      ? [h('div', { class: 'dk-stack dk-bito' }, cardEl(null)), h('span', { class: 'dk-count' }, `бито ${st.discard}`)]
+      : []));
   }
 
   function renderResult(st) {
     const box = $('#dk-result');
     if (st.status === 'result' && st.result) {
       const r = st.result;
-      box.replaceChildren(
+      box.replaceChildren(...[
         r.draw ? h('div', null, h('b', null, 'Ничья'), ' — ставки возвращены')
           : h('div', null, 'Дурак — ', h('b', null, r.durak.name), r.forfeit ? ' (вышел из партии)' : ''),
-        r.draw ? null : h('div', { class: 'small' }, r.payouts.filter((p) => p.amount > 0).map((p) => `${p.name} +${fmt(p.net)}`).join(' · ')));
+        r.draw ? null : h('div', { class: 'small' }, r.payouts.filter((p) => p.amount > 0).map((p) => `${p.name} +${fmt(p.net)}`).join(' · '))].filter(Boolean));
       box.hidden = false;
     } else if (st.status === 'countdown') {
       box.replaceChildren(h('div', null, 'Раздаём карты через ', h('b', { 'data-dk-countdown': '' }, Math.ceil(st.countdownIn / 1000)), '…'));
@@ -193,16 +198,13 @@
       const el = h('button', {
         type: 'button',
         class: 'dk-card' + (can ? ' playable' : '') + (D.selected === c ? ' selected' : ''),
+        'data-card': c,
         'aria-label': `Карта ${c[0] === 'T' ? '10' : c[0]} ${SUIT_WORDS[c[1]]}${can ? '' : ', сейчас не сыграть'}`,
         onclick: () => clickCard(c),
       }, cardEl(c, c[1] === st.trump ? 'trump' : ''));
       if (prevHand.size && !prevHand.has(c)) el.classList.add('fresh');
       return el;
     }));
-    // newly drawn cards slide in from the deck
-    $$('.dk-card.fresh', handEl).forEach((el, k) => anim(el, [
-      { transform: 'translateY(-60px) scale(.7)', opacity: 0 }, { transform: 'none', opacity: 1 },
-    ], { duration: 320, delay: k * 70, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }));
   }
 
   function renderStatus(st) {
@@ -222,7 +224,8 @@
       const w = st.waiting;
       const mineTurn = w.seats.includes(st.mySeat);
       const nameOf = (i) => (st.seats[i] ? st.seats[i].name : '');
-      if (w.kind === 'lead') text = mineTurn ? 'Ваш ход — положите любую карту' : `Ходит ${nameOf(w.seats[0])}`;
+      if (w.kind === 'pause') text = st.roundEnding && st.roundEnding.took ? `${nameOf(st.roundEnding.defender)} забирает карты` : 'Бито — карты уходят в отбой';
+      else if (w.kind === 'lead') text = mineTurn ? 'Ваш ход — положите любую карту' : `Ходит ${nameOf(w.seats[0])}`;
       else if (w.kind === 'defend') {
         if (mineTurn) text = (you.transfer && you.transfer.length) ? 'Отбивайтесь или переведите: выберите карту' : 'Отбивайтесь: выберите карту, затем карту на столе — или «Беру»';
         else text = `${nameOf(w.seats[0])} отбивается`;
@@ -293,23 +296,127 @@
   }
 
   // ---------- effects ----------
-  function effects() {
+  function fxLayer() {
+    let l = document.getElementById('dk-fx');
+    if (!l) { l = h('div', { id: 'dk-fx', class: 'dk-fx', 'aria-hidden': 'true' }); document.body.append(l); }
+    return l;
+  }
+  const center = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  const rectOf = (sel) => { const el = typeof sel === 'string' ? $(sel) : sel; return el ? el.getBoundingClientRect() : null; };
+  const seatRect = (i) => rectOf(`#dk-seats [data-seat="${i}"] .seat-box`);
+
+  function capture(prev, st) {
+    const snap = { hand: new Map(), ghosts: [], seatCards: [] };
+    if (!prev || prev.id !== st.id) return snap;
+    $$('#dk-hand .dk-card').forEach((b) => snap.hand.set(b.dataset.card, b.getBoundingClientRect()));
+    if (prev.table.length && !st.table.length) {
+      $$('#dk-table .card').forEach((c) => {
+        const r = c.getBoundingClientRect();
+        if (r.width) snap.ghosts.push({ node: c.cloneNode(true), rect: r });
+      });
+    }
+    snap.seatCards = prev.seats.map((x) => (x ? x.cards : 0));
+    return snap;
+  }
+
+  /** A clone that flies from one screen rect to another and disappears. */
+  function flyGhost(node, from, to, { delay = 0, duration = 520, rotate = 0, scale = 0.6, fade = true } = {}) {
+    if (!from || !to || !node.animate) return;
+    const g = node.cloneNode(true);
+    g.classList.add('dk-ghost');
+    g.style.cssText = `left:${from.left}px;top:${from.top}px;width:${from.width}px;height:${from.height}px;--cw:${from.width}px`;
+    fxLayer().append(g);
+    const a = center(from);
+    const b = center(to);
+    const anim2 = g.animate([
+      { transform: 'translate(0,0) rotate(0) scale(1)', opacity: 1 },
+      { transform: `translate(${b.x - a.x}px,${b.y - a.y}px) rotate(${rotate}deg) scale(${scale})`, opacity: fade ? 0 : 0.9 },
+    ], { duration, delay, easing: 'cubic-bezier(.45,.05,.3,1)', fill: 'both' });
+    anim2.onfinish = () => g.remove();
+  }
+
+  /** FLIP: an element already in place animates in from where it came from. */
+  function flyIn(el, from, { delay = 0, rotate = -14 } = {}) {
+    if (!from || !el) return;
+    const to = el.getBoundingClientRect();
+    const a = center(from);
+    const b = center(to);
+    const end = getComputedStyle(el).transform;
+    anim(el, [
+      { transform: `translate(${a.x - b.x}px,${a.y - b.y}px) rotate(${rotate}deg) scale(.85)`, opacity: 0.6 },
+      { transform: end === 'none' ? 'none' : end, opacity: 1 },
+    ], { duration: 380, delay, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+  }
+
+  function effects(snap) {
     const st = D.st;
     const prev = D.prev;
     if (!prev || prev.id !== st.id) return;
-    // new cards on the table
-    const before = new Set(prev.table.map((p) => p.a + (p.d || '')));
+    const deck = rectOf('#dk-deck');
+
+    // 1. cards thrown onto the table: from the player's hand or seat
     let added = 0;
-    $$('#dk-table .dk-pair').forEach((el) => {
-      if (before.has(el.dataset.key)) return;
-      added++;
-      const lastCard = el.lastElementChild;
-      anim(lastCard, [{ transform: 'translateY(-30px) rotate(-8deg) scale(.8)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-        { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    const lm = st.lastMove;
+    const sourceOf = (card) => {
+      if (!lm || lm.card !== card) return deck;
+      if (lm.seat === st.mySeat && snap.hand.has(card)) return snap.hand.get(card);
+      return seatRect(lm.seat) || deck;
+    };
+    const pairs = $$('#dk-table .dk-pair');
+    st.table.forEach((p, i) => {
+      const before = prev.table[i];
+      const el = pairs[i];
+      if (!el) return;
+      if (!before) { added++; flyIn(el.querySelector('.dk-a'), sourceOf(p.a)); }
+      else if (!before.d && p.d) { added++; flyIn(el.querySelector('.dk-d'), sourceOf(p.d), { rotate: 20 }); }
     });
     if (added) Sound.play('card');
-    if (prev.table.length && !st.table.length && st.status === 'playing') Sound.play(prev.taking ? 'chips' : 'fold');
-    if (prev.status !== 'playing' && st.status === 'playing') Sound.play('deal');
+
+    // 2. round over: stamp "Бито" / "Забирает" while the cards stay on the table
+    if (st.roundEnding && !prev.roundEnding) {
+      anim($('#dk-table .dk-stamp'), [
+        { transform: 'translate(-50%,-85%) scale(1.8) rotate(-12deg)', opacity: 0 },
+        { transform: 'translate(-50%,-85%) scale(1) rotate(-8deg)', opacity: 1 },
+      ], { duration: 260, easing: 'cubic-bezier(.2,1.4,.4,1)' });
+      Sound.play(st.roundEnding.took ? 'chips' : 'check');
+    }
+
+    // 3. table cleared: cards fly to the discard pile, or to whoever took them
+    if (snap.ghosts.length) {
+      const re = prev.roundEnding || { took: prev.taking, defender: prev.seats.findIndex((x) => x && x.defender) };
+      let target;
+      if (re.took) target = re.defender === st.mySeat ? rectOf('#dk-hand') : seatRect(re.defender);
+      else target = rectOf('#dk-discard');
+      snap.ghosts.forEach((gh, k) => flyGhost(gh.node, gh.rect, target, {
+        delay: k * 45, rotate: re.took ? 0 : 160 + k * 12, scale: re.took ? 0.7 : 0.55, fade: true,
+      }));
+      Sound.play(re.took ? 'deal' : 'fold');
+    }
+
+    // 4. drawing from the deck: backs fly to the other players, my new cards slide in from the deck
+    const took = snap.ghosts.length && prev.roundEnding && prev.roundEnding.took ? prev.roundEnding.defender : null;
+    if (deck && st.status === 'playing' && prev.status === 'playing') {
+      st.seats.forEach((x, i) => {
+        if (!x || i === st.mySeat || !x.inGame) return;
+        let inc = x.cards - (snap.seatCards[i] || 0);
+        if (i === took) inc -= snap.ghosts.length;
+        const to = seatRect(i);
+        for (let k = 0; k < Math.min(Math.max(inc, 0), 4); k++) {
+          flyGhost(cardEl(null), { left: deck.left, top: deck.top, width: deck.width * 0.6, height: deck.width * 0.84 }, to,
+            { delay: 250 + k * 90, rotate: 20, scale: 0.6, fade: true, duration: 450 });
+        }
+      });
+      const fresh = $$('#dk-hand .dk-card').filter((b) => !snap.hand.has(b.dataset.card));
+      if (snap.hand.size && fresh.length) {
+        fresh.forEach((b, k) => flyIn(b, took === st.mySeat ? rectOf('#dk-table') : deck, { delay: 200 + k * 80, rotate: 0 }));
+      }
+    }
+
+    if (prev.status !== 'playing' && st.status === 'playing') {
+      Sound.play('deal');
+      // the opening deal: every hand comes from the deck
+      $$('#dk-hand .dk-card').forEach((b, k) => flyIn(b, deck, { delay: k * 70, rotate: 0 }));
+    }
     if (prev.status === 'playing' && st.status === 'result') {
       const mine = st.result && st.result.payouts.find((p) => p.seat === st.mySeat);
       Sound.play(mine && mine.net > 0 ? 'bigwin' : mine && mine.net < 0 ? 'fold' : 'win', 0.1);
@@ -356,6 +463,11 @@
         $$('[data-dk-timer]').forEach((bar) => {
           bar.style.transform = `scaleX(${frac})`;
           bar.classList.toggle('low', frac < 0.3);
+          const av = bar.closest('.seat') && bar.closest('.seat').querySelector('.avatar');
+          if (av) {
+            av.style.setProperty('--p', frac.toFixed(3));
+            av.style.setProperty('--ring', frac < 0.3 ? 'var(--red-soft)' : 'var(--gold)');
+          }
         });
       }
       const cd = $('[data-dk-countdown]');
