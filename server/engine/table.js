@@ -3,6 +3,19 @@ const { newDeck, shuffle: secureShuffle } = require('./cards');
 const { bestHand } = require('./evaluator');
 
 const STREETS = ['preflop', 'flop', 'turn', 'river'];
+
+/** Default blind ladder (shared with tournaments). */
+const LEVELS = [
+  [1, 2], [2, 4], [3, 6], [5, 10], [10, 20], [15, 30], [25, 50], [40, 80], [60, 120], [100, 200], [150, 300],
+  [200, 400], [300, 600], [500, 1000], [800, 1600], [1200, 2400], [2000, 4000], [3000, 6000], [5000, 10000],
+];
+
+/** Ladder that starts at the given blinds and climbs the default levels (doubling past the top). */
+function ladderFrom(sb, bb, levels = LEVELS) {
+  const out = [[sb, bb], ...levels.filter((l) => l[1] > bb)];
+  while (out.length < 15) { const [a, b] = out[out.length - 1]; out.push([a * 2, b * 2]); }
+  return out;
+}
 const STREET_NAMES = { preflop: 'Префлоп', flop: 'Флоп', turn: 'Тёрн', river: 'Ривер' };
 
 class GameError extends Error {}
@@ -46,6 +59,11 @@ class Table {
     this.pendingBlinds = null;
     this.finished = false;
     this.histories = [];
+
+    // Blinds that go up every N hands (cash tables by choice, tournaments always).
+    this.baseBlinds = [this.sb, this.bb];
+    this.schedule = null;
+    this.setSchedule(cfg.blindsEvery || 0, cfg.levels);
 
     this.seats = Array(this.maxSeats).fill(null);
     this.dealer = -1;
@@ -103,6 +121,33 @@ class Table {
   /** New blinds take effect from the next hand. */
   setBlinds(sb, bb) {
     this.pendingBlinds = { sb, bb };
+    // keep climbing from the new level instead of jumping back down the old ladder
+    if (this.schedule) {
+      this.schedule.levels = ladderFrom(sb, bb);
+      this.schedule.level = 0;
+      this.schedule.handsLeft = this.schedule.every;
+    }
+  }
+
+  /** Raise the blinds every `every` hands (0 turns it off). */
+  setSchedule(every, levels) {
+    every = Math.floor(Number(every) || 0);
+    if (every <= 0) { this.schedule = null; return; }
+    const cur = this.pendingBlinds ? [this.pendingBlinds.sb, this.pendingBlinds.bb] : [this.sb, this.bb];
+    const ladder = levels ? levels.slice() : ladderFrom(cur[0], cur[1]);
+    let level = ladder.findIndex((l) => l[1] >= cur[1]);
+    if (level === -1) level = 0;
+    this.schedule = { every, levels: ladder, level, handsLeft: every };
+  }
+
+  /** Blind info for the client: current level and the hand the next raise starts from. */
+  blindInfo() {
+    const sch = this.schedule;
+    if (!sch) return null;
+    const next = sch.levels[sch.level + 1] || null;
+    // handsLeft = hands still to be played at this level after the last started one
+    const nextAt = this.handNo + sch.handsLeft + 1;
+    return { every: sch.every, level: sch.level + 1, next: next ? { sb: next[0], bb: next[1] } : null, nextAtHand: next ? nextAt : null };
   }
 
   start() {
@@ -136,6 +181,12 @@ class Table {
     this._log(`${s.name} встаёт из-за стола`);
     this.onLeave(s.userId, s.stack);
     this._touch();
+    // an emptied cash table with rising blinds starts over from its base level
+    if (!this.tournament && this.schedule && this.playerCount() === 0) {
+      [this.sb, this.bb] = this.baseBlinds;
+      this.pendingBlinds = null;
+      this.setSchedule(this.schedule.every);
+    }
   }
 
   setSittingOut(userId, value) {
@@ -206,11 +257,24 @@ class Table {
     if (this.hand || eligible.length < 2) return;
     this.handNo += 1;
     this.lastResult = null;
+    const sch = this.schedule;
+    if (sch) {
+      if (sch.handsLeft <= 0) {
+        if (sch.level < sch.levels.length - 1) {
+          sch.level += 1;
+          const [nsb, nbb] = sch.levels[sch.level];
+          this.pendingBlinds = { sb: nsb, bb: nbb };
+        }
+        sch.handsLeft = sch.every;
+      }
+      sch.handsLeft -= 1;
+    }
     if (this.pendingBlinds) {
+      const up = this.pendingBlinds.bb > this.bb;
       this.sb = this.pendingBlinds.sb;
       this.bb = this.pendingBlinds.bb;
       this.pendingBlinds = null;
-      this._log(`Блайнды повышены: ${this.sb}/${this.bb}`);
+      this._log(`Блайнды ${up ? 'повышены' : 'изменены'}: ${this.sb}/${this.bb}`);
     }
     const set = new Set(eligible);
     this.dealer = this._next(this.dealer, (s, i) => set.has(i));
@@ -727,6 +791,7 @@ class Table {
       maxSeats: this.maxSeats, players: this.playerCount(),
       minBuyIn: this.minBuyIn, maxBuyIn: this.maxBuyIn, permanent: this.permanent,
       tournament: this.tournament,
+      blindsEvery: this.schedule ? this.schedule.every : 0,
     };
   }
 
@@ -768,6 +833,7 @@ class Table {
       }),
       result: h && h.ended ? this.lastResult : null,
       finished: this.finished,
+      blinds: this.blindInfo(),
       tournamentInfo: this.extraState ? this.extraState(viewerId) : null,
       log: this.log.slice(-30),
       chat: this.chat.slice(-30),
@@ -800,4 +866,4 @@ class Table {
   }
 }
 
-module.exports = { Table, GameError };
+module.exports = { Table, GameError, LEVELS, ladderFrom };

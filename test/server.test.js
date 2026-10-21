@@ -149,10 +149,10 @@ test('Sit & Go: регистрация, отмена, старт при запо
     dataFile: path.join(dir, 'users.json'), actionTime: 3000,
     tableOpts: { startDelay: 30, pauseAfterHand: 40, runoutDelay: 5 },
     sngTemplates: [
-      { id: 'hu', name: 'Дуэль', game: 'NLH', seats: 2, buyIn: 1000, startStack: 1500, levelMinutes: 1 },
-      { id: 'three', name: 'Трое', game: 'PLO', seats: 3, buyIn: 500, startStack: 1500, levelMinutes: 1 },
+      { id: 'hu', name: 'Дуэль', game: 'NLH', seats: 2, buyIn: 1000, startStack: 1500, levelHands: 2 },
+      { id: 'three', name: 'Трое', game: 'PLO', seats: 3, buyIn: 500, startStack: 1500, levelHands: 2 },
     ],
-    levelMs: 200, sngLinger: 50,
+    sngLinger: 50,
   });
   await new Promise((r) => srv.server.listen(0, r));
   t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });
@@ -238,4 +238,104 @@ test('Sit & Go: регистрация, отмена, старт при запо
   await new Promise((r) => setTimeout(r, 100));
   srv.shutdown();
   assert.equal(sum(balances()), 30000, 'при остановке ничего не потеряно');
+});
+
+test('админка и дурак через сокеты', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({
+    dataFile: path.join(dir, 'users.json'), actionTime: 3000, adminNames: [],
+    tableOpts: { startDelay: 30, pauseAfterHand: 40, runoutDelay: 5 },
+    durakOpts: { actionTime: 40, awayTime: 20, countdown: 20, resultPause: 30 },
+  });
+  await new Promise((r) => srv.server.listen(0, r));
+  t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  const reg = [];
+  for (const n of ['Босс', 'Игрок', 'Гость']) reg.push((await post('/api/register', { name: n, password: 'secret1' })).body);
+  assert.equal(reg[0].user.role, 'admin', 'первый аккаунт — админ');
+  assert.equal(reg[1].user.role, 'player');
+  let clients = [];
+  t.after(() => clients.forEach((c) => c.close()));
+  const connectAs = (token) => new Promise((resolve, reject) => {
+    const c = connect(base, { auth: { token }, reconnection: false });
+    c.notices = [];
+    c.on('notice', (n) => c.notices.push(n));
+    c.on('durak:state', (s) => { c.durak = s; });
+    c.on('connect', () => resolve(c));
+    c.on('connect_error', (e) => reject(e));
+  });
+  clients = await Promise.all(reg.map((r) => connectAs(r.token)));
+  const [boss, pl, guest] = clients;
+  const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
+  const sum = () => Object.values(srv.store.data.users).reduce((a, u) => a + u.balance + Object.values(u.inPlay || {}).reduce((x, y) => x + y, 0), 0);
+
+  // права
+  assert.match((await call(pl, 'admin:overview', {})).error, /прав/);
+  const ov = await call(boss, 'admin:overview', {});
+  assert.ok(ov.ok && ov.users.length === 3 && ov.stats.online === 3);
+  const plId = reg[1].user.id;
+  const guestId = reg[2].user.id;
+
+  // фишки
+  assert.equal((await call(boss, 'admin:user', { userId: plId, action: 'chips', amount: 500 })).real, 500);
+  assert.equal((await call(boss, 'admin:user', { userId: plId, action: 'chips', amount: -999999 })).real, -10500, 'не ниже нуля');
+  await call(boss, 'admin:user', { userId: plId, action: 'chips', amount: 10000 });
+
+  // мут
+  await call(boss, 'admin:user', { userId: plId, action: 'mute' });
+  assert.match((await call(pl, 'table:chat', { tableId: 'holdem-micro', text: 'hi' })).error, /запретил/);
+  await call(boss, 'admin:user', { userId: plId, action: 'unmute' });
+  assert.ok((await call(pl, 'table:chat', { tableId: 'holdem-micro', text: 'hi' })).ok);
+
+  // объявление
+  const ann = new Promise((r) => guest.once('announce', r));
+  await call(boss, 'admin:announce', { text: 'Турнир в 21:00!' });
+  assert.equal((await ann).text, 'Турнир в 21:00!');
+
+  // стол: создать, сменить блайнды, кикнуть, закрыть с возвратом
+  const ct = await call(boss, 'admin:createTable', { name: 'Админский', game: 'NLH', stakes: 1, seats: 6, blindsEvery: 5, permanent: true });
+  assert.ok(ct.ok);
+  assert.ok((await call(pl, 'table:sit', { tableId: ct.tableId, seat: 0, buyIn: 1000 })).ok);
+  assert.ok((await call(boss, 'admin:table', { tableId: ct.tableId, action: 'blinds', sb: 50, bb: 100 })).ok);
+  assert.equal(srv.tables.get(ct.tableId).pendingBlinds.bb, 100);
+  const before = sum();
+  assert.ok((await call(boss, 'admin:table', { tableId: ct.tableId, action: 'close' })).ok);
+  assert.ok(!srv.tables.has(ct.tableId));
+  assert.equal(sum(), before, 'фишки со стола вернулись');
+
+  // сброс пароля
+  const rp = await call(boss, 'admin:user', { userId: guestId, action: 'resetPassword' });
+  assert.ok(rp.password && rp.password.length === 8);
+  assert.equal((await post('/api/login', { name: 'Гость', password: rp.password })).status, 200);
+
+  // дурак: двое садятся, готовы, партия доигрывается сама (тайм-ауты), банк сходится
+  const total0 = sum();
+  const g2 = await connectAs((await post('/api/login', { name: 'Гость', password: rp.password })).body.token);
+  clients.push(g2);
+  assert.ok((await call(pl, 'durak:sit', { tableId: 'durak-duel', seat: 0 })).ok);
+  assert.ok((await call(g2, 'durak:sit', { tableId: 'durak-duel', seat: 1 })).ok);
+  await call(g2, 'durak:watch', { tableId: 'durak-duel' });
+  await call(pl, 'durak:ready', { tableId: 'durak-duel', value: true });
+  await call(g2, 'durak:ready', { tableId: 'durak-duel', value: true });
+  const dt = srv.durakTables.get('durak-duel');
+  for (let i = 0; i < 200 && dt.status !== 'playing'; i++) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(dt.status, 'playing');
+  assert.equal(sum(), total0, 'ставки учтены в игре');
+  // гость видит только свои карты
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(g2.durak.hand.length, 6);
+  assert.equal(g2.durak.seats[0].cards, 6);
+  for (let i = 0; i < 500 && dt.status === 'playing'; i++) await new Promise((r) => setTimeout(r, 10));
+  assert.notEqual(dt.status, 'playing', 'партия закончилась');
+  assert.equal(sum(), total0, 'банк дурака выплачен');
+
+  // бан
+  const gone = new Promise((r) => pl.once('disconnect', r));
+  assert.ok((await call(boss, 'admin:user', { userId: plId, action: 'ban' })).ok);
+  await gone;
+  assert.equal((await post('/api/login', { name: 'Игрок', password: 'secret1' })).status, 400);
+  assert.match((await call(boss, 'admin:user', { userId: reg[0].user.id, action: 'ban' })).error, /себя/);
+  const log = (await call(boss, 'admin:overview', {})).log;
+  assert.ok(log.length >= 8, 'действия админа в журнале');
 });

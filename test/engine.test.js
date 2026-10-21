@@ -351,3 +351,46 @@ test('история раздачи и повтор скрывают чужие 
   assert.ok(t.replay('b', 1).events[0].players.find((p) => p.seat === 0).cards, 'после показа видны и в повторе');
   assert.throws(() => t.replay('a', 99), /не найдена/);
 });
+
+test('кэш-стол: блайнды растут каждые N раздач и сбрасываются, когда стол пустеет', () => {
+  const { t, timers } = makeTable({ sb: 5, bb: 10, blindsEvery: 2 });
+  t.sit('a', 'A', 0, 2000);
+  t.sit('b', 'B', 1, 2000);
+  const playHand = () => {
+    timers.runOne(); // старт
+    t.act(t.seats[t.hand.toAct].userId, 'fold');
+    timers.runOne(); // пауза после раздачи
+  };
+  playHand();
+  assert.equal(t.bb, 10);
+  assert.equal(t.blindInfo().nextAtHand, 3);
+  playHand();
+  assert.equal(t.bb, 10, 'раздачи 1–2 на первом уровне');
+  timers.runOne();
+  assert.equal(t.handNo, 3);
+  assert.equal(t.bb, 20, 'с 3-й раздачи блайнды выше');
+  assert.equal(t.sb, 10);
+  assert.equal(t.publicState('a').blinds.level, 2);
+  t.act(t.seats[t.hand.toAct].userId, 'fold');
+  timers.runOne();
+  t.standUp('a');
+  t.standUp('b');
+  assert.equal(t.bb, 10, 'пустой стол вернулся к базовым блайндам');
+  assert.equal(t.blindInfo().level, 1);
+});
+
+test('турнир: уровни по раздачам', () => {
+  const timers = fakeTimers();
+  const t = new Table({ id: 's', name: 'S', game: 'NLH', sb: 10, bb: 20, maxSeats: 2, blindsEvery: 1, levels: [[10, 20], [15, 30], [25, 50]] }, { timers, tournament: true });
+  t.seatDirect('a', 'A', 0, 5000);
+  t.seatDirect('b', 'B', 1, 5000);
+  t.start();
+  const bbs = [];
+  for (let k = 0; k < 4; k++) {
+    timers.runOne();
+    bbs.push(t.bb);
+    t.act(t.seats[t.hand.toAct].userId, 'fold');
+    timers.runOne();
+  }
+  assert.deepEqual(bbs, [20, 30, 50, 50], 'каждую раздачу новый уровень, на последнем остаёмся');
+});

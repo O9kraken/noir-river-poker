@@ -44,6 +44,7 @@
         <span class="chip-icon" aria-hidden="true"></span>
         <span><b id="me-balance">0</b><small id="me-inplay"></small></span>
       </div>
+      <a href="/admin" class="btn btn-ghost btn-sm" id="admin-link" hidden>Админка</a>
       <span class="me-name" id="me-name"></span>
       <button type="button" class="icon-btn" id="sound-btn" aria-label="Выключить звук" aria-pressed="false">
         <svg class="ico-on" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
@@ -55,6 +56,13 @@
     </div>
   </header>
   <div class="conn-banner" id="conn-banner" hidden>Соединение потеряно — переподключаемся…</div>
+  <div class="announce" id="announce" role="status" hidden>
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15.5 8.5a5 5 0 0 1 0 7"/></svg>
+    <span id="announce-text"></span>
+    <button type="button" class="icon-btn" id="announce-close" aria-label="Скрыть объявление">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
 
   <!-- LOBBY -->
   <main id="lobby" class="lobby" hidden>
@@ -72,6 +80,7 @@
       <div class="tabs lobby-tabs" role="tablist">
         <button type="button" role="tab" class="tab is-active" data-lobby-tab="cash" aria-selected="true">Кэш-столы</button>
         <button type="button" role="tab" class="tab" data-lobby-tab="sng" aria-selected="false">Турниры Sit &amp; Go</button>
+        <button type="button" role="tab" class="tab" data-lobby-tab="durak" aria-selected="false">Дурак</button>
       </div>
       <div class="filters" id="cash-filters" role="group" aria-label="Фильтр игр">
         <button type="button" class="pill is-active" data-filter="all">Все</button>
@@ -81,6 +90,7 @@
       </div>
       <div class="table-list" id="table-list"></div>
       <div class="table-list" id="sng-list" hidden></div>
+      <div class="table-list" id="durak-list" hidden></div>
     </div>
     <aside class="lobby-side">
       <section class="panel">
@@ -95,6 +105,68 @@
         <h2 class="h3">Правила</h2>
         <p class="muted small"><b>Холдем No-Limit</b>: 2 карты, любая комбинация из 7. <b>Омаха Pot-Limit</b>: 4 карты, ровно 2 с руки и 3 с борда, рейз не больше банка.</p>
       </section>
+    </aside>
+  </main>
+
+  <!-- DURAK -->
+  <main id="durak-view" class="table-view durak-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          Лобби
+        </a>
+        <div class="table-title">
+          <b id="dk-name"></b>
+          <span id="dk-meta" class="muted"></span>
+        </div>
+        <span class="hand-no muted" id="dk-game"></span>
+      </div>
+      <div class="felt-wrap">
+        <div class="felt dk-felt" id="dk-felt">
+          <div class="felt-rail" aria-hidden="true"></div>
+          <div class="dk-center">
+            <div class="dk-deck" id="dk-deck" aria-label="Колода"></div>
+            <div class="dk-table" id="dk-table" aria-label="Карты на столе"></div>
+            <div class="dk-discard" id="dk-discard"></div>
+          </div>
+          <div class="result dk-result" id="dk-result" role="status" hidden></div>
+          <div id="dk-seats"></div>
+        </div>
+      </div>
+      <div class="dk-hand-wrap">
+        <div class="dk-status" id="dk-status" role="status"></div>
+        <div class="dk-hand" id="dk-hand" aria-label="Ваши карты"></div>
+        <div class="ctrl dk-ctrl" id="dk-ctrl"></div>
+      </div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-dk-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-dk-tab="log" aria-selected="false">Лог</button>
+        <button type="button" role="tab" class="tab" data-dk-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="dk-chat-pane" class="side-pane">
+          <ul class="chat" id="dk-chat" aria-live="polite"></ul>
+          <form id="dk-chat-form" class="chat-form">
+            <label class="sr-only" for="dk-chat-input">Сообщение</label>
+            <input id="dk-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
+            <button class="icon-btn" type="submit" aria-label="Отправить">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </form>
+        </div>
+        <div id="dk-log-pane" class="side-pane" hidden><ul class="log" id="dk-log"></ul></div>
+        <div id="dk-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>Цель</b> — избавиться от карт. Кто остался с картами последним — дурак и теряет ставку, остальные делят банк.</p>
+          <p><b>Ход.</b> Первым ходит игрок с младшим козырем. Атакующий кладёт карту, остальные (кроме отбивающегося) могут подкидывать карты тех же достоинств, что уже лежат на столе.</p>
+          <p><b>Отбой.</b> Карту бьют старшей той же масти или козырем. Не можешь или не хочешь — «Беру»: заберёшь всё со стола и пропустишь ход.</p>
+          <p><b>Переводной.</b> Пока ничего не побито, отбивающийся может положить карту того же достоинства и перевести атаку на следующего игрока.</p>
+          <p><b>Лимит.</b> Не больше 6 карт за отбой (в первом — 5) и не больше, чем карт у отбивающегося.</p>
+          <p><b>Как играть здесь.</b> Атакуете — нажмите на подсвеченную карту. Отбиваетесь — выберите карту, затем нажмите на карту на столе, которую бьёте. Три пропущенных хода подряд — поражение.</p>
+        </div>
+      </div>
     </aside>
   </main>
 
@@ -173,7 +245,37 @@
       <legend>Мест за столом</legend>
       <div class="seg" id="seats-seg"></div>
     </fieldset>
+    <label class="field"><span>Рост блайндов</span><select name="blindsEvery" id="blinds-every"></select></label>
     <p class="form-error" id="create-error" role="alert"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Отмена</button>
+      <button type="submit" class="btn btn-gold" value="ok">Создать</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="modal-durak-create" class="modal">
+  <form method="dialog" class="form" id="durak-create-form">
+    <h2 class="h2">Новый стол: дурак</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Дурак у друзей"></label>
+    <fieldset class="seg-field">
+      <legend>Вариант</legend>
+      <div class="seg">
+        <label><input type="radio" name="variant" value="podkidnoy" checked><span>Подкидной</span></label>
+        <label><input type="radio" name="variant" value="perevodnoy"><span>Переводной</span></label>
+      </div>
+    </fieldset>
+    <label class="field"><span>Ставка с каждого игрока</span><select name="stake" id="durak-stake"></select></label>
+    <fieldset class="seg-field">
+      <legend>Игроков</legend>
+      <div class="seg">
+        <label><input type="radio" name="maxPlayers" value="2"><span>2</span></label>
+        <label><input type="radio" name="maxPlayers" value="3"><span>3</span></label>
+        <label><input type="radio" name="maxPlayers" value="4" checked><span>4</span></label>
+        <label><input type="radio" name="maxPlayers" value="5"><span>5</span></label>
+        <label><input type="radio" name="maxPlayers" value="6"><span>6</span></label>
+      </div>
+    </fieldset>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" data-close>Отмена</button>
       <button type="submit" class="btn btn-gold" value="ok">Создать</button>
@@ -246,5 +348,6 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/play.js"></script>
+<script src="/durak.js"></script>
 </body>
 </html>

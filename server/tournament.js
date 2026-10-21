@@ -11,11 +11,12 @@ const LEVELS = [
 /** Share of the prize pool per finishing place, by table size. */
 const PAYOUT_SHARES = { 2: [1], 3: [1], 4: [0.65, 0.35], 5: [0.65, 0.35], 6: [0.65, 0.35], 9: [0.5, 0.3, 0.2] };
 
+// levelHands: blinds go up every N hands
 const TEMPLATES = [
-  { id: 'turbo6', name: 'Турбо 6-max', game: 'NLH', seats: 6, buyIn: 500, startStack: 1500, levelMinutes: 3 },
-  { id: 'duel', name: 'Дуэль 1 на 1', game: 'NLH', seats: 2, buyIn: 1000, startStack: 1500, levelMinutes: 3 },
-  { id: 'omaha6', name: 'Омаха Sit & Go', game: 'PLO', seats: 6, buyIn: 500, startStack: 1500, levelMinutes: 4 },
-  { id: 'big9', name: 'Большой стол', game: 'NLH', seats: 9, buyIn: 2000, startStack: 3000, levelMinutes: 5 },
+  { id: 'turbo6', name: 'Турбо 6-max', game: 'NLH', seats: 6, buyIn: 500, startStack: 1500, levelHands: 5 },
+  { id: 'duel', name: 'Дуэль 1 на 1', game: 'NLH', seats: 2, buyIn: 1000, startStack: 1500, levelHands: 5 },
+  { id: 'omaha6', name: 'Омаха Sit & Go', game: 'PLO', seats: 6, buyIn: 500, startStack: 1500, levelHands: 5 },
+  { id: 'big9', name: 'Большой стол', game: 'NLH', seats: 9, buyIn: 2000, startStack: 3000, levelHands: 5 },
 ];
 
 /**
@@ -24,7 +25,7 @@ const TEMPLATES = [
  * and the top places are paid from the prize pool.
  *
  * deps: { store, makeTable(cfg, opts), onChange(sng), onStarted(sng),
- *         onFinished(sng), notify(userId, event, payload), levelMs, timers }
+ *         onFinished(sng), notify(userId, event, payload), levelHands, timers }
  */
 class SitAndGo {
   constructor(tpl, deps) {
@@ -35,18 +36,14 @@ class SitAndGo {
     this.seats = tpl.seats;
     this.buyIn = tpl.buyIn;
     this.startStack = tpl.startStack;
-    this.levelMinutes = tpl.levelMinutes;
-    this.levelMs = deps.levelMs || tpl.levelMinutes * 60000;
+    this.levelHands = deps.levelHands || tpl.levelHands || 5;
     this.deps = deps;
     this.timers = deps.timers || { set: setTimeout, clear: clearTimeout };
     this.status = 'registering'; // registering | running | finished
     this.players = []; // { userId, name, place, prize }
-    this.level = 0;
-    this.levelEndsAt = 0;
     this.table = null;
     this.startedAt = null;
     this.finishedAt = null;
-    this._levelTimer = null;
   }
 
   get key() { return 'sng:' + this.id; }
@@ -84,10 +81,9 @@ class SitAndGo {
   start() {
     this.status = 'running';
     this.startedAt = Date.now();
-    this.level = 0;
     const [sb, bb] = LEVELS[0];
     this.table = this.deps.makeTable(
-      { id: 'sng-' + this.id, name: this.name, game: this.game, sb, bb, maxSeats: this.seats },
+      { id: 'sng-' + this.id, name: this.name, game: this.game, sb, bb, maxSeats: this.seats, blindsEvery: this.levelHands, levels: LEVELS },
       {
         tournament: true,
         onBust: (list) => this._onBust(list),
@@ -107,25 +103,13 @@ class SitAndGo {
       const p = this.players[pIdx];
       this.table.seatDirect(p.userId, p.name, seat, this.startStack);
     });
-    this.levelEndsAt = Date.now() + this.levelMs;
-    this._scheduleLevel();
     this.table.start();
     for (const p of this.players) this.deps.notify(p.userId, 'sng:started', { sngId: this.id, tableId: this.table.id, name: this.name });
     this.deps.onStarted(this);
     this.deps.onChange(this);
   }
 
-  _scheduleLevel() {
-    this._levelTimer = this.timers.set(() => {
-      if (this.status !== 'running') return;
-      this.level = Math.min(this.level + 1, LEVELS.length - 1);
-      this.table.setBlinds(...LEVELS[this.level]);
-      this.levelEndsAt = Date.now() + this.levelMs;
-      this._scheduleLevel();
-      this.table.onUpdate(this.table);
-      this.deps.onChange(this);
-    }, this.levelMs);
-  }
+  get level() { return this.table && this.table.schedule ? this.table.schedule.level : 0; }
 
   alive() { return this.players.filter((p) => p.place == null); }
 
@@ -154,14 +138,12 @@ class SitAndGo {
     if (p && p.place == null) this._award(p, 1);
     this.status = 'finished';
     this.finishedAt = Date.now();
-    if (this._levelTimer) { this.timers.clear(this._levelTimer); this._levelTimer = null; }
     this.deps.onChange(this);
     this.deps.onFinished(this);
   }
 
   /** Server stop: refund registrations, split what is left of a running pool by chip count. */
   shutdown() {
-    if (this._levelTimer) { this.timers.clear(this._levelTimer); this._levelTimer = null; }
     const { store } = this.deps;
     if (this.status === 'registering') {
       for (const p of this.players) { store.deposit(p.userId, this.buyIn); store.setInPlay(p.userId, this.key, 0); }
@@ -193,16 +175,18 @@ class SitAndGo {
   }
 
   tableInfo(viewerId) {
-    const [sb, bb] = LEVELS[this.level];
-    const next = LEVELS[this.level + 1] || null;
+    const t = this.table;
+    const bi = t ? t.blindInfo() : null;
     const me = this.players.find((p) => p.userId === viewerId);
     return {
       sngId: this.id,
       status: this.status,
       level: this.level + 1,
-      sb, bb,
-      next: next ? { sb: next[0], bb: next[1] } : null,
-      nextLevelIn: this.status === 'running' ? Math.max(0, this.levelEndsAt - Date.now()) : 0,
+      sb: t ? t.sb : LEVELS[0][0],
+      bb: t ? t.bb : LEVELS[0][1],
+      next: bi ? bi.next : null,
+      nextAtHand: bi ? bi.nextAtHand : null,
+      levelHands: this.levelHands,
       alive: this.alive().length,
       total: this.seats,
       payouts: this.payouts(),
@@ -217,7 +201,7 @@ class SitAndGo {
     return {
       id: this.id, templateId: this.templateId, name: this.name, game: this.game, seats: this.seats,
       buyIn: this.buyIn, prizePool: this.prizePool, payouts: this.payouts(), startStack: this.startStack,
-      levelMinutes: this.levelMinutes, status: this.status, tableId: this.table ? this.table.id : null,
+      levelHands: this.levelHands, status: this.status, tableId: this.table ? this.table.id : null,
       players: this.players.map((p) => p.name), alive: this.alive().length,
       level: this.level + 1, winner: (this.players.find((p) => p.place === 1) || {}).name || null,
     };

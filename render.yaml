@@ -12,3 +12,6 @@ services:
         value: "22"
       - key: TRUST_PROXY
         value: "true"
+      # your nickname(s) for the admin panel, comma-separated; Render asks for it on deploy
+      - key: ADMIN_NAMES
+        sync: false
