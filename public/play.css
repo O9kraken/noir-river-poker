@@ -16,8 +16,8 @@
   --card: #F6F1E6;
   --card-red: #B0242F;
   --card-black: #141414;
-  --display: 'Playfair Display', Georgia, serif;
-  --body: 'Manrope', system-ui, -apple-system, sans-serif;
+  --display: 'Montserrat', system-ui, -apple-system, sans-serif;
+  --body: 'Inter', system-ui, -apple-system, sans-serif;
   --radius: 16px;
 }
 
@@ -224,7 +224,7 @@ body.four-color { --suit-c: #138A4E; --suit-d: #1E66D0; }
   width: var(--cw); height: calc(var(--cw) * 1.4); border-radius: calc(var(--cw) * 0.11);
   background: linear-gradient(165deg, #FFFFFF 0%, #F7F4EE 60%, #ECE7DD 100%);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 1px rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.35);
-  font-family: 'Manrope', system-ui, sans-serif; font-weight: 800; color: var(--suit-s);
+  font-family: 'Inter', system-ui, sans-serif; font-weight: 800; color: var(--suit-s);
   backface-visibility: hidden; user-select: none; container-type: inline-size;
 }
 .card.s-c { color: var(--suit-c); }
@@ -727,3 +727,6 @@ body {
 .dk-stamp.took { color: #FF8A92; }
 .dk-fx { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 .dk-ghost { position: absolute; margin: 0; }
+.dk-confirm { min-width: 180px; animation: confirmPulse 1.6s ease-in-out infinite; }
+@keyframes confirmPulse { 50% { box-shadow: 0 0 0 6px rgba(217, 182, 94, 0.22), 0 6px 18px rgba(217, 182, 94, 0.25); } }
+@media (prefers-reduced-motion: reduce) { .dk-confirm { animation: none; } }

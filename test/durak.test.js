@@ -40,7 +40,12 @@ test('дурак: первым ходит младший козырь, подк�
   g.defend(0, '9h', 0);
   g.attack(1, '7d');
   g.defend(0, 'Td', 1);
-  // подкинуть нечего (7, 9, T на столе) — раунд закрывается сам
+  // подкинуть нечего, но раунд не закрывается, пока атакующий сам не скажет «Бито»
+  assert.equal(g.table.length, 2, 'ждём подтверждения');
+  assert.deepEqual(g.waitingFor(), { kind: 'throw', seats: [1] });
+  assert.ok(g.canPass(1));
+  assert.ok(!g.canPass(0), 'отбивающийся «Бито» не говорит');
+  g.pass(1);
   assert.equal(g.table.length, 0, 'бито');
   assert.equal(g.discard, 4);
   assert.equal(g.attacker, 0, 'отбившийся ходит следующим');
@@ -239,4 +244,23 @@ test('стол дурака: после «бито» карты лежат на 
   assert.equal(g.table.length, 0);
   assert.equal(g.discard, 2, 'бито');
   assert.equal(t.publicState(att).roundEnding, null);
+});
+
+test('дурак: «Беру» — атакующий может подкинуть, раунд ждёт его «Пас»', () => {
+  const deck = riggedDeck([
+    ['6h', 'Kd', '7c', '9c', 'Tc', 'Jc'],
+    ['8h', '8d', 'Kc', 'Ah', '6s', '8c'],
+  ], '9s');
+  const g = new DurakGame([0, 1], { deck });
+  assert.equal(g.attacker, 1);
+  g.attack(1, '8h');
+  g.take(0);
+  assert.equal(g.table.length, 1, 'карты ещё на столе');
+  assert.deepEqual(g.waitingFor().kind, 'throw');
+  assert.ok(g.canThrow(1, '8d') && g.canThrow(1, '8c'), 'можно подкинуть вдогонку');
+  g.attack(1, '8d');
+  g.attack(1, '8c');
+  assert.equal(g.table.length, 3);
+  g.pass(1);
+  assert.equal(g.hand(0).length, 6 + 3, 'взял все три');
 });

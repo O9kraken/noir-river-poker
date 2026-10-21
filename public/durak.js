@@ -230,7 +230,11 @@
         if (mineTurn) text = (you.transfer && you.transfer.length) ? 'Отбивайтесь или переведите: выберите карту' : 'Отбивайтесь: выберите карту, затем карту на столе — или «Беру»';
         else text = `${nameOf(w.seats[0])} отбивается`;
       } else if (w.kind === 'throw') {
-        if (mineTurn) text = st.taking ? 'Соперник берёт — подкиньте вдогонку или «Пас»' : 'Можно подкинуть карту или сказать «Бито»';
+        if (mineTurn) {
+          const canAdd = (you.throwable || []).length > 0;
+          if (st.taking) text = canAdd ? 'Соперник берёт — подкиньте ему ещё карты или нажмите «Пас»' : 'Соперник берёт — подкинуть нечего, нажмите «Пас»';
+          else text = canAdd ? 'Всё побито — подкиньте ещё или подтвердите «Бито»' : 'Всё побито — подтвердите «Бито»';
+        }
         else text = st.taking ? `${nameOf(st.seats.findIndex((s) => s && s.defender))} берёт…` : 'Ждём, подкинут ли ещё…';
       }
     }
@@ -259,7 +263,12 @@
       box.append(h('button', { type: 'button', class: 'btn btn-gold', onclick: () => { D.selected = null; act('transfer', { card: c }); } }, 'Перевести'));
     }
     if (you.canTake) box.append(h('button', { type: 'button', class: 'btn btn-red', onclick: () => act('take') }, 'Беру'));
-    if (you.canPass) box.append(h('button', { type: 'button', class: 'btn btn-dark', onclick: () => act('pass') }, st.taking ? 'Пас' : 'Бито'));
+    if (you.canPass) {
+      // the main attacker must confirm: make it the obvious button
+      const main = you.role === 'attacker';
+      box.append(h('button', { type: 'button', class: 'btn ' + (main ? 'btn-gold dk-confirm' : 'btn-dark'), onclick: () => act('pass') },
+        st.taking ? (main ? 'Пас — пусть забирает' : 'Пас') : 'Бито'));
+    }
     box.append(h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: leave }, 'Сдаться'));
   }
 
@@ -423,7 +432,7 @@
     }
     const myTurnNow = st.status === 'playing' && st.waiting.seats.includes(st.mySeat);
     const myTurnBefore = prev.status === 'playing' && prev.waiting.seats.includes(prev.mySeat) && prev.waiting.kind === st.waiting.kind;
-    if (myTurnNow && !myTurnBefore && st.waiting.kind !== 'throw') Sound.play('turn');
+    if (myTurnNow && !myTurnBefore && (st.waiting.kind !== 'throw' || (st.you && st.you.role === 'attacker'))) Sound.play('turn');
   }
 
   // ---------- side ----------

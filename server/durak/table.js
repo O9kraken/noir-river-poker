@@ -27,6 +27,7 @@ class DurakTable {
     this.deps = deps;
     this.actionTime = opts.actionTime ?? 30000;
     this.awayTime = opts.awayTime ?? 6000;
+    this.confirmTime = opts.confirmTime ?? 15000; // time to say "Бито" / "Пас" or throw more
     this.countdownMs = opts.countdown ?? 3000;
     this.resultPause = opts.resultPause ?? 7000;
     this.roundPause = opts.roundPause ?? 1600; // the finished round stays on the table this long
@@ -219,7 +220,7 @@ class DurakTable {
     if (!w.seats.length) return;
     // nobody to wait for if every expected player is offline
     const allAway = w.seats.every((s) => !this.seats[s] || !this.seats[s].connected);
-    const ms = allAway ? this.awayTime : this.actionTime;
+    const ms = allAway ? this.awayTime : w.kind === 'throw' ? Math.min(this.confirmTime, this.actionTime) : this.actionTime;
     this.deadline = this.now() + ms;
     this.deadlineMs = ms;
     this._timer = this.timers.set(() => { this._timer = null; this._timeout(); }, ms);

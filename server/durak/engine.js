@@ -61,6 +61,8 @@ class DurakGame {
     // pauseRounds: instead of clearing the table at once, mark the round as finished
     // and let the caller show it for a moment, then call finishRound()
     this.pauseRounds = !!opts.pauseRounds;
+    // confirmEnd: the attacker has to say "Бито" / "Пас" himself, the round never closes on its own
+    this.confirmEnd = opts.confirmEnd !== false;
     this.pendingEnd = false;
     this.log = [];
 
@@ -222,11 +224,18 @@ class DurakGame {
       // defender ran out of cards but still has to beat: impossible, so taking is the only option
       return;
     }
-    const waiting = this.attackers().filter((s) => !this.passed.has(s) && this._canAddAny(s));
+    const waiting = this.attackers().filter((s) => this._mustRespond(s));
     if (waiting.length === 0) {
       if (this.pauseRounds) this.pendingEnd = true;
       else this._endRound();
     }
+  }
+
+  /** Still owes an answer in the throw-in phase: the main attacker always, others only if they can add. */
+  _mustRespond(s) {
+    if (this.passed.has(s)) return false;
+    if (this.confirmEnd && s === this.attacker) return true;
+    return this._canAddAny(s);
   }
 
   /** Clear a round that was left on the table for display (pauseRounds mode). */
@@ -292,7 +301,7 @@ class DurakGame {
     if (this.pendingEnd) return { kind: 'pause', seats: [] };
     if (!this.table.length) return { kind: 'lead', seats: [this.attacker] };
     if (this.uncovered() > 0 && !this.taking) return { kind: 'defend', seats: [this.defender] };
-    return { kind: 'throw', seats: this.attackers().filter((s) => !this.passed.has(s) && this._canAddAny(s)) };
+    return { kind: 'throw', seats: this.attackers().filter((s) => this._mustRespond(s)) };
   }
 
   totalCards() {
