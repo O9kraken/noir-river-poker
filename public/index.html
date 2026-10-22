@@ -10,9 +10,11 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<link rel="preload" href="/art/hero.svg" as="image">
+<link rel="preload" href="/art/hero.webp" as="image" fetchpriority="high">
+<link rel="preload" href="/fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/landing.css">
+<script src="/landing.js" defer></script>
 </head>
 <body>
 <div class="page">
@@ -20,8 +22,8 @@
 
   <!-- HERO -->
   <header class="hero" id="top">
-    <div class="hero-bg" aria-hidden="true"></div>
-    <img class="hero-art" src="/art/hero.svg" alt="" width="1000" height="1000" fetchpriority="high">
+    <img class="hero-photo" src="/art/hero.webp" alt="" width="1920" height="1080" fetchpriority="high">
+    <div class="hero-shade" aria-hidden="true"></div>
 
     <nav class="wrap topnav" aria-label="Разделы">
       <div class="pills">
@@ -30,93 +32,112 @@
         <a class="pill" href="#fair">Честно</a>
         <a class="pill" href="#faq">Вопросы</a>
       </div>
-      <a class="member" href="/play">
-        <span>Войти в клуб</span>
-        <i aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></i>
+      <a class="member" id="member" href="/play">
+        <span class="member-text">Войти в&nbsp;клуб</span>
+        <i class="member-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></i>
       </a>
     </nav>
 
     <div class="wrap hero-grid">
-      <p class="tagline"><span class="cap">Г</span>де азарт встречает дружбу, а каждая раздача честная.</p>
+      <p class="tagline"><span class="cap">Г</span>де азарт встречает дружбу, а&nbsp;каждая раздача честная.</p>
       <div class="hero-center">
-        <h1 class="wordmark" aria-label="NOIR RIVER">NOIR<span>RIVER</span></h1>
-        <a class="orb" href="/play" aria-label="Играть">
-          <span class="orb-in"><b>Иг</b><small>рать</small></span>
-        </a>
+        <h1 class="wordmark" aria-label="NOIR RIVER">NOIR <span>RIVER</span></h1>
+        <p class="hero-sub">Покер, турниры, дурак и&nbsp;блэкджек для&nbsp;своей компании</p>
+        <a class="orb" href="/play"><span class="orb-in">Играть</span></a>
       </div>
       <ul class="suits" aria-hidden="true"><li>♠&#xFE0E;</li><li class="r">♥&#xFE0E;</li><li class="r">♦&#xFE0E;</li><li>♣&#xFE0E;</li></ul>
-      <a class="scroll" href="#games">
+      <a class="scroll" href="#about">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
         Листайте вниз
       </a>
     </div>
+  </header>
 
-    <div class="wrap trio">
+  <main>
+    <section class="wrap trio" id="about" aria-label="О клубе">
       <h2 class="trio-a">Кто мы?</h2>
-      <p class="trio-b"><span class="cap">М</span>ы закрытый клуб для своих: покер, турниры, дурак и блэкджек на игровые фишки. Без скачивания — с компьютера, планшета или телефона.</p>
+      <p class="trio-b"><span class="cap">М</span>ы&nbsp;закрытый клуб для своих: покер, турниры, дурак и&nbsp;блэкджек на&nbsp;игровые фишки. Без скачивания&nbsp;— с&nbsp;компьютера, планшета или телефона.</p>
       <div class="trio-c">
         <p class="trio-title">Станьте частью игры</p>
-        <a class="joined" href="/play">
+        <a class="joined" href="/play" data-auth-cta>
           <span>Регистрация</span>
           <i aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i>
         </a>
       </div>
-    </div>
-  </header>
+    </section>
 
-  <main>
     <!-- GAMES -->
     <section class="games" id="games" aria-label="Игры">
       <article class="feat">
         <h2 class="feat-title"><span>Больше, чем</span> просто покер</h2>
-        <div class="feat-panel">
-          <p>Холдем No-Limit и Limit, шорт-дек 6+, Омаха и Омаха-5. Панель шансов показывает эквити и вероятность каждой комбинации прямо за столом.</p>
-          <a class="feat-link" href="/play">Сесть за стол <span aria-hidden="true">→</span></a>
-          <b class="feat-num">01</b>
+        <div class="feat-media"><img src="/art/poker.webp" alt="Пара тузов, борд и фишки на зелёном сукне" width="1600" height="1000" loading="lazy"></div>
+        <div class="glass">
+          <span class="chip-label">01 · Покер</span>
+          <p class="glass-lead">Садитесь за&nbsp;стол в&nbsp;любой момент: блайнды от&nbsp;1/2 до&nbsp;500/1000.</p>
+          <hr>
+          <ul class="glass-list">
+            <li><i aria-hidden="true">5</i><div><b>Пять вариантов</b><span>Холдем NL и&nbsp;Limit, шорт-дек 6+, Омаха и&nbsp;Омаха-5</span></div></li>
+            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></i><div><b>Шансы на&nbsp;столе</b><span>Эквити и&nbsp;вероятность каждой комбинации</span></div></li>
+          </ul>
+          <a class="glass-link" href="/play">Сесть за&nbsp;стол <span aria-hidden="true">→</span></a>
         </div>
-        <div class="feat-img"><img src="/art/poker.svg" alt="Пара тузов и фишки на зелёном сукне" width="480" height="300" loading="lazy"></div>
       </article>
 
       <article class="feat flip">
-        <h2 class="feat-title"><span>Турниры</span> по своим правилам</h2>
-        <div class="feat-panel">
-          <p>Sit &amp; Go стартуют, как только стол полон. Админ собирает свои турниры: бай-ин, гарантия фонда, блайнды, выплаты и время старта.</p>
-          <a class="feat-link" href="/play">К турнирам <span aria-hidden="true">→</span></a>
-          <b class="feat-num">02</b>
+        <h2 class="feat-title"><span>Турниры</span> по&nbsp;своим правилам</h2>
+        <div class="feat-media"><img src="/art/tournament.webp" alt="Золотой кубок турнира и фишки" width="1600" height="1000" loading="lazy"></div>
+        <div class="glass">
+          <span class="chip-label">02 · Турниры</span>
+          <p class="glass-lead">Sit &amp; Go стартуют, как только стол заполнен.</p>
+          <hr>
+          <ul class="glass-list">
+            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 3M17 6h3a3 3 0 0 1-3 3"/></svg></i><div><b>Свой формат</b><span>Бай-ин, гарантия, блайнды и&nbsp;выплаты</span></div></li>
+            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i><div><b>По&nbsp;расписанию</b><span>Старт в&nbsp;нужное время, каждый день</span></div></li>
+          </ul>
+          <a class="glass-link" href="/play">К&nbsp;турнирам <span aria-hidden="true">→</span></a>
         </div>
-        <div class="feat-img"><img src="/art/tournament.svg" alt="Золотой кубок турнира" width="480" height="300" loading="lazy"></div>
       </article>
 
       <article class="feat">
-        <h2 class="feat-title"><span>Дурак</span> на фишки</h2>
-        <div class="feat-panel">
-          <p>Подкидной и переводной, от двух до шести игроков. Подкидывайте вдогонку, переводите и подтверждайте «бито».</p>
-          <a class="feat-link" href="/play">Сыграть в дурака <span aria-hidden="true">→</span></a>
-          <b class="feat-num">03</b>
+        <h2 class="feat-title"><span>Дурак</span> на&nbsp;фишки</h2>
+        <div class="feat-media"><img src="/art/durak.webp" alt="Колода с козырем, отбитые карты и веер в руке" width="1600" height="1000" loading="lazy"></div>
+        <div class="glass">
+          <span class="chip-label">03 · Дурак</span>
+          <p class="glass-lead">От&nbsp;двух до&nbsp;шести игроков, ставка в&nbsp;общий банк.</p>
+          <hr>
+          <ul class="glass-list">
+            <li><i aria-hidden="true">♣&#xFE0E;</i><div><b>Подкидной и&nbsp;переводной</b><span>Подкидывайте вдогонку и&nbsp;переводите</span></div></li>
+            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></i><div><b>Честное «бито»</b><span>Ход переходит, когда все подтвердили</span></div></li>
+          </ul>
+          <a class="glass-link" href="/play">Сыграть в&nbsp;дурака <span aria-hidden="true">→</span></a>
         </div>
-        <div class="feat-img"><img src="/art/durak.svg" alt="Веер карт и козырь" width="480" height="300" loading="lazy"></div>
       </article>
 
       <article class="feat flip">
         <h2 class="feat-title"><span>Блэкджек</span> против дилера</h2>
-        <div class="feat-panel">
-          <p>Общий стол на пять боксов, шесть колод, сплит, дабл и страховка. Блэкджек платит 3:2.</p>
-          <a class="feat-link" href="/play">Взять карту <span aria-hidden="true">→</span></a>
-          <b class="feat-num">04</b>
+        <div class="feat-media"><img src="/art/blackjack.webp" alt="Туз и король на столе для блэкджека" width="1600" height="1000" loading="lazy"></div>
+        <div class="glass">
+          <span class="chip-label">04 · Блэкджек</span>
+          <p class="glass-lead">Общий стол на&nbsp;пять боксов, шесть колод.</p>
+          <hr>
+          <ul class="glass-list">
+            <li><i aria-hidden="true">21</i><div><b>Платит 3:2</b><span>Дилер стоит на&nbsp;всех 17</span></div></li>
+            <li><i aria-hidden="true">A</i><div><b>Сплит и&nbsp;дабл</b><span>До&nbsp;четырёх рук, страховка</span></div></li>
+          </ul>
+          <a class="glass-link" href="/play">Взять карту <span aria-hidden="true">→</span></a>
         </div>
-        <div class="feat-img"><img src="/art/blackjack.svg" alt="Туз и король — блэкджек" width="480" height="300" loading="lazy"></div>
       </article>
     </section>
 
     <!-- FAIR -->
     <section class="believe" id="fair">
       <div class="wrap">
-        <h2 class="big"><span class="cap">М</span>ы верим в честную игру</h2>
+        <h2 class="big"><span class="cap">М</span>ы&nbsp;верим в&nbsp;честную игру</h2>
         <div class="quad">
-          <div><b>01</b><h3>Честная раздача</h3><p>Колоду тасует сервер криптостойким генератором. Карты соперников до вскрытия не видит никто.</p></div>
-          <div><b>02</b><h3>Шансы на виду</h3><p>Пара или лучше выпадает в 83% раздач Холдема — панель шансов покажет это сама.</p></div>
-          <div><b>03</b><h3>Только свои</h3><p>Приватные столы, друзья и приглашения по ссылке.</p></div>
-          <div><b>04</b><h3>Без денег</h3><p>Играем на фишки. Их нельзя купить или вывести — только выиграть.</p></div>
+          <div><b>01</b><h3>Честная раздача</h3><p>Колоду тасует сервер криптостойким генератором. Карты соперников до&nbsp;вскрытия не&nbsp;видит никто.</p></div>
+          <div><b>02</b><h3>Шансы на&nbsp;виду</h3><p>Пара или лучше выпадает в&nbsp;83% раздач Холдема&nbsp;— панель шансов покажет это сама.</p></div>
+          <div><b>03</b><h3>Только свои</h3><p>Приватные столы, друзья и&nbsp;приглашения по&nbsp;ссылке.</p></div>
+          <div><b>04</b><h3>Без денег</h3><p>Играем на&nbsp;фишки. Их&nbsp;нельзя купить или вывести&nbsp;— только выиграть.</p></div>
         </div>
       </div>
     </section>
@@ -126,10 +147,10 @@
       <div class="wrap faq-grid">
         <h2 class="faq-h">Вопросы</h2>
         <div class="faq">
-          <details><summary>Это игра на деньги?<span aria-hidden="true">+</span></summary><p>Нет. Все ставки — игровые фишки, на старте их 10 000.</p></details>
-          <details><summary>Почему комбинации выпадают так часто?<span aria-hidden="true">+</span></summary><p>Из семи карт Холдема пара или лучше собирается в 83% раздач, две пары — почти в каждой четвёртой. Это обычная математика, и панель шансов за столом её показывает.</p></details>
-          <details><summary>Как сыграть только с друзьями?<span aria-hidden="true">+</span></summary><p>Создайте стол с галочкой «Приватный» и отправьте друзьям ссылку-приглашение.</p></details>
-          <details><summary>Что делать, если фишки закончились?<span aria-hidden="true">+</span></summary><p>Заберите ежедневный бонус или напишите администратору — он может начислить фишки.</p></details>
+          <details><summary>Это игра на&nbsp;деньги?<span aria-hidden="true">+</span></summary><p>Нет. Все ставки&nbsp;— игровые фишки, на&nbsp;старте их&nbsp;10&nbsp;000.</p></details>
+          <details><summary>Почему комбинации выпадают так часто?<span aria-hidden="true">+</span></summary><p>Из&nbsp;семи карт Холдема пара или лучше собирается в&nbsp;83% раздач, две пары&nbsp;— почти в&nbsp;каждой четвёртой. Это обычная математика, и&nbsp;панель шансов за&nbsp;столом её&nbsp;показывает.</p></details>
+          <details><summary>Как сыграть только с&nbsp;друзьями?<span aria-hidden="true">+</span></summary><p>Создайте стол с&nbsp;галочкой «Приватный» и&nbsp;отправьте друзьям ссылку-приглашение.</p></details>
+          <details><summary>Что делать, если фишки закончились?<span aria-hidden="true">+</span></summary><p>Заберите ежедневный бонус или напишите администратору&nbsp;— он&nbsp;может начислить фишки.</p></details>
         </div>
       </div>
     </section>
@@ -138,7 +159,7 @@
     <section class="final">
       <div class="wrap final-in">
         <h2 class="final-h"><span>Карты розданы.</span> Ваш ход.</h2>
-        <a class="orb orb-sm" href="/play" aria-label="Играть"><span class="orb-in"><b>Иг</b><small>рать</small></span></a>
+        <a class="orb orb-sm" href="/play"><span class="orb-in">Играть</span></a>
       </div>
     </section>
   </main>
@@ -146,7 +167,7 @@
   <footer class="foot">
     <div class="wrap foot-in">
       <a class="logo" href="#top"><img src="/brand/mark.svg" alt="" width="28" height="28"><span>NOIR <em>RIVER</em></span></a>
-      <p><span class="age">18+</span> Игра на игровые фишки без денежных выигрышей.</p>
+      <p><span class="age">18+</span> Игра на&nbsp;игровые фишки без денежных выигрышей.</p>
     </div>
   </footer>
 </div>

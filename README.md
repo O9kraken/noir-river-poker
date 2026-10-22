@@ -197,14 +197,14 @@ server/
   engine/evaluator.js оценка рук: Холдем, шорт-дек, Омаха
   engine/table.js     стол: посадка, раздача, торговля, банки, шоудаун, история, турнирный режим
 public/
-  index.html, landing.css  лендинг
-  art/                картинки игр (SVG)
+  index.html, landing.css, landing.js  лендинг (показывает аккаунт, если вход выполнен — GET /api/me)
+  art/                3D-рендеры игр (WebP) и текстура сукна
   odds.js, odds-worker.js  панель шансов
   play.html/.css/.js  лобби и игровой стол
   durak.js            экран дурака
   blackjack.js        экран блэкджека
   brand/, favicon.*   логотип и иконки
-  fonts/              шрифты Inter и Montserrat (OFL)
+  fonts/              шрифт Manrope (OFL) для всего сайта
   social.js           профиль, друзья, приглашения
   admin.html/.js      админ-панель
 test/                 тесты движка и сервера

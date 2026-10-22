@@ -529,3 +529,18 @@ test('конструктор турниров: фриролл с гаранти�
   assert.equal(srv.store.get(regs[1].user.id).balance, 10000, 'удаление вернуло бай-ин');
   assert.match((await call(adm, 'admin:sngTemplateDelete', { templateId: 'turbo6' })).error, /свои/);
 });
+
+test('/api/me: аккаунт для шапки лендинга', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({ dataFile: path.join(dir, 'u.json'), adminNames: [] });
+  await new Promise((r) => srv.server.listen(0, r));
+  t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  assert.equal((await fetch(base + '/api/me')).status, 401);
+  assert.equal((await fetch(base + '/api/me', { headers: { Authorization: 'Bearer nope' } })).status, 401);
+  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Лендинг', password: 'secret1' }) }).then((r) => r.json());
+  const me = await fetch(base + '/api/me', { headers: { Authorization: 'Bearer ' + reg.token } }).then((r) => r.json());
+  assert.equal(me.name, 'Лендинг');
+  assert.equal(me.balance, 10000);
+  assert.ok(!('password' in me) && !('hash' in me));
+});

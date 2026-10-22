@@ -70,6 +70,15 @@ function createServer({
   });
   app.post('/api/logout', (req, res) => { store.logout(req.body?.token); res.json({ ok: true }); });
   app.get('/api/leaderboard', (req, res) => res.json(store.leaderboard()));
+  // who is signed in (the landing page shows the account in its header)
+  app.get('/api/me', (req, res) => {
+    const m = /^Bearer\s+(.+)$/.exec(req.get('authorization') || '');
+    const u = m && store.userByToken(m[1]);
+    res.set('Cache-Control', 'no-store');
+    if (!u) return res.status(401).json({ error: 'unauthorized' });
+    const p = store.profile(u.id);
+    res.json({ name: p.name, balance: p.balance, inPlay: p.inPlay, avatar: p.avatar, role: p.role });
+  });
   function authError(res, e) {
     if (e instanceof StoreError) return res.status(400).json({ error: e.message });
     console.error(e);
