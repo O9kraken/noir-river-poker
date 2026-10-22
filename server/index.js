@@ -12,6 +12,9 @@ const { DurakTable } = require('./durak/table');
 const { BlackjackTable } = require('./blackjack/table');
 const { RouletteTable } = require('./roulette/table');
 const { CheckersTable } = require('./checkers/table');
+const { ChessTable } = require('./chess/table');
+const { CapitalTable } = require('./capital/table');
+const { MafiaTable } = require('./mafia/table');
 const { BotDriver, makeBots, isBot, LEVELS: BOT_LEVELS, LEVEL_NAMES } = require('./bots');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -27,6 +30,11 @@ const DURAK_STAKES = [50, 100, 250, 500, 1000, 5000];
 const RL_LIMITS = [[5, 500], [10, 2000], [100, 20000]];
 const CK_STAKES = [50, 100, 250, 500, 1000, 5000];
 const CK_CLOCKS = [3, 5, 10];
+const CH_STAKES = [50, 100, 250, 500, 1000, 5000];
+const CH_CLOCKS = [3, 5, 10, 15];
+const CAP_STAKES = [100, 200, 500, 1000, 5000];
+const CAP_TIMES = [30, 45, 60, 0];
+const MF_STAKES = [50, 100, 250, 500, 1000];
 const REACTIONS = ['👍', '😂', '😮', '😎', '🔥', '😢', '🙏', '🎉'];
 const ADMIN_NAMES = (process.env.ADMIN_NAMES || '').split(',').map((x) => x.trim()).filter(Boolean);
 const STARTED_AT = Date.now();
@@ -34,7 +42,7 @@ const STARTED_AT = Date.now();
 function createServer({
   dataFile = DATA_FILE, actionTime = ACTION_TIME, tableOpts = {},
   sngTemplates = TEMPLATES, levelHands = Number(process.env.SNG_LEVEL_HANDS) || 0, sngLinger = 120000,
-  durakOpts = {}, bjOpts = {}, rlOpts = {}, ckOpts = {}, adminNames = ADMIN_NAMES, store: givenStore = null, botOpts = {},
+  durakOpts = {}, bjOpts = {}, rlOpts = {}, ckOpts = {}, chOpts = {}, capOpts = {}, mfOpts = {}, adminNames = ADMIN_NAMES, store: givenStore = null, botOpts = {},
 } = {}) {
   const store = givenStore || new Store(dataFile, { adminNames });
   const app = express();
@@ -500,8 +508,7 @@ function createServer({
       const ended = (tt, r) => {
         fx(key, r.filter((x) => x.userId && x.net > 0).map((x) => ({ seat: tt.seatOf(x.userId), amount: x.net, userId: x.userId })));
         if (cfg.practice) {
-          const w = r.find((x) => x.win);
-          if (w) fx(key, [{ seat: tt.seatOf(w.userId), amount: 0, text: 'Победа', userId: w.userId }]);
+          fx(key, r.filter((x) => x.win).map((w) => ({ seat: tt.seatOf(w.userId), amount: 0, text: 'Победа', userId: w.userId })));
           return;
         }
         onEnd(tt, r);
@@ -535,6 +542,29 @@ function createServer({
     for (const r of results) if (r.userId) store.recordGame(r.userId, 'checkers', { table: tt.name, net: r.net, win: r.win, draw: r.draw });
     rate('checkers', results.map((r) => ({ userId: r.userId, score: r.win ? 1 : r.draw ? 0.5 : 0 })));
   });
+  const CH = registerKind('ch', ChessTable, 'Шахматы', chOpts, (tt, results) => {
+    for (const r of results) if (r.userId) store.recordGame(r.userId, 'chess', { table: tt.name, net: r.net, win: r.win, draw: r.draw });
+    rate('chess', results.map((r) => ({ userId: r.userId, score: r.win ? 1 : r.draw ? 0.5 : 0 })));
+  });
+  const CAP = registerKind('cap', CapitalTable, 'Капитал', capOpts, (tt, results) => {
+    for (const r of results) if (r.userId) store.recordGame(r.userId, 'capital', { table: tt.name, net: r.net, win: r.win, place: r.place, total: results.length });
+  });
+  const MF = registerKind('mf', MafiaTable, 'Мафия', mfOpts, (tt, results) => {
+    for (const r of results) if (r.userId) store.recordGame(r.userId, 'mafia', { table: tt.name, net: r.net, win: r.win, role: r.role });
+  });
+  [
+    { id: 'ch-club', name: 'Шахматный клуб', stake: 100, clockMs: 10 * 60000 },
+    { id: 'ch-blitz', name: 'Блиц', stake: 250, clockMs: 5 * 60000 },
+    { id: 'ch-big', name: 'Гроссмейстерская', stake: 1000, clockMs: 15 * 60000 },
+  ].forEach((d) => CH.make({ ...d, permanent: true }));
+  [
+    { id: 'cap-club', name: 'Капитал на четверых', stake: 200, maxPlayers: 4, timeLimitMin: 45 },
+    { id: 'cap-big', name: 'Большой капитал', stake: 1000, maxPlayers: 6, timeLimitMin: 60 },
+  ].forEach((d) => CAP.make({ ...d, permanent: true }));
+  [
+    { id: 'mf-club', name: 'Вечер мафии', stake: 100, maxPlayers: 10 },
+    { id: 'mf-don', name: 'Дон Ривер', stake: 500, maxPlayers: 8 },
+  ].forEach((d) => MF.make({ ...d, permanent: true }));
   [
     { id: 'rl-club', name: 'Для своих', minBet: 5, maxBet: 500 },
     { id: 'rl-euro', name: 'Монте-Карло', minBet: 10, maxBet: 2000 },
@@ -710,6 +740,33 @@ function createServer({
       t.sit(bot.userId, bot.name, 1);
       return { kind: 'ck', id: t.id, href: `#/ck/${t.id}` };
     }
+    if (game === 'ch') {
+      const [bot] = makeBots(1, crypto.randomInt(10));
+      const cl = CH_CLOCKS.includes(Number(clock)) ? Number(clock) : 15;
+      const t = CH.make({ level, name: `Тренировка · ${tag}`, stake: 0, clockMs: cl * 60000, createdBy: uid, private: true, practice: true });
+      t.bots = new BotDriver(t, 'ch', [bot], level, botOpts);
+      t.sit(uid, name, 0);
+      t.sit(bot.userId, bot.name, 1);
+      return { kind: 'ch', id: t.id, href: `#/ch/${t.id}` };
+    }
+    if (game === 'cap') {
+      const n = Math.min(5, Math.max(1, Math.floor(Number(bots)) || 2));
+      const list = makeBots(n, crypto.randomInt(10));
+      const t = CAP.make({ level, name: `Тренировка · ${tag}`, stake: 0, maxPlayers: n + 1, timeLimitMin: 60, createdBy: uid, private: true, practice: true });
+      t.bots = new BotDriver(t, 'cap', list, level, botOpts);
+      t.sit(uid, name, 0);
+      list.forEach((b, k) => t.sit(b.userId, b.name, k + 1));
+      return { kind: 'cap', id: t.id, href: `#/cap/${t.id}` };
+    }
+    if (game === 'mf') {
+      const n = Math.min(9, Math.max(4, Math.floor(Number(bots)) || 6));
+      const list = makeBots(n, crypto.randomInt(10));
+      const t = MF.make({ level, name: `Тренировка · ${tag}`, stake: 0, maxPlayers: n + 1, createdBy: uid, private: true, practice: true });
+      t.bots = new BotDriver(t, 'mf', list, level, botOpts);
+      t.sit(uid, name, 0);
+      list.forEach((b, k) => t.sit(b.userId, b.name, k + 1));
+      return { kind: 'mf', id: t.id, href: `#/mf/${t.id}` };
+    }
     if (game === 'durak') {
       const n = Math.min(5, Math.max(1, Math.floor(Number(bots)) || 2));
       const list = makeBots(n, crypto.randomInt(8));
@@ -796,6 +853,9 @@ function createServer({
       ck: CK.list(),
       myCk: [...CK.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
       ckStakes: CK_STAKES,
+      ch: CH.list(), myCh: [...CH.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), chStakes: CH_STAKES, chClocks: CH_CLOCKS,
+      cap: CAP.list(), myCap: [...CAP.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), capStakes: CAP_STAKES, capTimes: CAP_TIMES,
+      mf: MF.list(), myMf: [...MF.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), mfStakes: MF_STAKES,
       ckClocks: CK_CLOCKS,
       reactions: REACTIONS,
       botLevels: BOT_LEVELS.map((k) => ({ id: k, name: LEVEL_NAMES[k] })),
@@ -892,14 +952,14 @@ function createServer({
     on('friends:invite', ({ id, href }) => {
       const fid = String(id);
       if (!store.areFriends(userId, fid)) throw new GameError('Приглашать можно только друзей');
-      const m = /^#\/(table|durak|bj|rl|ck)\/([\w-]+)$/.exec(String(href || ''));
+      const m = /^#\/(table|durak|bj|rl|ck|ch|cap|mf)\/([\w-]+)$/.exec(String(href || ''));
       if (!m) throw new GameError('Неверная ссылка');
       const t = m[1] === 'table' ? tables.get(m[2]) : m[1] === 'durak' ? durakTables.get(m[2]) : m[1] === 'bj' ? bjTables.get(m[2]) : extra[m[1]].map.get(m[2]);
       if (!t) throw new GameError('Стол не найден');
       if (Date.now() - lastInvite < 1500) throw new GameError('Не так быстро');
       lastInvite = Date.now();
       if (!isOnline(fid)) throw new GameError('Друг сейчас не в сети');
-      const game = { poker: t.tournament ? 'Sit & Go' : 'Покер', durak: 'Дурак', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки' }[KIND_OF(t)];
+      const game = { poker: t.tournament ? 'Sit & Go' : 'Покер', durak: 'Дурак', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки', ch: 'Шахматы', cap: 'Капитал', mf: 'Мафия' }[KIND_OF(t)];
       io.to('user:' + fid).emit('invite', { from: store.brief(userId), href, title: t.name, game });
     });
 
@@ -1015,7 +1075,7 @@ function createServer({
     let lastReact = 0;
     on('react', ({ room, emoji }) => {
       if (!REACTIONS.includes(emoji)) throw new GameError('Нет такой реакции');
-      const m = /^(table|durak|bj|rl|ck):([\w-]+)$/.exec(String(room || ''));
+      const m = /^(table|durak|bj|rl|ck|ch|cap|mf):([\w-]+)$/.exec(String(room || ''));
       if (!m) throw new GameError('Стол не найден');
       const t = m[1] === 'table' ? tables.get(m[2]) : m[1] === 'durak' ? durakTables.get(m[2]) : m[1] === 'bj' ? bjTables.get(m[2]) : extra[m[1]].map.get(m[2]);
       if (!t) throw new GameError('Стол не найден');
@@ -1026,7 +1086,10 @@ function createServer({
       io.to(room).emit('react', { room, seat, emoji, name: socket.data.name });
     });
 
-    on('ratings:get', ({ kind }) => ({ list: store.ratingTable(kind === 'durak' ? 'durak' : 'checkers'), me: (store.get(userId).rating || {})[kind === 'durak' ? 'durak' : 'checkers'] }));
+    on('ratings:get', ({ kind }) => {
+      const k = ['durak', 'chess'].includes(kind) ? kind : 'checkers';
+      return { list: store.ratingTable(k), me: (store.get(userId).rating || {})[k] };
+    });
     on('season:get', ({ game }) => ({ season: store.seasonView(String(game || 'total'), userId) }));
 
     on('table:act', ({ tableId, type, amount }) => {
@@ -1155,7 +1218,7 @@ function createServer({
       on(kind + ':sit', ({ tableId, seat }) => {
         const t = K.get(tableId);
         let idx = Math.floor(Number(seat));
-        if (kind === 'rl' && !(idx >= 0)) idx = t.freeSeat();
+        if ((kind === 'rl' || kind === 'cap' || kind === 'mf') && !(idx >= 0)) idx = t.freeSeat();
         if (idx === -1) throw new GameError('Все места заняты');
         t.sit(userId, socket.data.name, idx);
         socket.join(kind + ':' + t.id);
@@ -1170,7 +1233,9 @@ function createServer({
       on(kind + ':chat', ({ tableId, text }) => {
         const t = K.get(tableId);
         const clean = chatText(text);
-        if (clean) t.addChat(socket.data.name, clean, hueOf(userId));
+        if (!clean) return;
+        if (kind === 'mf') t.say(userId, socket.data.name, clean, hueOf(userId));
+        else t.addChat(socket.data.name, clean, hueOf(userId));
       });
     }
     const ownCount = (K) => [...K.map.values()].filter((t) => t.createdBy === userId).length;
@@ -1200,6 +1265,64 @@ function createServer({
       return { tableId: t.id };
     });
     on('ck:ready', ({ tableId, value }) => { CK.get(tableId).setReady(userId, !!value); });
+    // ----- chess -----
+    on('ch:create', ({ name, stake, clock, private: priv }) => {
+      if (CH.map.size >= MAX_TABLES) throw new GameError('Слишком много столов');
+      const st = Number(stake);
+      const cl = Number(clock);
+      if (!CH_STAKES.includes(st) || !CH_CLOCKS.includes(cl)) throw new GameError('Неверные параметры стола');
+      if (ownCount(CH) >= 3) throw new GameError('Можно создать не больше 3 столов');
+      const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Шахматы у ${socket.data.name}`;
+      const t = CH.make({ name: clean, stake: st, clockMs: cl * 60000, createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
+      return { tableId: t.id };
+    });
+    on('ch:ready', ({ tableId, value }) => { CH.get(tableId).setReady(userId, !!value); });
+    on('ch:move', ({ tableId, from, to, promo }) => { CH.get(tableId).move(userId, { from, to, promo }); });
+    on('ch:resign', ({ tableId }) => { CH.get(tableId).resign(userId); });
+    on('ch:draw', ({ tableId }) => { CH.get(tableId).offerDraw(userId); });
+    on('ch:declineDraw', ({ tableId }) => { CH.get(tableId).declineDraw(userId); });
+    // ----- Капитал -----
+    on('cap:create', ({ name, stake, maxPlayers, time, private: priv }) => {
+      if (CAP.map.size >= MAX_TABLES) throw new GameError('Слишком много столов');
+      const st = Number(stake);
+      const mp = Number(maxPlayers);
+      const tm = Number(time);
+      if (!CAP_STAKES.includes(st) || !(mp >= 2 && mp <= 6) || !CAP_TIMES.includes(tm)) throw new GameError('Неверные параметры стола');
+      if (ownCount(CAP) >= 3) throw new GameError('Можно создать не больше 3 столов');
+      const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Капитал у ${socket.data.name}`;
+      const t = CAP.make({ name: clean, stake: st, maxPlayers: mp, timeLimitMin: tm, createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
+      return { tableId: t.id };
+    });
+    on('cap:ready', ({ tableId, value }) => { CAP.get(tableId).setReady(userId, !!value); });
+    on('cap:roll', ({ tableId }) => { CAP.get(tableId).roll(userId); });
+    on('cap:buy', ({ tableId }) => { CAP.get(tableId).buy(userId); });
+    on('cap:decline', ({ tableId }) => { CAP.get(tableId).decline(userId); });
+    on('cap:bail', ({ tableId }) => { CAP.get(tableId).payBail(userId); });
+    on('cap:build', ({ tableId, cell }) => { CAP.get(tableId).build(userId, Number(cell)); });
+    on('cap:sell', ({ tableId, cell }) => { CAP.get(tableId).sell(userId, Number(cell)); });
+    on('cap:mortgage', ({ tableId, cell }) => { CAP.get(tableId).mortgage(userId, Number(cell)); });
+    on('cap:end', ({ tableId }) => { CAP.get(tableId).endTurn(userId); });
+    on('cap:trade', ({ tableId, offer }) => { CAP.get(tableId).offerTrade(userId, offer || {}); });
+    on('cap:tradeAnswer', ({ tableId, accept }) => { CAP.get(tableId).answerTrade(userId, !!accept); });
+    on('cap:resign', ({ tableId }) => { CAP.get(tableId).resign(userId); });
+    // ----- Мафия -----
+    on('mf:create', ({ name, stake, maxPlayers, private: priv }) => {
+      if (MF.map.size >= MAX_TABLES) throw new GameError('Слишком много столов');
+      const st = Number(stake);
+      const mp = Number(maxPlayers);
+      if (!MF_STAKES.includes(st) || !(mp >= 5 && mp <= 10)) throw new GameError('Неверные параметры стола');
+      if (ownCount(MF) >= 3) throw new GameError('Можно создать не больше 3 столов');
+      const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Мафия у ${socket.data.name}`;
+      const t = MF.make({ name: clean, stake: st, maxPlayers: mp, createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
+      return { tableId: t.id };
+    });
+    on('mf:ready', ({ tableId, value }) => { MF.get(tableId).setReady(userId, !!value); });
+    on('mf:night', ({ tableId, kind, target }) => { MF.get(tableId).nightAction(userId, String(kind), target); });
+    on('mf:readyVote', ({ tableId }) => { MF.get(tableId).readyToVote(userId); });
+    on('mf:vote', ({ tableId, target }) => { MF.get(tableId).vote(userId, target); });
     on('ck:move', ({ tableId, path }) => { CK.get(tableId).move(userId, Array.isArray(path) ? path.slice(0, 20).map(Number) : []); });
     on('ck:resign', ({ tableId }) => { CK.get(tableId).resign(userId); });
     on('ck:draw', ({ tableId }) => { CK.get(tableId).offerDraw(userId); });

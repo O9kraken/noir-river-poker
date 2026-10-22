@@ -3,7 +3,7 @@
   const NR = window.NR;
   const { $, $$, h, fmt, toast, call, Sound, S } = NR;
 
-  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go', roulette: 'Рулетка', checkers: 'Шашки', wheel: 'Колесо', season: 'Сезон' };
+  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go', roulette: 'Рулетка', checkers: 'Шашки', chess: 'Шахматы', capital: 'Капитал', mafia: 'Мафия', wheel: 'Колесо', season: 'Сезон' };
   const HAND_NAMES = ['Старшая карта', 'Пара', 'Две пары', 'Сет', 'Стрит', 'Флеш', 'Фулл-хаус', 'Каре', 'Стрит-флеш', 'Роял-флеш'];
   const SYMBOLS = ['', 's', 'h', 'd', 'c', 'crown', 'star', 'bolt', 'moon', 'flame'];
   const HUES = [0, 25, 45, 90, 150, 185, 210, 250, 285, 320];
@@ -246,7 +246,28 @@
           stat('Победы', fmt(s.checkers.wins), pct(s.checkers.wins, s.checkers.games)),
           stat('Ничьи', fmt(s.checkers.draws)),
           stat('Итог', signed(s.checkers.net)),
-          elo('checkers'))) : null);
+          elo('checkers'))) : null,
+      s.chess ? h('article', { class: 'pcard' },
+        h('h2', { class: 'h3' }, 'Шахматы'),
+        h('div', { class: 'pstats' },
+          stat('Партий', fmt(s.chess.games)),
+          stat('Победы', fmt(s.chess.wins), pct(s.chess.wins, s.chess.games)),
+          stat('Ничьи', fmt(s.chess.draws)),
+          stat('Итог', signed(s.chess.net)),
+          elo('chess'))) : null,
+      s.capital ? h('article', { class: 'pcard' },
+        h('h2', { class: 'h3' }, 'Капитал'),
+        h('div', { class: 'pstats' },
+          stat('Партий', fmt(s.capital.games)),
+          stat('Победы', fmt(s.capital.wins), pct(s.capital.wins, s.capital.games)),
+          stat('Итог', signed(s.capital.net)))) : null,
+      s.mafia ? h('article', { class: 'pcard' },
+        h('h2', { class: 'h3' }, 'Мафия'),
+        h('div', { class: 'pstats' },
+          stat('Партий', fmt(s.mafia.games)),
+          stat('Победы', fmt(s.mafia.wins), pct(s.mafia.wins, s.mafia.games)),
+          stat('За мафию', fmt(s.mafia.asMafia), s.mafia.asMafia ? `побед ${fmt(s.mafia.mafiaWins)}` : null),
+          stat('Итог', signed(s.mafia.net)))) : null);
 
     const ach = p.achievements;
     const doneN = ach.filter((a) => a.done).length;

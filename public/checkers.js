@@ -203,7 +203,7 @@
       ban.replaceChildren(
         h('b', null, st.result.winner ? (myWin ? 'Победа!' : myLoss ? 'Поражение' : `Победа ${st.result.winner === 'w' ? 'белых' : 'чёрных'}`) : 'Ничья'),
         h('span', null, myWin || !st.myColor ? (REASON_ME[st.result.reason] || '') : st.result.text ? st.result.text[0].toUpperCase() + st.result.text.slice(1) : ''),
-        myWin && st.stake ? h('small', null, `+${fmt(st.stake)} фишек`) : null);
+        myWin && st.stake ? h('small', null, `+${fmt(st.stake)} фишек`) : '');
     } else ban.hidden = true;
 
     renderStatus();

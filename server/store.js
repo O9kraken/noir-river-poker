@@ -12,8 +12,8 @@ const WHEEL = [
 ];
 const WHEEL_TOTAL = WHEEL.reduce((a, s) => a + s.weight, 0);
 const RATING_START = 1200;
-const RATED = ['checkers', 'durak'];
-const SEASON_GAMES = ['poker', 'sng', 'durak', 'bj', 'roulette', 'checkers'];
+const RATED = ['checkers', 'durak', 'chess'];
+const SEASON_GAMES = ['poker', 'sng', 'durak', 'bj', 'roulette', 'checkers', 'chess', 'capital', 'mafia'];
 const SEASON_PRIZES = [5000, 3000, 1500];
 const SEASON_MIN_GAMES = 10;
 const SEASON_KEEP = 12;
@@ -37,6 +37,9 @@ function emptyStats() {
     bj: { rounds: 0, wins: 0, losses: 0, pushes: 0, blackjacks: 0, net: 0, biggestWin: 0 },
     roulette: { spins: 0, wins: 0, net: 0, straight: 0, biggestWin: 0 },
     checkers: { games: 0, wins: 0, losses: 0, draws: 0, net: 0 },
+    chess: { games: 0, wins: 0, losses: 0, draws: 0, net: 0 },
+    capital: { games: 0, wins: 0, net: 0 },
+    mafia: { games: 0, wins: 0, net: 0, asMafia: 0, mafiaWins: 0 },
   };
 }
 
@@ -224,6 +227,15 @@ class Store {
     } else if (kind === 'checkers') {
       bump('ckGames');
       if (f.win) bump('ckWins');
+    } else if (kind === 'chess') {
+      bump('chGames');
+      if (f.win) bump('chWins');
+    } else if (kind === 'capital') {
+      bump('capGames');
+      if (f.win) bump('capWins');
+    } else if (kind === 'mafia') {
+      bump('mfGames');
+      if (f.win) bump('mfWins');
     }
     if (kind === 'poker') {
       const p = st.poker;
@@ -286,6 +298,27 @@ class Store {
       p.net += f.net;
       if (f.draw) p.draws += 1; else if (f.win) p.wins += 1; else p.losses += 1;
       entry = { kind, table: f.table, net: f.net, text: f.draw ? 'Ничья' : f.win ? 'Победа' : 'Поражение' };
+    } else if (kind === 'chess') {
+      const p = st.chess;
+      p.games += 1;
+      p.net += f.net;
+      if (f.draw) p.draws += 1; else if (f.win) p.wins += 1; else p.losses += 1;
+      entry = { kind, table: f.table, net: f.net, text: f.draw ? 'Ничья' : f.win ? 'Победа' : 'Поражение' };
+    } else if (kind === 'capital') {
+      const p = st.capital;
+      p.games += 1;
+      p.net += f.net;
+      if (f.win) p.wins += 1;
+      entry = { kind, table: f.table, net: f.net, text: f.win ? 'Главный магнат' : `${f.place} место из ${f.total}` };
+    } else if (kind === 'mafia') {
+      const p = st.mafia;
+      const maf = f.role === 'maf' || f.role === 'don';
+      p.games += 1;
+      p.net += f.net;
+      if (f.win) p.wins += 1;
+      if (maf) { p.asMafia += 1; if (f.win) p.mafiaWins += 1; }
+      const ROLE = { civ: 'мирный', maf: 'мафия', don: 'дон', com: 'комиссар', doc: 'доктор' };
+      entry = { kind, table: f.table, net: f.net, text: `${f.win ? 'Победа' : 'Поражение'} · ${ROLE[f.role] || ''}` };
     }
     if (SEASON_GAMES.includes(kind)) {
       const net = kind === 'sng' ? f.prize - f.buyIn : f.tournament ? 0 : (f.net || 0);
@@ -798,6 +831,9 @@ const ACHIEVEMENTS = [
   { id: 'natural10', title: 'Любимец шуза', text: '10 блэкджеков', reward: 3000, ok: (s) => s.bj.blackjacks >= 10, progress: (s) => [s.bj.blackjacks, 10] },
   { id: 'straight', title: 'В яблочко', text: 'Выиграть ставку на одно число в рулетке', reward: 1000, ok: (s) => s.roulette.straight >= 1 },
   { id: 'ck10', title: 'Гроссмейстер', text: 'Выиграть 10 партий в шашки', reward: 3000, ok: (s) => s.checkers.wins >= 10, progress: (s) => [s.checkers.wins, 10] },
+  { id: 'chess10', title: 'Шахматист', text: 'Выиграть 10 партий в шахматы', reward: 3000, ok: (s) => s.chess.wins >= 10, progress: (s) => [s.chess.wins, 10] },
+  { id: 'tycoon', title: 'Магнат', text: 'Выиграть партию в «Капитал»', reward: 2000, ok: (s) => s.capital.wins >= 1 },
+  { id: 'godfather', title: 'Крёстный отец', text: 'Победить в мафии, играя за мафию', reward: 1500, ok: (s) => s.mafia.mafiaWins >= 1 },
   { id: 'season1', title: 'Чемпион недели', text: 'Победить в еженедельном сезоне', reward: 5000, ok: (s, u) => (u.seasonWins || 0) >= 1 },
   { id: 'elo1400', title: 'Мастер доски', text: 'Поднять рейтинг в шашках до 1400', reward: 3000, ok: (s, u) => u.rating.checkers.peak >= 1400, progress: (s, u) => [u.rating.checkers.peak, 1400] },
   { id: 'rich', title: 'Состоятельный', text: 'Накопить 50 000 фишек', reward: 5000, ok: (s, u, chips) => chips >= 50000, progress: (s, u, chips) => [chips, 50000] },
@@ -815,6 +851,9 @@ const QUESTS = [
   { id: 'bjwin3', group: 'other', title: 'Обыграть дилера', text: 'Выиграть 3 раунда в блэкджеке', metric: 'bjWins', target: 3, reward: 700 },
   { id: 'rl10', group: 'other', title: 'Колесо фортуны', text: 'Сделать ставки в 10 спинах рулетки', metric: 'rlSpins', target: 10, reward: 600 },
   { id: 'ckwin', group: 'other', title: 'Дамка в деле', text: 'Выиграть партию в шашки', metric: 'ckWins', target: 1, reward: 900 },
+  { id: 'chwin', group: 'other', title: 'Шах и мат', text: 'Выиграть партию в шахматы', metric: 'chWins', target: 1, reward: 900 },
+  { id: 'cap1', group: 'other', title: 'Деловой вечер', text: 'Сыграть партию в «Капитал»', metric: 'capGames', target: 1, reward: 800 },
+  { id: 'mf1', group: 'other', title: 'Город засыпает', text: 'Сыграть партию в мафию', metric: 'mfGames', target: 1, reward: 700 },
   { id: 'sng1', group: 'any', title: 'Турнирный день', text: 'Сыграть турнир Sit & Go', metric: 'sngPlayed', target: 1, reward: 900 },
   { id: 'itm', group: 'any', title: 'В призах', text: 'Занять призовое место в турнире', metric: 'sngItm', target: 1, reward: 1200 },
 ];

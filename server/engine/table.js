@@ -55,6 +55,8 @@ class Table {
     // and ranked instead of sitting out, blinds can change between hands.
     this.tournament = !!opts.tournament;
     this.autoActDelay = opts.autoActDelay ?? 1200;
+    // a player who drops offline on their turn gets a pause to come back (per hand)
+    this.pauseMs = opts.pauseMs ?? 60000;
     this.onBust = opts.onBust || (() => {});
     this.onTournamentEnd = opts.onTournamentEnd || (() => {});
     this.extraState = null; // () => object merged into publicState (tournament info)
@@ -225,7 +227,51 @@ class Table {
     const i = this.seatOf(userId);
     if (i === -1) return;
     this.seats[i].connected = connected;
+    const h = this.hand;
+    if (h && !h.ended && h.toAct === i) {
+      if (!connected) this._pauseTurn(i);
+      else this._resumeTurn(i);
+    }
     this.onUpdate(this);
+  }
+
+  /** The player to act went offline: stop their clock and wait for them a while. */
+  _pauseTurn(i) {
+    const h = this.hand;
+    const s = this.seats[i];
+    if (!h || h.paused || this.tournament && s.sittingOut) return;
+    h.pauseUsed ||= {};
+    const budget = this.pauseMs - (h.pauseUsed[i] || 0);
+    if (budget <= 500) return;
+    this._clearTurnTimer();
+    const remaining = Math.max(1000, h.turnLimit - (this.now() - h.turnStarted));
+    h.paused = { seat: i, since: this.now(), until: this.now() + budget, remaining };
+    this._log(`${s.name} не в сети — пауза до ${Math.round(budget / 1000)} с`);
+    const handNo = h.no;
+    this._turnTimer = this.timers.set(() => {
+      this._turnTimer = null;
+      if (!this.hand || this.hand.no !== handNo || !this.hand.paused) return;
+      this._endPause();
+      this._onTimeout(i, handNo);
+    }, budget);
+  }
+  _endPause() {
+    const h = this.hand;
+    if (!h || !h.paused) return null;
+    const p = h.paused;
+    h.pauseUsed[p.seat] = (h.pauseUsed[p.seat] || 0) + (this.now() - p.since);
+    h.paused = null;
+    return p;
+  }
+  _resumeTurn(i) {
+    const h = this.hand;
+    if (!h || !h.paused || h.paused.seat !== i) return;
+    const p = this._endPause();
+    this._clearTurnTimer();
+    h.turnStarted = this.now() - (h.turnLimit - p.remaining);
+    const handNo = h.no;
+    this._turnTimer = this.timers.set(() => this._onTimeout(i, handNo), p.remaining);
+    this._log(`${this.seats[i].name} вернулся — игра продолжается`);
   }
 
   // ---------- hand flow ----------
@@ -373,10 +419,12 @@ class Table {
     // an absent tournament player acts automatically after a short pause
     h.turnLimit = this.tournament && this.seats[i].sittingOut ? this.autoActDelay : this.actionTime;
     this._turnTimer = this.timers.set(() => this._onTimeout(i, handNo), h.turnLimit);
+    if (!this.seats[i].connected && !(this.tournament && this.seats[i].sittingOut)) this._pauseTurn(i);
     this.onUpdate(this);
   }
 
   _clearTurnTimer() {
+    if (this.hand && this.hand.paused) this._endPause();
     if (this._turnTimer) { this.timers.clear(this._turnTimer); this._turnTimer = null; }
   }
 
@@ -825,7 +873,8 @@ class Table {
       sbIdx: h ? h.sbIdx : -1,
       bbIdx: h ? h.bbIdx : -1,
       toAct: h && !h.ended ? h.toAct : -1,
-      turnRemaining: h && !h.ended && h.toAct !== -1 ? Math.max(0, h.turnLimit - (this.now() - h.turnStarted)) : 0,
+      turnRemaining: h && !h.ended && h.toAct !== -1 ? (h.paused ? h.paused.remaining : Math.max(0, h.turnLimit - (this.now() - h.turnStarted))) : 0,
+      paused: h && !h.ended && h.paused ? { seat: h.paused.seat, name: this.seats[h.paused.seat] ? this.seats[h.paused.seat].name : '', left: Math.max(0, h.paused.until - this.now()) } : null,
       actionTime: h && h.toAct !== -1 ? h.turnLimit : this.actionTime,
       currentBet: h ? h.currentBet : 0,
       raises: h && !h.ended ? h.raises || 0 : 0,

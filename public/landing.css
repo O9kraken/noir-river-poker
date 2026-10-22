@@ -38,7 +38,7 @@ ul, ol { padding: 0; list-style: none; }
 button { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--gold-2); outline-offset: 3px; }
 
-.frame { width: 100%; margin: 0 auto; padding: 14px; }
+.frame { width: 100%; padding: 14px; }
 
 /* ---------- shared bits ---------- */
 .kicker { display: inline-flex; align-items: center; gap: 10px; font-size: 11.5px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: var(--gold-2); }
@@ -378,3 +378,4 @@ button { font: inherit; color: inherit; }
 .notif span { display: flex; flex-direction: column; line-height: 1.3; font-size: 12.5px; color: var(--muted); min-width: 0; }
 .notif b { color: var(--ivory); font-size: 13.5px; }
 @media (max-width: 640px) { .b-app { flex-direction: column; align-items: stretch; } .notif { width: 100%; } }
+.show-tab { padding: 10px 16px; border-radius: 16px; } .show-tabs { gap: 6px; }

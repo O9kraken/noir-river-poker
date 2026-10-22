@@ -41,7 +41,15 @@ class CheckersTable {
     this.chat = [];
     this._clockTimer = null;
     this._flow = null;
+    this.reasons = REASONS;
     this.lastActivity = this.now();
+  }
+
+  /** Subclasses (chess) plug in their own game. */
+  _newGame() { return new CheckersGame(); }
+  _legalView(g, myColor, running) {
+    const mine = myColor && running === myColor;
+    return { legal: mine ? g.legal().map((m) => m.path) : [], mustCapture: mine ? g.legal().some((m) => m.captures.length) : false };
   }
 
   seatOf(userId) { return this.seats.findIndex((s) => s && s.userId === userId); }
@@ -106,7 +114,7 @@ class CheckersTable {
     const first = this.gameNo === 1 ? crypto.randomInt(2) : (this.colors ? this.colors.b : 0);
     this.colors = { w: first, b: 1 - first };
     for (const s of this.seats) { s.ready = false; this.deps.onInPlay && this.deps.onInPlay(s.userId, this.stake); }
-    this.game = new CheckersGame();
+    this.game = this._newGame();
     this.status = 'playing';
     this.drawOffer = null;
     this.lastResult = null;
@@ -193,8 +201,9 @@ class CheckersTable {
       results.push({ userId: s ? s.userId : null, color, net, win: winner === color, draw: winner === null });
     }
     this.status = 'result';
-    this.lastResult = { winner, reason, text: REASONS[reason] || '', winnerName: winner ? (this.seats[this.colors[winner]] || {}).name || null : null };
-    this._log(winner ? `Победа ${winner === 'w' ? 'белых' : 'чёрных'}: ${REASONS[reason]}. Банк ${this.pot}` : `Ничья: ${REASONS[reason]}. Ставки возвращены`);
+    const R = this.reasons;
+    this.lastResult = { winner, reason, text: R[reason] || '', winnerName: winner ? (this.seats[this.colors[winner]] || {}).name || null : null };
+    this._log(winner ? `Победа ${winner === 'w' ? 'белых' : 'чёрных'}: ${R[reason]}. Банк ${this.pot}` : `Ничья: ${R[reason]}. Ставки возвращены`);
     this.deps.onGameEnd && this.deps.onGameEnd(this, results);
     this.pot = 0;
     this._update();
@@ -249,14 +258,13 @@ class CheckersTable {
       turn: g && this.status === 'playing' ? g.turn : null,
       clock: g ? { w: clock.w, b: clock.b, running } : null,
       lastMove: this.lastMove || null,
-      moves: g ? g.moves.map((m) => m.text) : [],
-      counts: g ? { w: g.count('w'), b: g.count('b'), wk: g.kings('w'), bk: g.kings('b') } : null,
+      moves: g ? g.moves.map((m) => m.text || m.san) : [],
+      counts: g && g.count ? { w: g.count('w'), b: g.count('b'), wk: g.kings('w'), bk: g.kings('b') } : null,
       drawOffer: this.drawOffer,
       result: this.lastResult,
       mySeat: me,
       myColor,
-      legal: myColor && running === myColor ? g.legal().map((m) => m.path) : [],
-      mustCapture: myColor && running === myColor ? g.legal().some((m) => m.captures.length) : false,
+      ...this._legalView(g, myColor, running),
       log: this.log.slice(-30),
       chat: this.chat.slice(-30),
     };

@@ -129,6 +129,27 @@
           <span class="mode-cnt" data-cnt="ck"></span>
         </span>
       </button>
+      <button type="button" class="mode" data-go-tab="ch">
+        <img class="mode-art" src="/art/chess.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Шахматы</b><small>Классика FIDE на ставку с шахматными часами</small></span>
+          <span class="mode-cnt" data-cnt="ch"></span>
+        </span>
+      </button>
+      <button type="button" class="mode" data-go-tab="cap">
+        <img class="mode-art" src="/art/capital.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Капитал</b><small>Улицы, дома и отели: станьте главным магнатом</small></span>
+          <span class="mode-cnt" data-cnt="cap"></span>
+        </span>
+      </button>
+      <button type="button" class="mode" data-go-tab="mf">
+        <img class="mode-art" src="/art/mafia.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Мафия</b><small>Город засыпает — ведущий сервер, от 5 игроков</small></span>
+          <span class="mode-cnt" data-cnt="mf"></span>
+        </span>
+      </button>
     </div>
   </main>
 
@@ -192,6 +213,31 @@
             <span class="gnav-pop-cap"><b>Шашки</b><small>Русские шашки один на&nbsp;один на&nbsp;ставку</small><i data-cnt="ck"></i></span>
           </span>
         </button>
+
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="ch" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6M12 2v4M8.5 9.5c0-2 1.6-3.5 3.5-3.5s3.5 1.5 3.5 3.5c0 1.3-.7 2.4-1.7 3l1.2 4.5H9l1.2-4.5c-1-.6-1.7-1.7-1.7-3z"/><path d="M6 21h12M7.5 17h9l1 4h-11z"/></svg></span>
+          <span class="gnav-txt"><b>Шахматы</b><small data-cnt="ch"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/chess.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Шахматы</b><small>Классика FIDE на ставку с шахматными часами</small><i data-cnt="ch"></i></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="cap" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg></span>
+          <span class="gnav-txt"><b>Капитал</b><small data-cnt="cap"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/capital.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Капитал</b><small>Улицы, дома и отели: станьте главным магнатом</small><i data-cnt="cap"></i></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="mf" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h18"/><path d="M6 12c0-4 2.5-7 6-7s6 3 6 7"/><path d="M4.5 12c0 1.5 3.4 3 7.5 3s7.5-1.5 7.5-3"/><path d="M9 9h6"/></svg></span>
+          <span class="gnav-txt"><b>Мафия</b><small data-cnt="mf"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/mafia.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Мафия</b><small>Город засыпает — ведущий сервер, от 5 игроков</small><i data-cnt="mf"></i></span>
+          </span>
+        </button>
       </div>
     </nav>
     <div class="lobby-main">
@@ -216,6 +262,9 @@
       <div class="table-list" id="bj-list" hidden></div>
       <div class="table-list" id="rl-list" hidden></div>
       <div class="table-list" id="ck-list" hidden></div>
+      <div class="table-list" id="ch-list" hidden></div>
+      <div class="table-list" id="cap-list" hidden></div>
+      <div class="table-list" id="mf-list" hidden></div>
     </div>
     <aside class="lobby-side">
       <section class="panel quests-panel" id="quests-panel" aria-live="polite">
@@ -541,6 +590,161 @@
     </aside>
   </main>
 
+  <!-- CHESS -->
+  <main id="ch-view" class="table-view ck-view ch-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span class="btn-label">Лобби</span>
+        </a>
+        <div class="table-title"><b id="ch-name"></b><span id="ch-meta" class="muted"></span></div>
+        <span class="hand-no muted" id="ch-game"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
+      </div>
+      <div class="ck-stage">
+        <div class="ck-player top" id="ch-top"></div>
+        <div class="ck-board-wrap">
+          <div class="ck-board ch-board" id="ch-board" role="grid" aria-label="Шахматная доска"></div>
+          <div class="ch-promo" id="ch-promo" hidden></div>
+          <div class="ck-banner" id="ch-banner" hidden></div>
+        </div>
+        <div class="ck-player bottom" id="ch-bottom"></div>
+        <div class="dk-status ck-status" id="ch-status" role="status"></div>
+        <div class="ck-ctrl" id="ch-ctrl"></div>
+      </div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-ch-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-ch-tab="log" aria-selected="false">Ходы</button>
+        <button type="button" role="tab" class="tab" data-ch-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="ch-chat-pane" class="side-pane">
+          <ul class="chat" id="ch-chat" aria-live="polite"></ul>
+          <form id="ch-chat-form" class="chat-form">
+            <label class="sr-only" for="ch-chat-input">Сообщение</label>
+            <input id="ch-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение сопернику…">
+            <button class="icon-btn" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </form>
+        </div>
+        <div id="ch-log-pane" class="side-pane" hidden><ol class="log" id="ch-log"></ol></div>
+        <div id="ch-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>Классические шахматы</b> по правилам FIDE: рокировка, взятие на проходе, превращение пешки.</p>
+          <p><b>Как ходить:</b> нажмите на свою фигуру — подсветятся поля, куда она может пойти, — и нажмите на нужное поле. Дойдя до последней горизонтали, пешка превращается в выбранную фигуру.</p>
+          <p><b>Победа</b> — мат, время соперника вышло, он сдался или ушёл. <b>Ничья</b> — пат, по согласию, нехватка фигур для мата, 50 ходов без взятий и ходов пешкой, трёхкратное повторение позиции.</p>
+          <p>У каждого шахматные часы с добавлением 2 секунд за ход. Ставка списывается с обоих, когда оба нажали «Готов». Победитель забирает банк, при ничьей ставки возвращаются. Цвет меняется каждую партию.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- CAPITAL -->
+  <main id="cap-view" class="table-view cap-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span class="btn-label">Лобби</span>
+        </a>
+        <div class="table-title"><b id="cap-name"></b><span id="cap-meta" class="muted"></span></div>
+        <span class="hand-no muted" id="cap-game"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
+      </div>
+      <div class="cap-stage">
+        <div class="cap-board-wrap">
+          <div class="cap-board" id="cap-board" aria-label="Игровое поле «Капитал»">
+            <div class="cap-center" id="cap-center"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-cap-tab="players" aria-selected="true">Игроки</button>
+        <button type="button" role="tab" class="tab" data-cap-tab="chat" aria-selected="false">Чат</button>
+        <button type="button" role="tab" class="tab" data-cap-tab="log" aria-selected="false">Лог</button>
+        <button type="button" role="tab" class="tab" data-cap-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="cap-players-pane" class="side-pane cap-players"><div id="cap-players"></div></div>
+        <div id="cap-chat-pane" class="side-pane" hidden>
+          <ul class="chat" id="cap-chat" aria-live="polite"></ul>
+          <form id="cap-chat-form" class="chat-form">
+            <label class="sr-only" for="cap-chat-input">Сообщение</label>
+            <input id="cap-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
+            <button class="icon-btn" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </form>
+        </div>
+        <div id="cap-log-pane" class="side-pane" hidden><ul class="log" id="cap-log"></ul></div>
+        <div id="cap-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>«Капитал»</b> — игра о недвижимости для 2–6 игроков. У каждого 1&nbsp;500 игровых кредитов, они не связаны с&nbsp;фишками.</p>
+          <p><b>Ход:</b> бросьте кубики и пройдите по полю. Свободную улицу, пристань или станцию можно купить. На чужой собственности платите аренду владельцу. Дубль — ходите ещё раз, три дубля подряд — в Участок.</p>
+          <p><b>Кварталы.</b> Соберите все улицы одного цвета — аренда удвоится, и можно строить дома (до четырёх) и отель. Стройте равномерно.</p>
+          <p><b>Деньги.</b> За проход Старта — 200. Собственность можно заложить за половину цены, выкупить — за 55%. Если не хватает денег, дома продаются и улицы закладываются сами; не хватило и этого — банкротство.</p>
+          <p><b>Участок:</b> выйти можно за 50, по карточке или выбросив дубль; после трёх попыток залог платится сам.</p>
+          <p><b>Обмен:</b> в свой ход нажмите на соперника и предложите обмен улицами и деньгами.</p>
+          <p><b>Победа.</b> Последний небанкрот забирает банк фишек. Если у стола есть лимит времени, по его окончании побеждает самый богатый (деньги + собственность + дома).</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- MAFIA -->
+  <main id="mf-view" class="table-view mf-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span class="btn-label">Лобби</span>
+        </a>
+        <div class="table-title"><b id="mf-name"></b><span id="mf-meta" class="muted"></span></div>
+        <span class="hand-no muted" id="mf-game"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
+      </div>
+      <div class="mf-stage" id="mf-stage">
+        <div class="mf-ring" id="mf-ring"><div class="mf-center" id="mf-center"></div></div>
+        <div class="mf-panel" id="mf-panel"></div>
+      </div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-mf-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-mf-tab="log" aria-selected="false">Лог</button>
+        <button type="button" role="tab" class="tab" data-mf-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="mf-chat-pane" class="side-pane">
+          <p class="mf-channel" id="mf-channel" hidden></p>
+          <ul class="chat" id="mf-chat" aria-live="polite"></ul>
+          <form id="mf-chat-form" class="chat-form">
+            <label class="sr-only" for="mf-chat-input">Сообщение</label>
+            <input id="mf-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение городу…">
+            <button class="icon-btn" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </form>
+        </div>
+        <div id="mf-log-pane" class="side-pane" hidden><ul class="log" id="mf-log"></ul></div>
+        <div id="mf-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>Мафия</b> на&nbsp;5–10 игроков, ведущий&nbsp;— сервер. Роли раздаются случайно и&nbsp;видны только вам.</p>
+          <p><b>Роли.</b> Мафия (примерно каждый третий) знает своих и&nbsp;ночью выбирает жертву. Дон&nbsp;— глава мафии: его голос решает при равенстве, и&nbsp;каждую ночь он&nbsp;ищет комиссара. Комиссар каждую ночь проверяет одного игрока. Доктор (от&nbsp;6 игроков) лечит одного&nbsp;— того, кого спас, мафия не&nbsp;убьёт; одного и&nbsp;того же две ночи подряд лечить нельзя. Остальные&nbsp;— мирные жители.</p>
+          <p><b>День.</b> Город обсуждает ночь в&nbsp;чате, затем открыто голосует. Кто набрал больше всех голосов, выбывает и&nbsp;раскрывает роль. Ничья или больше половины воздержавшихся&nbsp;— никого не&nbsp;сажают.</p>
+          <p><b>Ночью</b> пишет только мафия&nbsp;— в&nbsp;свой закрытый чат. Выбывшие молчат до&nbsp;конца партии.</p>
+          <p><b>Победа.</b> Город побеждает, когда вся мафия выбыла. Мафия&nbsp;— когда её&nbsp;не&nbsp;меньше, чем мирных. Банк делят все игроки победившей стороны, включая выбывших.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
   <!-- TABLE -->
   <main id="table-view" class="table-view" hidden>
     <div class="table-stage">
@@ -804,6 +1008,52 @@
   </form>
 </dialog>
 
+<dialog id="modal-ch-create" class="modal">
+  <form method="dialog" class="form" id="ch-create-form">
+    <h2 class="h2">Новая доска: шахматы</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Партия на интерес"></label>
+    <label class="field"><span>Ставка</span><select name="stake" id="ch-stake"></select></label>
+    <label class="field"><span>Контроль времени</span><select name="clock" id="ch-clock"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватная доска</b><small>Не видна в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button type="submit" class="btn btn-gold" value="ok">Создать</button></div>
+  </form>
+</dialog>
+
+<dialog id="modal-cap-create" class="modal">
+  <form method="dialog" class="form" id="cap-create-form">
+    <h2 class="h2">Новый стол: Капитал</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Деловой вечер"></label>
+    <label class="field"><span>Ставка в банк</span><select name="stake" id="cap-stake"></select></label>
+    <label class="field"><span>Игроков</span><select name="players"><option value="2">до 2</option><option value="3">до 3</option><option value="4" selected>до 4</option><option value="5">до 5</option><option value="6">до 6</option></select></label>
+    <label class="field"><span>Длительность</span><select name="time" id="cap-time"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button type="submit" class="btn btn-gold" value="ok">Создать</button></div>
+  </form>
+</dialog>
+
+<dialog id="modal-mf-create" class="modal">
+  <form method="dialog" class="form" id="mf-create-form">
+    <h2 class="h2">Новый город: мафия</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Ночной город"></label>
+    <label class="field"><span>Ставка в банк</span><select name="stake" id="mf-stake"></select></label>
+    <label class="field"><span>Игроков</span><select name="players"><option value="5">до 5</option><option value="6">до 6</option><option value="7">до 7</option><option value="8">до 8</option><option value="9">до 9</option><option value="10" selected>до 10</option></select></label>
+    <p class="muted small">Партия начинается, когда за столом от&nbsp;5 игроков и&nbsp;все нажали «Готов».</p>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button type="submit" class="btn btn-gold" value="ok">Создать</button></div>
+  </form>
+</dialog>
+
+<dialog id="modal-cap-trade" class="modal cap-trade-modal">
+  <form method="dialog" class="form" id="cap-trade-form">
+    <h2 class="h2" id="cap-trade-title">Обмен</h2>
+    <div class="cap-trade-cols">
+      <fieldset class="cap-trade-side"><legend>Вы отдаёте</legend><div id="cap-trade-give"></div><label class="field"><span>и денег</span><input type="number" name="giveCash" min="0" step="10" value="0"></label></fieldset>
+      <fieldset class="cap-trade-side"><legend id="cap-trade-get-label">Вы получаете</legend><div id="cap-trade-get"></div><label class="field"><span>и денег</span><input type="number" name="getCash" min="0" step="10" value="0"></label></fieldset>
+    </div>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button type="submit" class="btn btn-gold" value="ok">Предложить</button></div>
+  </form>
+</dialog>
+
 <dialog id="modal-invite" class="modal">
   <div class="form">
     <h2 class="h2">Пригласить за стол</h2>
@@ -893,6 +1143,9 @@
 <script src="/roulette.js"></script>
 <script src="/checkers.js"></script>
 <script src="/dm.js"></script>
+<script src="/chess.js"></script>
+<script src="/capital.js"></script>
+<script src="/mafia.js"></script>
 <script src="/fx.js"></script>
 <script src="/notify.js"></script>
 <script src="/wheel.js"></script>

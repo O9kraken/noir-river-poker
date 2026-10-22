@@ -285,6 +285,9 @@
     myCk: new Set(),
     ckStakes: [],
     ckClocks: [],
+    ch: [], myCh: new Set(), chStakes: [], chClocks: [],
+    cap: [], myCap: new Set(), capStakes: [], capTimes: [],
+    mf: [], myMf: new Set(), mfStakes: [],
     private: [],
     bjLimits: [],
     durakStakes: [],
@@ -415,6 +418,9 @@
       S.ckStakes = res.ckStakes || [];
       S.ckClocks = res.ckClocks || [];
       S.botLevels = res.botLevels || null;
+      S.ch = res.ch || []; S.myCh = new Set(res.myCh || []); S.chStakes = res.chStakes || []; S.chClocks = res.chClocks || [];
+      S.cap = res.cap || []; S.myCap = new Set(res.myCap || []); S.capStakes = res.capStakes || []; S.capTimes = res.capTimes || [];
+      S.mf = res.mf || []; S.myMf = new Set(res.myMf || []); S.mfStakes = res.mfStakes || [];
       fillExtraForms();
       S.durakStakes = res.durakStakes || [];
       setAnnouncement(res.announcement);
@@ -454,6 +460,12 @@
     socket.on('lobby:ck', (list) => { S.ck = list; renderLobby(); });
     socket.on('rl:state', (st) => { if (window.RouletteUI) window.RouletteUI.onState(st); });
     socket.on('ck:state', (st) => { if (window.CheckersUI) window.CheckersUI.onState(st); });
+    socket.on('lobby:ch', (list) => { S.ch = list; renderLobby(); });
+    socket.on('lobby:cap', (list) => { S.cap = list; renderLobby(); });
+    socket.on('lobby:mf', (list) => { S.mf = list; renderLobby(); });
+    socket.on('ch:state', (st) => { if (window.ChessUI) window.ChessUI.onState(st); });
+    socket.on('cap:state', (st) => { if (window.CapitalUI) window.CapitalUI.onState(st); });
+    socket.on('mf:state', (st) => { if (window.MafiaUI) window.MafiaUI.onState(st); });
     socket.on('lobby:private', (list) => { S.private = list; renderLobby(); });
     if (window.SocialUI) window.SocialUI.bind(socket);
     socket.on('bj:state', (st) => { if (window.BjUI) window.BjUI.onState(st); });
@@ -468,7 +480,7 @@
   // ================= routing =================
   window.addEventListener('hashchange', route);
 
-  const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI };
+  const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI, ch: () => window.ChessUI, cap: () => window.CapitalUI, mf: () => window.MafiaUI };
   async function route() {
     if (!S.socket) return;
     const gm = location.hash === '#/games';
@@ -481,13 +493,14 @@
       S.tableId = null;
       S.ts = null;
       for (const ui of [window.DurakUI, window.BjUI, window.RouletteUI, window.CheckersUI]) if (ui) ui.close();
-      for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view', '#rl-view', '#ck-view', '#profile-view']) $(v).hidden = true;
+      for (const [k, ui] of Object.entries(EXTRA_VIEWS)) { if (ui()) ui().close(); $(`#${k}-view`).hidden = true; }
+      for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view', '#profile-view']) $(v).hidden = true;
       document.title = gm ? 'Все игры — NOIR RIVER' : 'Рейтинги — NOIR RIVER';
       if (gm) renderLobby(); else if (window.RatingsUI) window.RatingsUI.open();
       window.scrollTo(0, 0);
       return;
     }
-    const xm = location.hash.match(/^#\/(rl|ck)\/([\w-]+)/);
+    const xm = location.hash.match(/^#\/(rl|ck|ch|cap|mf)\/([\w-]+)/);
     for (const [k, ui] of Object.entries(EXTRA_VIEWS)) if (ui() && (!xm || xm[1] !== k)) { ui().close(); $(`#${k}-view`).hidden = true; }
     if (xm) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
@@ -636,15 +649,19 @@
     $('#bj-list').hidden = tab !== 'bj';
     $('#rl-list').hidden = tab !== 'rl';
     $('#ck-list').hidden = tab !== 'ck';
+    for (const k of ['ch', 'cap', 'mf']) $(`#${k}-list`).hidden = tab !== k;
     $('#create-btn-label').textContent = tab === 'sng' ? 'Создать турнир' : 'Создать стол';
-    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки на фишки' }[tab];
+    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки на фишки', ch: 'Шахматы на фишки', cap: 'Капитал', mf: 'Мафия' }[tab];
     if (tab === 'cash') renderCashList();
     else if (tab === 'sng') renderSngList();
     else if (tab === 'durak') renderDurakList();
     else if (tab === 'rl') renderRlList();
     else if (tab === 'ck') renderCkList();
+    else if (tab === 'ch') renderChList();
+    else if (tab === 'cap') renderCapList();
+    else if (tab === 'mf') renderMfList();
     else renderBjList();
-    const PRACTICE_LIST = { cash: ['#table-list', 'poker'], durak: ['#durak-list', 'durak'], ck: ['#ck-list', 'ck'] };
+    const PRACTICE_LIST = { cash: ['#table-list', 'poker'], durak: ['#durak-list', 'durak'], ck: ['#ck-list', 'ck'], ch: ['#ch-list', 'ch'], cap: ['#cap-list', 'cap'], mf: ['#mf-list', 'mf'] };
     if (PRACTICE_LIST[tab]) $(PRACTICE_LIST[tab][0]).prepend(practiceCard(PRACTICE_LIST[tab][1]));
     renderMyTables();
     const seatedCash = S.tables.reduce((a, t) => a + t.players, 0);
@@ -657,6 +674,9 @@
     setCnt('bj', `${S.bj.reduce((a, t) => a + t.players, 0)} за столами`);
     setCnt('rl', `${S.rl.reduce((a, t) => a + t.players, 0)} у колеса`);
     setCnt('ck', `${S.ck.filter((t) => t.status === 'playing').length} партий идёт`);
+    setCnt('ch', `${S.ch.filter((t) => t.status === 'playing').length} партий идёт`);
+    setCnt('cap', `${S.cap.reduce((a, t) => a + t.players, 0)} за столами`);
+    setCnt('mf', `${S.mf.reduce((a, t) => a + t.players, 0)} в городе`);
     if (S.me) {
       const hr = new Date().getHours();
       const part = hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -758,7 +778,68 @@
       }));
     }
   }
+  function renderChList() {
+    const list = $('#ch-list');
+    list.replaceChildren();
+    const rows = S.ch.concat(S.private.filter((x) => x.kind === 'ch' && !x.practice)).sort((a, b) => (b.private - a.private) || a.stake - b.stake);
+    if (!rows.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
+    for (const t of rows) {
+      const mine = S.myCh.has(t.id);
+      list.append(tcard({
+        mine, priv: t.private ? t.owner : null, badge: '♞', badgeCls: 'dk-badge ck-badge',
+        kind: `Шахматы · ${t.clockMin} мин + 2 с`,
+        status: { cls: t.status === 'playing' ? 'running' : 'registering', text: CK_STATUS[t.status] },
+        title: t.name,
+        stats: [['Ставка', fmt(t.stake)], ['Банк', fmt(t.stake * 2)]],
+        fill: { n: t.players, max: 2, label: t.players === 2 ? 'оба игрока на месте' : t.players ? 'ждём соперника' : 'доска свободна' },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/ch/${t.id}` }, mine ? 'Вернуться' : t.players < 2 ? 'Сесть за доску' : 'Смотреть'),
+      }));
+    }
+  }
+  const MANY_STATUS = { waiting: 'Ждут игроков', countdown: 'Старт…', playing: 'Идёт партия', result: 'Итоги' };
+  function renderCapList() {
+    const list = $('#cap-list');
+    list.replaceChildren();
+    const rows = S.cap.concat(S.private.filter((x) => x.kind === 'cap' && !x.practice)).sort((a, b) => (b.private - a.private) || a.stake - b.stake);
+    if (!rows.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
+    for (const t of rows) {
+      const mine = S.myCap.has(t.id);
+      list.append(tcard({
+        mine, priv: t.private ? t.owner : null, badge: '⌂', badgeCls: 'dk-badge cap-badge',
+        kind: `Капитал · ${t.timeLimitMin ? `${t.timeLimitMin} мин` : 'без лимита'}`,
+        status: { cls: t.status === 'playing' ? 'running' : 'registering', text: MANY_STATUS[t.status] },
+        title: t.name,
+        stats: [['Ставка', fmt(t.stake)], ['Игроков', `до ${t.maxSeats}`]],
+        fill: { n: t.players, max: t.maxSeats, label: `${t.players} из ${t.maxSeats}` },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/cap/${t.id}` }, mine ? 'Вернуться' : 'Открыть стол'),
+      }));
+    }
+  }
+  function renderMfList() {
+    const list = $('#mf-list');
+    list.replaceChildren();
+    const rows = S.mf.concat(S.private.filter((x) => x.kind === 'mf' && !x.practice)).sort((a, b) => (b.private - a.private) || a.stake - b.stake);
+    if (!rows.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
+    for (const t of rows) {
+      const mine = S.myMf.has(t.id);
+      list.append(tcard({
+        mine, priv: t.private ? t.owner : null, badge: '♠', badgeCls: 'dk-badge mf-badge',
+        kind: `Мафия · от ${t.minPlayers} до ${t.maxSeats} игроков`,
+        status: { cls: t.status === 'playing' ? 'running' : 'registering', text: MANY_STATUS[t.status] },
+        title: t.name,
+        stats: [['Ставка', fmt(t.stake)], ['В городе', `${t.players} / ${t.maxSeats}`]],
+        fill: { n: t.players, max: t.maxSeats, label: t.players < t.minPlayers ? `нужно ещё ${t.minPlayers - t.players}` : `${t.players} из ${t.maxSeats}` },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/mf/${t.id}` }, mine ? 'Вернуться' : 'Открыть стол'),
+      }));
+    }
+  }
   function fillExtraForms() {
+    const opt = (sel, items, value) => { const el = $(sel); el.replaceChildren(...items.map(([v, label]) => h('option', { value: v }, label))); el.value = String(value); };
+    opt('#ch-stake', S.chStakes.map((x) => [x, `${fmt(x)} с каждого · банк ${fmt(x * 2)}`]), S.chStakes.includes(250) ? 250 : S.chStakes[0]);
+    opt('#ch-clock', S.chClocks.map((x) => [x, `${x} минут на партию + 2 с за ход`]), S.chClocks.includes(10) ? 10 : S.chClocks[0]);
+    opt('#cap-stake', S.capStakes.map((x) => [x, `${fmt(x)} с каждого`]), S.capStakes.includes(200) ? 200 : S.capStakes[0]);
+    opt('#cap-time', S.capTimes.map((x) => [x, x ? `${x} минут, затем побеждает самый богатый` : 'Без лимита — до последнего банкрота']), S.capTimes.includes(45) ? 45 : S.capTimes[0]);
+    opt('#mf-stake', S.mfStakes.map((x) => [x, `${fmt(x)} с каждого`]), S.mfStakes.includes(100) ? 100 : S.mfStakes[0]);
     const a = $('#rl-limits');
     a.replaceChildren(...S.rlLimits.map(([x, y], i) => h('option', { value: i }, `фишка от ${fmt(x)}, за спин до ${fmt(y)}`)));
     a.value = S.rlLimits.length > 1 ? '1' : '0';
@@ -778,6 +859,18 @@
     f.name.value = '';
     location.hash = `#/rl/${res.tableId}`;
   });
+  const createForm = (id, ev, kind, payload) => $(id).addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const res = await call(ev, { name: f.name.value, private: f.private.checked, ...payload(f) });
+    if (!res) return;
+    f.closest('dialog').close();
+    f.name.value = '';
+    location.hash = `#/${kind}/${res.tableId}`;
+  });
+  createForm('#ch-create-form', 'ch:create', 'ch', (f) => ({ stake: Number(f.stake.value), clock: Number(f.clock.value) }));
+  createForm('#cap-create-form', 'cap:create', 'cap', (f) => ({ stake: Number(f.stake.value), maxPlayers: Number(f.players.value), time: Number(f.time.value) }));
+  createForm('#mf-create-form', 'mf:create', 'mf', (f) => ({ stake: Number(f.stake.value), maxPlayers: Number(f.players.value) }));
   $('#ck-create-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
@@ -956,8 +1049,9 @@
     const bjs = S.bj.filter((t) => S.myBj.has(t.id)).map((t) => ({ id: t.id, href: `#/bj/${t.id}`, name: t.name, meta: `Блэкджек · ${fmt(t.minBet)}+` }));
     const rls = S.rl.filter((t) => S.myRl.has(t.id)).map((t) => ({ id: t.id, href: `#/rl/${t.id}`, name: t.name, meta: `Рулетка · ${fmt(t.minBet)}+` }));
     const cks = S.ck.filter((t) => S.myCk.has(t.id)).map((t) => ({ id: t.id, href: `#/ck/${t.id}`, name: t.name, meta: `Шашки · ${fmt(t.stake)}` }));
+    const many = [['ch', 'Шахматы'], ['cap', 'Капитал'], ['mf', 'Мафия']].flatMap(([k, label]) => S[k].filter((t) => S['my' + k[0].toUpperCase() + k.slice(1)].has(t.id)).map((t) => ({ id: t.id, href: `#/${k}/${t.id}`, name: t.name, meta: `${label} · ${fmt(t.stake)}` })));
     const pr = S.private.filter((t) => t.practice).map((t) => ({ id: t.id, href: t.href, name: t.name, meta: 'с компьютером' }));
-    const all = cash.concat(sng).concat(dk).concat(bjs).concat(rls).concat(cks).concat(pr);
+    const all = cash.concat(sng).concat(dk).concat(bjs).concat(rls).concat(cks).concat(many).concat(pr);
     if (!all.length) mine.append(h('p', { class: 'muted' }, 'Вы пока не сидите за столом.'));
     for (const t of all) mine.append(h('a', { href: t.href || `#/table/${t.id}` }, h('span', null, t.name), h('span', { class: 'muted' }, t.meta)));
   }
@@ -980,10 +1074,13 @@
     poker: { title: 'Покер с компьютером', variants: [['NLH', 'Холдем NL'], ['PLO', 'Омаха PL'], ['SD', 'Шорт-дек 6+'], ['LHE', 'Холдем Limit']], bots: [1, 2, 3, 4, 5], defBots: 3 },
     durak: { title: 'Дурак с компьютером', variants: [['podkidnoy', 'Подкидной'], ['perevodnoy', 'Переводной']], bots: [1, 2, 3, 4], defBots: 2 },
     ck: { title: 'Шашки с компьютером', variants: null, bots: null },
+    ch: { title: 'Шахматы с компьютером', variants: null, bots: null, clock: true },
+    cap: { title: 'Капитал с компьютером', variants: null, bots: [1, 2, 3, 4, 5], defBots: 2 },
+    mf: { title: 'Мафия с ботами', variants: null, bots: [4, 5, 6, 7, 8, 9], defBots: 6, botsLabel: (n) => `${n + 1} игроков: вы и ${n} ботов` },
   };
   const BOT_ICON = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3.5"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 15.5h5M2 12v3M22 12v3"/></svg>';
   function practiceCard(game) {
-    const kindOf = { poker: 'poker', durak: 'durak', ck: 'ck' }[game];
+    const kindOf = game;
     const existing = S.private.find((t) => t.practice && t.kind === kindOf);
     const ico = h('span', { class: 'practice-ico' });
     ico.innerHTML = BOT_ICON;
@@ -1007,8 +1104,9 @@
     $('#practice-variant-field').hidden = !P.variants;
     if (P.variants) $('#practice-variant').replaceChildren(...P.variants.map(([v, n]) => h('option', { value: v }, n)));
     $('#practice-bots-field').hidden = !P.bots;
-    if (P.bots) $('#practice-bots').replaceChildren(...P.bots.map((n) => h('option', { value: n, selected: n === P.defBots }, `${n} ${n === 1 ? 'бот' : n < 5 ? 'бота' : 'ботов'}`)));
-    $('#practice-clock-field').hidden = game !== 'ck';
+    if (P.bots) $('#practice-bots').replaceChildren(...P.bots.map((n) => h('option', { value: n, selected: n === P.defBots }, P.botsLabel ? P.botsLabel(n) : `${n} ${n === 1 ? 'бот' : n < 5 ? 'бота' : 'ботов'}`)));
+    $('#practice-clock-field').hidden = game !== 'ck' && game !== 'ch';
+    $('#practice-clock').replaceChildren(...(game === 'ch' ? [5, 10, 15] : [5, 10]).map((m) => h('option', { value: m, selected: m === 10 }, `${m} минут`)));
     $('#modal-practice').showModal();
   }
   $('#practice-form').addEventListener('submit', async (e) => {
@@ -1042,6 +1140,7 @@
     if (S.lobbyTab === 'bj') { $('#modal-bj-create').showModal(); return; }
     if (S.lobbyTab === 'rl') { $('#modal-rl-create').showModal(); return; }
     if (S.lobbyTab === 'ck') { $('#modal-ck-create').showModal(); return; }
+    if (['ch', 'cap', 'mf'].includes(S.lobbyTab)) { $(`#modal-${S.lobbyTab}-create`).showModal(); return; }
     if (S.lobbyTab === 'sng') { openSngCreate(); return; }
     $('#create-error').textContent = '';
     $('#modal-create').showModal();
@@ -1366,6 +1465,14 @@
       res.hidden = true;
     }
 
+    // a player dropped offline on their turn: the clock waits for them
+    let pb = $('#pause-banner');
+    if (!pb) { pb = h('div', { id: 'pause-banner', class: 'pause-banner', role: 'status' }); $('#felt').append(pb); }
+    if (t.paused) {
+      pb.hidden = false;
+      pb.replaceChildren(h('i', { 'aria-hidden': 'true' }, '❚❚'), h('span', null, h('b', null, 'Пауза'), ` — ${t.paused.name} не в сети, ждём `, h('b', { 'data-pause-left': '' }, clockLeft(t.paused.left))));
+    } else pb.hidden = true;
+
     // seats
     const freshDeal = [];
     const freshReveal = [];
@@ -1640,8 +1747,21 @@
     if (!turn.canRaise) return h('div', { class: 'ctrl' }, actions);
 
     const key = `${t.handNo}-${t.street}-${t.currentBet}`;
+    // bet sizes go in steps of the small blind; the minimum and all-in stay reachable
+    const unit = Math.max(1, t.sb || 1);
+    const snap = (v) => {
+      v = Number(v) || turn.minTo;
+      if (v >= turn.maxTo) return turn.maxTo;
+      if (v <= turn.minTo) return turn.minTo;
+      return clamp(Math.round(v / unit) * unit, turn.minTo, turn.maxTo);
+    };
+    const firstStep = Math.ceil(turn.minTo / unit) * unit;
+    const steps = [turn.minTo];
+    for (let v = firstStep === turn.minTo ? firstStep + unit : firstStep; v < turn.maxTo; v += unit) steps.push(v);
+    if (steps[steps.length - 1] !== turn.maxTo) steps.push(turn.maxTo);
+    const stepIndex = (v) => { let lo = 0; let hi = steps.length - 1; while (lo < hi) { const mid = (lo + hi) >> 1; if (steps[mid] < v) lo = mid + 1; else hi = mid; } return lo; };
     if (S.raiseKey !== key) { S.raiseKey = key; S.raiseVal = turn.minTo; }
-    S.raiseVal = clamp(S.raiseVal, turn.minTo, turn.maxTo);
+    S.raiseVal = snap(clamp(S.raiseVal, turn.minTo, turn.maxTo));
 
     // fixed-limit (or a single possible size): one button, no slider
     if (turn.minTo === turn.maxTo) {
@@ -1660,16 +1780,17 @@
       onclick: () => act(S.raiseVal >= you.stack + turn.myBet ? 'allin' : 'raise', S.raiseVal),
     }, label, ' ', kbd('R'));
     raiseClick = () => raiseBtn.click();
-    const num = h('input', { type: 'number', min: turn.minTo, max: turn.maxTo, step: 1, value: S.raiseVal, 'aria-label': 'Сумма ставки' });
-    const slider = h('input', { type: 'range', class: 'range', min: turn.minTo, max: turn.maxTo, step: 1, value: S.raiseVal, 'aria-label': 'Размер ставки' });
+    const num = h('input', { type: 'number', min: turn.minTo, max: turn.maxTo, step: unit, value: S.raiseVal, 'aria-label': 'Сумма ставки' });
+    const slider = h('input', { type: 'range', class: 'range', min: 0, max: steps.length - 1, step: 1, value: stepIndex(S.raiseVal), 'aria-label': 'Размер ставки', 'aria-valuetext': fmt(S.raiseVal) });
     const setVal = (v, from) => {
-      S.raiseVal = clamp(Math.round(Number(v) || turn.minTo), turn.minTo, turn.maxTo);
+      S.raiseVal = snap(v);
       if (from !== 'num') num.value = S.raiseVal;
-      if (from !== 'slider') slider.value = S.raiseVal;
+      if (from !== 'slider') slider.value = stepIndex(S.raiseVal);
+      slider.setAttribute('aria-valuetext', fmt(S.raiseVal));
       const isAllIn = S.raiseVal >= you.stack + turn.myBet;
       label.textContent = isAllIn ? `Олл-ин ${fmt(S.raiseVal)}` : `${verb} ${fmt(S.raiseVal)}`;
     };
-    slider.addEventListener('input', () => setVal(slider.value, 'slider'));
+    slider.addEventListener('input', () => setVal(steps[Number(slider.value)], 'slider'));
     num.addEventListener('input', () => setVal(num.value, 'num'));
     num.addEventListener('blur', () => { num.value = S.raiseVal; });
     num.addEventListener('keydown', (e) => { if (e.key === 'Enter') raiseBtn.click(); });
@@ -1678,7 +1799,7 @@
 
     const potAfterCall = t.pot + turn.toCall;
     const preset = (lbl, v, cls = '') => {
-      const val = Math.max(turn.minTo, Math.min(turn.maxTo, Math.round(v)));
+      const val = snap(Math.max(turn.minTo, Math.min(turn.maxTo, Math.round(v))));
       return h('button', { type: 'button', class: 'pill ' + cls, title: `${verb} ${fmt(val)}`, onclick: () => setVal(val) },
         lbl, h('small', null, fmt(val)));
     };
@@ -1884,12 +2005,14 @@
   $('#sng-lobby').addEventListener('click', () => { $('#modal-sng').close(); S.lobbyTab = 'sng'; $$('[data-lobby-tab]').forEach((x) => { const on = x.dataset.lobbyTab === 'sng'; x.classList.toggle('is-active', on); x.setAttribute('aria-selected', on); }); });
 
   // ================= timers =================
+  function clockLeft(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
   function tick() {
     const t = S.ts;
     if (t) {
       const elapsed = performance.now() - S.tsAt;
+      if (t.paused) { const el = $('[data-pause-left]'); if (el) el.textContent = clockLeft(t.paused.left - elapsed); }
       if (t.toAct !== -1) {
-        const left = Math.max(0, t.turnRemaining - elapsed);
+        const left = Math.max(0, t.turnRemaining - (t.paused ? 0 : elapsed));
         const frac = left / t.actionTime;
         $$('[data-timer]').forEach((bar) => {
           bar.style.transform = `scaleX(${frac})`;
