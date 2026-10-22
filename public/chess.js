@@ -103,6 +103,22 @@
     return h('div', { class: `ch-piece ${white ? 'w' : 'b'}`, 'data-sq': sq, 'aria-label': `${white ? 'белый' : 'чёрный'} ${NAMES[t]} ${sqName(sq)}` }, GLYPH[t] + '︎');
   }
 
+  const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** Slide a piece in an arc: lifted in the middle, a soft landing. */
+  function glide(layer, from, to, delay) {
+    const el = layer.querySelector(`.ch-piece:not(.taken)[data-sq="${to}"]`);
+    if (!el || !el.animate) return;
+    const a = centre(from); const b = centre(to);
+    const dx = a.x - b.x; const dy = a.y - b.y;
+    const dist = Math.hypot(dx, dy);
+    const lift = Math.min(0.35, 0.12 + dist / (b.size * 20)) * b.size;
+    el.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(1)`, filter: 'drop-shadow(0 2px 2px rgba(0,0,0,.4))' },
+      { transform: `translate(${dx / 2}px, ${dy / 2 - lift}px) scale(1.14)`, filter: 'drop-shadow(0 14px 10px rgba(0,0,0,.45))', offset: 0.5 },
+      { transform: 'translate(0,0) scale(1)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,.4))' },
+    ], { duration: Math.min(520, 260 + dist * 0.6), delay, easing: 'cubic-bezier(.35,.1,.25,1)', fill: 'backwards' });
+  }
+
   function render(moved) {
     const st = C.st;
     if (!st) return;
@@ -135,13 +151,37 @@
       if (C.sel === sq) el.classList.add('lift');
       kids.push(el);
     });
+    // the piece taken by the last move stays for a moment and falls away
+    const prevBoard = C.prev && C.prev.board;
+    let takenSq = -1;
+    if (moved && prevBoard && moved.captured) takenSq = moved.flag === 'ep' ? moved.to + (moved.color === 'w' ? 8 : -8) : moved.to;
+    if (takenSq >= 0 && prevBoard[takenSq] && !REDUCE) {
+      const ghost = pieceEl(prevBoard[takenSq], takenSq);
+      const c = centre(takenSq);
+      ghost.style.setProperty('--x', `${c.x}px`); ghost.style.setProperty('--y', `${c.y}px`); ghost.style.setProperty('--s', `${c.size}px`);
+      ghost.classList.add('taken');
+      kids.unshift(ghost);
+    }
     layer.replaceChildren(...kids);
-    if (moved) {
-      const el = layer.querySelector(`.ch-piece[data-sq="${moved.to}"]`);
-      if (el && el.animate) {
-        const a = centre(moved.from); const b = centre(moved.to);
-        el.animate([{ transform: `translate(${a.x - b.x}px, ${a.y - b.y}px)` }, { transform: 'translate(0,0)' }], { duration: 220, easing: 'ease-out' });
+    if (moved && !REDUCE) {
+      glide(layer, moved.from, moved.to, 0);
+      // castling: the rook follows the king
+      if (moved.flag === 'castle') {
+        const kingSide = moved.to > moved.from;
+        glide(layer, kingSide ? moved.to + 1 : moved.to - 2, kingSide ? moved.to - 1 : moved.to + 1, 120);
       }
+      const sqEl = C.squares[moved.to];
+      if (sqEl) { sqEl.classList.remove('land'); void sqEl.offsetWidth; sqEl.classList.add('land'); }
+      if (st.check && st.check !== moved.color) { const k = C.squares[board.findIndex((x) => x === (st.check === 'w' ? 'K' : 'k'))]; if (k) k.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 400, delay: 300 }); }
+    } else if (!REDUCE && st.board && C.prev && (!C.prev.board || C.prev.gameNo !== st.gameNo) && !st.moves.length) {
+      // a new game: the pieces drop onto the board rank by rank
+      layer.querySelectorAll('.ch-piece').forEach((el) => {
+        const sq = Number(el.dataset.sq);
+        const row = Math.floor(sq / 8);
+        const order = row < 4 ? row : 7 - row;
+        el.animate([{ transform: 'translateY(-40%) scale(1.15)', opacity: 0 }, { transform: 'translateY(4%) scale(.98)', opacity: 1, offset: 0.75 }, { transform: 'none', opacity: 1 }],
+          { duration: 420, delay: order * 90 + (sq % 8) * 25, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'backwards' });
+      });
     }
 
     // players

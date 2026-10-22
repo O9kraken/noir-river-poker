@@ -36,7 +36,10 @@
     return { r: i - 29, c: 11, side: 'r' };
   }
 
-  const C = { id: null, st: null, prev: null, at: 0, cells: [], tokens: new Map(), detail: null, tradeWith: null };
+  const C = { id: null, st: null, prev: null, at: 0, cells: [], tokens: new Map(), detail: null, tradeWith: null, rollUntil: 0, lastRoll: null, cardKey: null };
+  const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ROLL_MS = 650;
+  const STEP_MS = 170;
   const send = (ev, extra = {}) => call(ev, { tableId: C.id, ...extra });
 
   async function open(id) {
@@ -75,7 +78,10 @@
     C.st = st;
     C.at = performance.now();
     if (st.mySeat >= 0) S.myCap.add(st.id); else S.myCap.delete(st.id);
+    const g = st.game; const pg = C.prev && C.prev.game;
+    if (g && pg && g.moveNo !== pg.moveNo && g.dice && !REDUCE) { C.rollUntil = performance.now() + ROLL_MS; C.lastRoll = g.moveNo; }
     render();
+    animateChanges();
     effects();
   }
 
@@ -101,7 +107,7 @@
       el.classList.toggle('picked', C.detail === i);
       const hs = el.querySelector('.cap-houses');
       const n = c ? c.houses : 0;
-      hs.replaceChildren(...(n === 5 ? [h('b', { class: 'hotel' })] : Array.from({ length: n }, () => h('b'))));
+      if (hs.dataset.n !== String(n)) { hs.dataset.n = n; hs.replaceChildren(...(n === 5 ? [h('b', { class: 'hotel' })] : Array.from({ length: n }, () => h('b')))); }
     });
     renderTokens();
     renderCenter();
@@ -142,21 +148,38 @@
       el.classList.toggle('turn', g.turn === p.seat && st.status === 'playing');
       const old = prevG && prevG.players.find((x) => x.seat === p.seat);
       const target = `translate(${pt.x}px, ${pt.y}px)`;
-      if (old && old.pos !== p.pos && el.animate) {
-        // walk cell by cell when moving forward a few steps
+      if (old && old.pos !== p.pos && el.animate && !REDUCE) {
+        // hop cell by cell after the dice land; long jumps (cards, arrest) fly in one arc
         const steps = (p.pos - old.pos + 40) % 40;
+        const path = [];
+        if (steps > 0 && steps <= 12) for (let k = 0; k <= steps; k++) path.push(cellCenter((old.pos + k) % 40));
+        else path.push(cellCenter(old.pos));
+        path.push(pt);
         const frames = [];
-        if (steps > 0 && steps <= 12) for (let k = 0; k <= steps; k++) { const c = cellCenter((old.pos + k) % 40); frames.push({ transform: `translate(${c.x}px, ${c.y}px)` }); }
-        else { const c = cellCenter(old.pos); frames.push({ transform: `translate(${c.x}px, ${c.y}px)` }); }
-        frames.push({ transform: target });
-        el.animate(frames, { duration: Math.min(1600, 140 * frames.length), easing: 'ease-in-out' });
+        const hop = Math.max(10, C.cells[0].offsetWidth * 0.35);
+        for (let k = 0; k < path.length - 1; k++) {
+          const a = path[k]; const b = path[k + 1];
+          const big = path.length === 2;
+          frames.push({ transform: `translate(${a.x}px, ${a.y}px) scale(1)`, offset: k / (path.length - 1), easing: 'ease-out' });
+          frames.push({ transform: `translate(${(a.x + b.x) / 2}px, ${(a.y + b.y) / 2 - (big ? hop * 3 : hop)}px) scale(${big ? 1.4 : 1.18})`, offset: (k + 0.5) / (path.length - 1), easing: 'ease-in' });
+        }
+        frames.push({ transform: `${target} scale(1)`, offset: 1 });
+        const delay = Math.max(0, C.rollUntil - performance.now());
+        const dur = path.length === 2 ? 700 : STEP_MS * (path.length - 1);
+        el.animate(frames, { duration: dur, delay, fill: 'backwards' });
+        el.animate([{ transform: `${target} scale(1.25, .8)` }, { transform: `${target} scale(1)` }], { duration: 220, delay: delay + dur, easing: 'cubic-bezier(.3,1.6,.5,1)' });
+        p._arrive = delay + dur;
       }
       el.style.transform = target;
     }
   }
 
-  function dieEl(n) {
-    return h('span', { class: 'cap-die' }, ...Array.from({ length: 9 }, (_, k) => h('i', { class: PIPS[n].includes(k) ? 'on' : '' })));
+  function dieEl(n, k = 0) {
+    const rolling = performance.now() < C.rollUntil;
+    const el = h('span', { class: 'cap-die' + (rolling ? ' rolling' : ''), style: rolling ? `animation-delay:${-(ROLL_MS - (C.rollUntil - performance.now()))}ms;--spin:${k ? -1 : 1}` : '' },
+      ...Array.from({ length: 9 }, (_, i) => h('i', { class: PIPS[rolling ? 1 + Math.floor(Math.random() * 6) : n].includes(i) ? 'on' : '' })));
+    el.dataset.face = n;
+    return el;
   }
 
   function detailCard(i) {
@@ -227,8 +250,15 @@
     const cur = playerBySeat(g.turn);
     const mine = me();
     const myTurn = mine && !mine.out && g.turn === mine.seat;
-    parts.push(h('div', { class: 'cap-dice' }, ...(g.dice ? g.dice.map(dieEl) : [dieEl(1), dieEl(1)].map((d) => { d.classList.add('idle'); return d; }))));
-    if (g.card) parts.push(h('div', { class: `cap-card ${g.card.deck}` }, h('small', null, g.card.deck === 'luck' ? 'Удача' : 'Фонд'), h('span', null, g.card.text)));
+    parts.push(h('div', { class: 'cap-dice' }, ...(g.dice ? g.dice.map((n, k) => dieEl(n, k)) : [dieEl(1), dieEl(1)].map((d) => { d.classList.add('idle'); return d; }))));
+    if (g.card) {
+      const key = `${g.moveNo}:${g.card.text}`;
+      // the card turns over once the token has arrived; the timing survives re-renders
+      if (C.cardKey !== key) { C.cardKey = key; C.cardAt = Math.max(performance.now(), C.rollUntil) + 450; }
+      const since = performance.now() - C.cardAt;
+      const flip = !REDUCE && since < 700;
+      parts.push(h('div', { class: `cap-card ${g.card.deck}` + (flip ? ' flip' : ''), style: flip ? `--dt:${-Math.round(since)}ms` : '' }, h('small', null, g.card.deck === 'luck' ? 'Удача' : 'Фонд'), h('span', null, g.card.text)));
+    }
     const who = h('p', { class: 'cap-msg' }, h('i', { class: 'cap-dot', style: `background:${cur ? cur.color : '#888'}` }), myTurn ? 'Ваш ход' : `Ходит ${cur ? cur.name : '…'}`, h('span', { class: 'cap-timer', 'data-cap-timer': '' }));
     parts.push(who);
     if (g.trade) {
@@ -342,6 +372,43 @@
     if (await send('cap:chat', { text })) input.value = '';
   });
 
+  /** Money flying up from tokens, fresh ownership flashing, new houses popping up. */
+  function animateChanges() {
+    const st = C.st; const prev = C.prev;
+    if (REDUCE || !prev || !st.game || !prev.game || $('#cap-view').hidden) return;
+    const g = st.game; const pg = prev.game;
+    const layer = $('#cap-tokens');
+    const wait = Math.max(0, C.rollUntil - performance.now());
+    for (const p of g.players) {
+      const was = pg.players.find((x) => x.seat === p.seat);
+      if (!was || was.cash === p.cash || p.out) continue;
+      const d = p.cash - was.cash;
+      const pt = cellCenter(p.pos);
+      const el = h('span', { class: 'cap-money ' + (d > 0 ? 'plus' : 'minus'), style: `left:${pt.x}px;top:${pt.y}px` }, `${d > 0 ? '+' : '−'}${fmt(Math.abs(d))}`);
+      layer.append(el);
+      const delay = (p._arrive || wait) + 150;
+      const a = el.animate([{ transform: 'translate(-50%, -20%) scale(.6)', opacity: 0 }, { transform: 'translate(-50%, -120%) scale(1.1)', opacity: 1, offset: 0.2 }, { transform: 'translate(-50%, -180%) scale(1)', opacity: 1, offset: 0.7 }, { transform: 'translate(-50%, -240%) scale(.95)', opacity: 0 }], { duration: 1500, delay, easing: 'ease-out', fill: 'both' });
+      a.onfinish = () => el.remove();
+      const row = $(`#cap-players .cap-pl[data-seat="${p.seat}"] .cap-cash`);
+      if (row) row.animate([{ color: d > 0 ? '#7FD6A8' : '#E06A72', transform: 'scale(1.25)' }, { color: '', transform: 'scale(1)' }], { duration: 900, delay });
+    }
+    g.cells.forEach((c, i) => {
+      const o = pg.cells[i];
+      const el = C.cells[i];
+      if (c.owner != null && o.owner !== c.owner) {
+        const owner = g.players.find((p) => p.seat === c.owner);
+        el.animate([{ boxShadow: `inset 0 0 0 2px ${owner.color}, 0 0 0 0 ${owner.color}` }, { boxShadow: `inset 0 0 0 4px ${owner.color}, 0 0 22px 6px ${owner.color}`, offset: 0.35 }, { boxShadow: `inset 0 0 0 2px ${owner.color}, 0 0 0 0 transparent` }], { duration: 1100, delay: wait });
+      }
+      if (c.houses > o.houses) {
+        const hs = el.querySelectorAll('.cap-houses b');
+        const nb = hs[hs.length - 1];
+        if (nb) nb.animate([{ transform: 'translateY(-160%) scale(0)', opacity: 0 }, { transform: 'translateY(10%) scale(1.4)', opacity: 1, offset: 0.65 }, { transform: 'none', opacity: 1 }], { duration: 520, easing: 'cubic-bezier(.3,1.4,.5,1)' });
+        el.animate([{ filter: 'brightness(1.4)' }, { filter: 'none' }], { duration: 600 });
+      }
+      if (c.mortgaged !== o.mortgaged) el.animate([{ transform: 'scale(1)' }, { transform: 'scale(.9) rotate(-2deg)' }, { transform: 'scale(1)' }], { duration: 380 });
+    });
+  }
+
   function effects() {
     const st = C.st; const prev = C.prev;
     if (!prev || !st.game) return;
@@ -359,6 +426,11 @@
 
   function tick() {
     const st = C.st;
+    const rolling = $$('#cap-center .cap-die.rolling');
+    if (rolling.length) {
+      if (performance.now() >= C.rollUntil) renderCenter();
+      else if ((tick.n = (tick.n || 0) + 1) % 4 === 0) rolling.forEach((d) => { const f = 1 + Math.floor(Math.random() * 6); [...d.children].forEach((pip, i) => pip.classList.toggle('on', PIPS[f].includes(i))); });
+    }
     if (st && st.game && st.status === 'playing' && !$('#cap-view').hidden) {
       const el = $('[data-cap-timer]');
       if (el) {

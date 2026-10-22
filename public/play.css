@@ -1797,3 +1797,96 @@ button.cap-seat.free:hover { border-color: var(--gold); color: var(--gold-2); }
   .mf-pname { font-size: 11.5px; }
   .mf-news { font-size: 12px; }
 }
+
+/* ================= v11: livelier chess, «Капитал» and mafia ================= */
+@media (prefers-reduced-motion: no-preference) {
+  .ch-piece { transition: translate .22s cubic-bezier(.3, 1.4, .5, 1), filter .2s; }
+  .ch-piece.lift { translate: 0 -9%; filter: drop-shadow(0 10px 8px rgba(0, 0, 0, .5)) drop-shadow(0 0 6px rgba(240, 212, 138, .8)); }
+  .ch-piece.taken { animation: chTaken .55s cubic-bezier(.5, 0, .75, .4) .18s forwards; z-index: 0; }
+  @keyframes chTaken { 0% { opacity: 1; transform: none; } 30% { transform: translateY(-8%) rotate(-8deg) scale(1.05); } 100% { opacity: 0; transform: translate(18%, 30%) rotate(38deg) scale(.55); filter: blur(1px); } }
+  .ch-board .ck-sq.target::before { animation: chDot .25s cubic-bezier(.3, 1.6, .5, 1) both; }
+  @keyframes chDot { from { transform: translate(-50%, -50%) scale(0); } }
+  .ck-sq.land::after { content: ''; position: absolute; inset: 0; pointer-events: none; animation: chLand .6s ease-out .25s both; border-radius: 4px; }
+  @keyframes chLand { 0% { box-shadow: inset 0 0 0 0 rgba(240, 212, 138, .0); } 30% { box-shadow: inset 0 0 0 5px rgba(240, 212, 138, .75); } 100% { box-shadow: inset 0 0 0 0 rgba(240, 212, 138, 0); } }
+  .ck-sq.check { animation: chCheck 1.2s ease-in-out infinite; }
+  @keyframes chCheck { 50% { filter: brightness(1.25) saturate(1.3); } }
+  .ch-promo:not([hidden]) { animation: popIn .28s cubic-bezier(.3, 1.5, .5, 1); }
+  .ck-banner:not([hidden]) { animation: popIn .45s cubic-bezier(.3, 1.4, .5, 1); }
+  @keyframes popIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.7); } }
+}
+.ck-sq.check { background-image: radial-gradient(circle, rgba(255, 120, 128, .95), rgba(176, 36, 47, .6) 55%, transparent 76%) !important; }
+/* v11 «Капитал»: dice tumble, money floats, card flip */
+.cap-money { position: absolute; z-index: 5; pointer-events: none; padding: 3px 9px; border-radius: 999px; font-weight: 800; font-size: max(12px, 1.6cqi); white-space: nowrap; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); opacity: 0; }
+.cap-money.plus { background: #1E5B3E; color: #B9F2D2; border: 1px solid #7FD6A8; }
+.cap-money.minus { background: #5E1D23; color: #FFD0D4; border: 1px solid #E06A72; }
+.cap-cash { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  .cap-die.rolling { animation: capRoll 650ms cubic-bezier(.2, .7, .3, 1) both; }
+  .cap-die.rolling i.on { background: #6A5A40; }
+  .cap-dice .cap-die:not(.rolling):not(.idle) { animation: capSettle .35s cubic-bezier(.3, 1.6, .5, 1); }
+  @keyframes capRoll {
+    0% { transform: translate(calc(var(--spin, 1) * -120%), -140%) rotate(calc(var(--spin, 1) * -200deg)) scale(.7); }
+    45% { transform: translate(calc(var(--spin, 1) * 18%), 8%) rotate(calc(var(--spin, 1) * 40deg)) scale(1.05); }
+    65% { transform: translate(calc(var(--spin, 1) * -6%), -22%) rotate(calc(var(--spin, 1) * -12deg)); }
+    82% { transform: translate(0, 2%) rotate(calc(var(--spin, 1) * 4deg)); }
+    100% { transform: none; }
+  }
+  @keyframes capSettle { from { transform: scale(1.18); box-shadow: 0 6px 0 #C9BC98, 0 0 26px rgba(240, 212, 138, .9); } }
+  .cap-card.flip { animation: capFlip .6s cubic-bezier(.3, 1.3, .5, 1) var(--dt, 0ms) both; transform-origin: 50% 50%; }
+  @keyframes capFlip { 0% { transform: perspective(600px) rotateY(90deg) translateY(30%) scale(.7); opacity: 0; } 60% { transform: perspective(600px) rotateY(-12deg) scale(1.04); opacity: 1; } 100% { transform: none; opacity: 1; } }
+  .cap-token.turn { animation: capTurn 1.6s ease-in-out infinite; }
+  @keyframes capTurn { 50% { box-shadow: 0 0 0 2px #fff, 0 0 0 5px var(--c), 0 0 20px 7px var(--c); } }
+}
+/* v11 mafia: sky, phase curtain, vote lines, deaths, role reveal */
+.mf-stage { position: relative; overflow: hidden; isolation: isolate; }
+.mf-stage.day { background: radial-gradient(ellipse at 50% 20%, rgba(240, 190, 110, .14), transparent 70%); }
+.mf-sky { position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity 1.2s; }
+.mf-stage.night .mf-sky { opacity: 1; }
+.mf-sky i { position: absolute; width: var(--s); height: var(--s); border-radius: 50%; background: #EAF0FF; box-shadow: 0 0 6px rgba(200, 215, 255, .9); opacity: .7; }
+.mf-moon { position: absolute; right: 7%; top: 6%; width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle at 36% 36%, #FFF8E0, #E8DAB0 60%, #BFAF84); box-shadow: 0 0 40px 10px rgba(255, 240, 200, .25); transform: translateY(30px); transition: transform 1.4s cubic-bezier(.2, .8, .3, 1); }
+.mf-moon::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 70% 30%, rgba(14, 18, 40, .0) 30%, transparent 31%), radial-gradient(circle at 62% 62%, rgba(150, 135, 95, .35) 0 8%, transparent 9%), radial-gradient(circle at 34% 58%, rgba(150, 135, 95, .3) 0 6%, transparent 7%); }
+.mf-stage.night .mf-moon { transform: none; }
+.mf-curtain { position: absolute; inset: 0; z-index: 8; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 0 20px;
+  background: radial-gradient(ellipse at 50% 50%, rgba(6, 8, 10, .82), rgba(6, 8, 10, .55) 70%); animation: mfCurtain 2.4s ease forwards; }
+.mf-curtain b { font-size: clamp(34px, 7vw, 72px); font-weight: 800; letter-spacing: .02em; color: var(--gold-2); text-shadow: 0 6px 30px rgba(0, 0, 0, .7); animation: mfTitle 2.4s cubic-bezier(.2, .8, .3, 1) forwards; }
+.mf-curtain span { font-size: clamp(14px, 2vw, 18px); color: var(--ivory); max-width: 520px; animation: mfSub 2.4s ease forwards; }
+.mf-curtain.night { background: radial-gradient(ellipse at 50% 50%, rgba(10, 16, 48, .9), rgba(4, 6, 20, .7) 70%); }
+.mf-curtain.night b { color: #C9D6FF; }
+.mf-curtain.morning b, .mf-curtain.day b { color: #FFD9A0; }
+.mf-curtain.vote b, .mf-curtain.verdict b { color: #FF9AA2; }
+@keyframes mfCurtain { 0% { opacity: 0; } 12% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes mfTitle { 0% { transform: translateY(24px) scale(.92); letter-spacing: .3em; opacity: 0; } 22% { opacity: 1; } 60% { transform: none; letter-spacing: .04em; } 100% { transform: translateY(-10px); } }
+@keyframes mfSub { 0%, 18% { opacity: 0; transform: translateY(10px); } 35% { opacity: 1; transform: none; } }
+.mf-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 0; }
+.mf-lines line { stroke: rgba(224, 106, 114, .6); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 0; filter: drop-shadow(0 0 4px rgba(224, 106, 114, .6)); }
+.mf-lines line.mine { stroke: var(--gold-2); filter: drop-shadow(0 0 4px rgba(240, 212, 138, .7)); }
+.mf-p { z-index: 1; }
+.mf-center { z-index: 1; }
+.mf-bar { display: block; width: min(180px, 70%); height: 4px; border-radius: 2px; background: rgba(239, 234, 224, .12); overflow: hidden; }
+.mf-bar i { display: block; height: 100%; background: var(--gold-2); transform-origin: left; border-radius: inherit; }
+.mf-bar.night i { background: #8FA8FF; } .mf-bar.vote i { background: var(--red-soft); }
+@media (prefers-reduced-motion: no-preference) {
+  .mf-sky i { animation: mfTwinkle 3.2s ease-in-out var(--d) infinite; }
+  @keyframes mfTwinkle { 50% { opacity: .15; transform: scale(.6); } }
+  .mf-lines line.fresh { animation: mfDraw .55s cubic-bezier(.4, 0, .2, 1) both; }
+  @keyframes mfDraw { from { stroke-dashoffset: 1; } }
+  .mf-votes.bump { animation: mfBump .45s cubic-bezier(.3, 1.8, .5, 1) .35s both; }
+  @keyframes mfBump { from { transform: scale(0); } 60% { transform: scale(1.45); } }
+  .mf-p.dying .mf-av { animation: mfShake .5s ease-in-out var(--dt, 0ms) both, mfFade 1.6s ease calc(var(--dt, 0ms) + .5s) both; }
+  .mf-p.dying .mf-x { animation: mfDim .6s ease calc(var(--dt, 0ms) + .3s) both; }
+  .mf-p.dying .mf-x::before { animation: mfSlashA .3s cubic-bezier(.5, 0, .3, 1) calc(var(--dt, 0ms) + .55s) both; }
+  .mf-p.dying .mf-x::after { animation: mfSlashB .3s cubic-bezier(.5, 0, .3, 1) calc(var(--dt, 0ms) + .8s) both; }
+  .mf-p.dying { animation: mfDie 2.1s ease var(--dt, 0ms) both; }
+  @keyframes mfShake { 20%, 60% { transform: translateX(-4px) rotate(-4deg); } 40%, 80% { transform: translateX(4px) rotate(4deg); } }
+  @keyframes mfFade { from { filter: none; } to { filter: grayscale(1) brightness(.8); } }
+  @keyframes mfDim { from { opacity: 0; } }
+  @keyframes mfSlashA { from { width: 0; } }
+  @keyframes mfSlashB { from { width: 0; } }
+  @keyframes mfDie { 0%, 40% { opacity: 1; } 100% { opacity: .5; } }
+  .mf-p.can { animation: mfCan 2s ease-in-out infinite; }
+  @keyframes mfCan { 50% { border-color: rgba(240, 212, 138, .9); box-shadow: 0 0 16px rgba(240, 212, 138, .3); } }
+  .mf-card.reveal { animation: mfReveal .9s cubic-bezier(.3, 1.2, .4, 1) calc(var(--dt, 0ms) + .3s) both; }
+  .mf-card.reveal .mf-card-ico { animation: mfIco .6s cubic-bezier(.3, 1.8, .5, 1) calc(var(--dt, 0ms) + 1s) both; }
+  @keyframes mfReveal { 0% { transform: perspective(800px) rotateY(180deg) scale(.85); opacity: 0; } 40% { opacity: 1; } 100% { transform: none; } }
+  @keyframes mfIco { from { transform: scale(0) rotate(-30deg); } }
+}

@@ -97,9 +97,12 @@
   }
 
   function currentTable() {
-    const m = location.hash.match(/^#\/(table|durak|bj)\/([\w-]+)/);
+    // every game screen: poker, durak, blackjack, roulette, checkers, chess, «Капитал», mafia
+    const m = location.hash.match(/^#\/(table|durak|bj|rl|ck|ch|cap|mf)\/([\w-]+)/);
     if (!m) return null;
-    const name = m[1] === 'table' ? $('#t-name').textContent : m[1] === 'durak' ? $('#dk-name').textContent : $('#bj-name').textContent;
+    const NAME_EL = { table: '#t-name', durak: '#dk-name' };
+    const el = $(NAME_EL[m[1]] || `#${m[1]}-name`);
+    const name = el ? el.textContent : 'стол';
     return { href: `#/${m[1]}/${m[2]}`, name };
   }
 

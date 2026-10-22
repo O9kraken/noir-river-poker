@@ -12,13 +12,14 @@
   };
   const MAFIA = new Set(['maf', 'don']);
   const PHASE = { intro: 'Знакомство', night: 'Ночь', morning: 'Утро', day: 'День · обсуждение', vote: 'Голосование', verdict: 'Приговор', result: 'Финал' };
-  const C = { id: null, st: null, prev: null, at: 0, nightPick: null };
+  const C = { id: null, st: null, prev: null, at: 0, nightPick: null, roleShown: null };
+  const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const send = (ev, extra = {}) => call(ev, { tableId: C.id, ...extra });
 
   async function open(id) {
     if (C.id === id) return;
     if (C.id) call('mf:unwatch', { tableId: C.id }, true);
-    C.id = id; C.st = null; C.prev = null;
+    C.id = id; C.st = null; C.prev = null; C.dying = new Map();
     const res = await call('mf:watch', { tableId: id });
     if (!res) { location.hash = '#/'; return; }
     onState(res.state);
@@ -63,9 +64,31 @@
     await send('mf:night', { kind: act.kind, target: seat });
   }
 
+  /** The night sky over the table: stars and a moon, built once. */
+  function sky(stage) {
+    if (stage.querySelector('.mf-sky')) return;
+    const stars = Array.from({ length: 46 }, (_, i) => {
+      const x = (i * 37.7) % 100; const y = (i * 53.3) % 62;
+      return h('i', { style: `left:${x}%;top:${y}%;--d:${(i % 7) * 0.45}s;--s:${1 + (i % 3)}px` });
+    });
+    stage.prepend(h('div', { class: 'mf-sky', 'aria-hidden': 'true' }, h('span', { class: 'mf-moon' }), ...stars));
+  }
+
+  /** A full-width title card when the phase changes: «Ночь 2», «Утро», «Голосование». */
+  function curtain(g) {
+    const stage = $('#mf-stage');
+    stage.querySelectorAll('.mf-curtain').forEach((x) => x.remove());
+    const title = g.phase === 'night' ? `Ночь ${g.day}` : g.phase === 'morning' ? `Утро ${g.day}` : PHASE[g.phase];
+    const sub = { intro: 'Роли розданы. Запомните свою.', night: 'Город засыпает. Просыпается мафия…', morning: g.news || 'Город просыпается', day: 'Обсуждайте и ищите мафию', vote: 'Решает большинство', verdict: g.news || '' }[g.phase] || '';
+    const el = h('div', { class: 'mf-curtain ' + g.phase, 'aria-hidden': 'true' }, h('b', null, title), sub ? h('span', null, sub) : null);
+    stage.append(el);
+    setTimeout(() => el.remove(), 2400);
+  }
+
   function render() {
     const st = C.st;
     const g = st.game;
+    sky($('#mf-stage'));
     document.title = `${st.name} — мафия — NOIR RIVER`;
     $('#mf-name').textContent = st.name;
     $('#mf-meta').textContent = st.practice ? 'Мафия · с ботами, без ставки' : `Мафия · ставка ${fmt(st.stake)} · ${st.minPlayers}–${st.maxSeats} игроков`;
@@ -73,6 +96,7 @@
     const stage = $('#mf-stage');
     stage.classList.toggle('night', !!(g && g.phase === 'night'));
     stage.classList.toggle('vote', !!(g && g.phase === 'vote'));
+    stage.classList.toggle('day', !!(g && ['morning', 'day', 'vote', 'verdict'].includes(g.phase) && st.status === 'playing'));
     renderRing();
     renderCenter();
     renderPanel();
@@ -94,26 +118,71 @@
     const me = st.me;
     const kills = me && me.kills ? Object.values(me.kills) : [];
     const myChecks = me && (me.checks || me.donChecks) ? (me.checks || me.donChecks) : [];
+    const pg = C.prev && C.prev.game;
+    const prevTally = {};
+    if (pg && pg.votes) for (const t of Object.values(pg.votes)) if (t != null) prevTally[t] = (prevTally[t] || 0) + 1;
+    const wasAlive = (seat) => { const q = pg && pg.players.find((x) => x.seat === seat); return q ? q.alive : null; };
+    const pos = {};
     const items = people.map((p, k) => {
       const ang = Math.PI / 2 + (k / n) * Math.PI * 2;
       const x = 50 + 42 * Math.cos(ang);
       const y = 50 + 40 * Math.sin(ang);
+      pos[p.seat] = { x, y };
+      const dyingFor = dying(p, wasAlive(p.seat));
       const role = p.role ? ROLE[p.role] : null;
       const targetable = act && p.alive && !(act.kind === 'vote' && p.seat === st.mySeat) && !(act.kind === 'kill' && p.role && MAFIA.has(p.role)) && !(act.kind === 'check' && p.seat === st.mySeat) && !(act.kind === 'heal' && me.lastHeal === p.seat);
       const check = myChecks.find((c) => c.seat === p.seat);
       const myPick = me && me.acted && Object.values(me.acted).includes(p.seat);
       const myVote = g && g.votes && g.votes[st.mySeat] === p.seat;
-      const cls = ['mf-p', !p.alive && 'dead', p.seat === st.mySeat && 'me', targetable && 'can', (myPick || myVote) && 'picked', kills.includes(p.seat) && 'marked', !p.connected && !p.waiting && 'off'].filter(Boolean).join(' ');
-      const el = h('button', { type: 'button', class: cls, style: `left:${x}%;top:${y}%`, 'data-seat': p.seat, disabled: !targetable, onclick: () => clickPlayer(p.seat), 'aria-label': `${p.name}${p.alive ? '' : ', выбыл'}${role ? `, ${role.name}` : ''}` },
+      const cls = ['mf-p', !p.alive && 'dead', p.seat === st.mySeat && 'me', targetable && 'can', (myPick || myVote) && 'picked', kills.includes(p.seat) && 'marked', !p.connected && !p.waiting && 'off', dyingFor !== false && 'dying'].filter(Boolean).join(' ');
+      const el = h('button', { type: 'button', class: cls, style: `left:${x}%;top:${y}%` + (dyingFor !== false ? `;--dt:${-Math.round(dyingFor)}ms` : ''), 'data-seat': p.seat, disabled: !targetable, onclick: () => clickPlayer(p.seat), 'aria-label': `${p.name}${p.alive ? '' : ', выбыл'}${role ? `, ${role.name}` : ''}` },
         h('span', { class: 'mf-av' }, NR.avatarEl(p.name, p.avatar, 'sm'), !p.alive ? h('i', { class: 'mf-x', 'aria-hidden': 'true' }) : null),
         h('b', { class: 'mf-pname' }, p.name),
         role ? h('small', { class: 'mf-role r-' + p.role }, role.icon + ' ' + role.name) : p.waiting ? h('small', { class: 'mf-role' }, p.ready ? 'готов' : 'ждёт') : null,
         check ? h('small', { class: 'mf-check ' + ((check.mafia || check.com) ? 'bad' : 'ok') }, me.checks ? (check.mafia ? 'мафия!' : 'не мафия') : (check.com ? 'комиссар!' : 'не комиссар')) : null,
-        tally[p.seat] ? h('span', { class: 'mf-votes' }, tally[p.seat]) : null,
+        tally[p.seat] ? h('span', { class: 'mf-votes' + ((tally[p.seat] || 0) > (prevTally[p.seat] || 0) ? ' bump' : '') }, tally[p.seat]) : null,
         g && g.phase === 'day' && p.ready ? h('span', { class: 'mf-ready', title: 'Готов голосовать' }, '✓') : null);
       return el;
     });
-    ring.replaceChildren(...items, center);
+    ring.replaceChildren(voteLines(g, pg, pos), ...items, center);
+  }
+
+  /** Lines from each voter to their choice; fresh votes are drawn in. */
+  function voteLines(g, pg, pos) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'mf-lines');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('aria-hidden', 'true');
+    if (!g || !g.votes || !['vote', 'verdict'].includes(g.phase)) return svg;
+    for (const [from, to] of Object.entries(g.votes)) {
+      const a = pos[from]; const b = pos[to];
+      if (to == null || !a || !b) continue;
+      const fresh = !(pg && pg.votes && pg.votes[from] === to);
+      const dx = b.x - a.x; const dy = b.y - a.y; const len = Math.hypot(dx, dy) || 1;
+      const cut = Math.min(9, len / 3);
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', a.x + (dx / len) * cut); line.setAttribute('y1', a.y + (dy / len) * cut);
+      line.setAttribute('x2', b.x - (dx / len) * cut); line.setAttribute('y2', b.y - (dy / len) * cut);
+      line.setAttribute('pathLength', '1');
+      line.setAttribute('vector-effect', 'non-scaling-stroke');
+      if (fresh && !REDUCE) line.setAttribute('class', 'fresh');
+      if (C.st && Number(from) === C.st.mySeat) line.classList.add('mine');
+      svg.append(line);
+    }
+    return svg;
+  }
+
+  /** A player who has just died plays the death animation; keep the class through re-renders until it ends. */
+  C.dying = new Map();
+  function dying(p, was) {
+    if (p.alive) { C.dying.delete(p.seat); return false; }
+    if (REDUCE) return false;
+    const now = performance.now();
+    if (was === true && !C.dying.has(p.seat)) C.dying.set(p.seat, now + 2200);
+    const until = C.dying.get(p.seat);
+    return until != null && now < until ? now - (until - 2200) : false;
   }
 
   const replace = (el, ...kids) => el.replaceChildren(...kids.filter(Boolean));
@@ -134,6 +203,7 @@
     replace(box,
       h('p', { class: 'mf-phase' }, g.phase === 'night' ? `Ночь ${g.day}` : g.phase === 'morning' ? `Утро ${g.day}` : PHASE[g.phase]),
       h('p', { class: 'mf-timer', 'data-mf-timer': '' }),
+      g.phaseMs ? h('span', { class: 'mf-bar ' + g.phase }, h('i', { 'data-mf-bar': '' })) : null,
       g.news && (g.phase === 'morning' || g.phase === 'day') ? h('p', { class: 'mf-news' }, g.news) : null,
       g.phase === 'night' ? h('p', { class: 'mf-news muted' }, 'Город спит. Мафия, комиссар и доктор делают свой выбор.') : null,
       g.phase === 'intro' ? h('p', { class: 'mf-news' }, 'Посмотрите на свою роль внизу. Скоро наступит ночь.') : null,
@@ -157,7 +227,11 @@
     const me = st.me;
     if (me && g && st.status !== 'waiting') {
       const R = ROLE[me.role];
-      parts.push(h('div', { class: 'mf-card r-' + me.role + (me.alive ? '' : ' dead') },
+      const key = `${st.gameNo}:${me.role}`;
+      if (C.roleShown !== key) { C.roleShown = key; C.roleAt = performance.now(); }
+      const since = performance.now() - C.roleAt;
+      const reveal = !REDUCE && since < 1700;
+      parts.push(h('div', { class: 'mf-card r-' + me.role + (me.alive ? '' : ' dead') + (reveal ? ' reveal' : ''), style: reveal ? `--dt:${-Math.round(since)}ms` : '' },
         h('span', { class: 'mf-card-ico', 'aria-hidden': 'true' }, R.icon),
         h('div', null, h('small', null, 'Ваша роль'), h('b', null, R.name), h('p', null, me.alive ? R.text : 'Вы выбыли — наблюдайте и молчите до конца партии.'))));
       if (MAFIA.has(me.role) && st.status === 'playing') {
@@ -230,6 +304,7 @@
     const st = C.st; const prev = C.prev;
     if (!prev || !st.game) return;
     const ph = st.game.phase; const pph = prev.game && prev.game.phase;
+    if (ph !== pph && !REDUCE && st.status === 'playing' && !$('#mf-view').hidden) curtain(st.game);
     if (ph !== pph) {
       if (ph === 'intro') Sound.play('deal');
       else if (ph === 'night') Sound.play('fold');
@@ -248,6 +323,8 @@
         const s = Math.ceil(left / 1000);
         el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
         el.classList.toggle('low', left < 10000);
+        const bar = $('[data-mf-bar]');
+        if (bar && st.game.phaseMs) bar.style.transform = `scaleX(${Math.min(1, left / st.game.phaseMs)})`;
       }
     }
     requestAnimationFrame(tick);
