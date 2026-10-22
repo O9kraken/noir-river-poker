@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NOIR RIVER — играть в покер</title>
 <meta name="theme-color" content="#0A0D0C">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/play.css">
 </head>
@@ -12,7 +16,7 @@
 
 <!-- AUTH -->
 <section id="view-auth" class="view auth" hidden>
-  <a href="/" class="brand brand-lg"><span class="brand-mark" aria-hidden="true">♠&#xFE0E;</span>NOIR RIVER</a>
+  <a href="/" class="brand brand-lg"><img class="brand-mark" src="/brand/mark.svg" alt="" width="48" height="48"><span>NOIR <b>RIVER</b></span></a>
   <div class="auth-card">
     <div class="tabs" role="tablist">
       <button type="button" role="tab" class="tab is-active" data-auth-tab="login" aria-selected="true">Вход</button>
@@ -36,7 +40,7 @@
 <!-- APP -->
 <div id="view-app" class="view app" hidden>
   <header class="topbar">
-    <a href="#/" class="brand"><span class="brand-mark" aria-hidden="true">♠&#xFE0E;</span><span class="brand-text">NOIR RIVER</span></a>
+    <a href="#/" class="brand"><img class="brand-mark" src="/brand/mark.svg" alt="" width="34" height="34"><span class="brand-text">NOIR <b>RIVER</b></span></a>
     <div class="topbar-right">
       <button type="button" class="btn btn-ghost btn-sm" id="bonus-btn" hidden>Бонус +<span id="bonus-amount"></span></button>
       <div class="wallet" title="Баланс / за столами">
@@ -97,6 +101,11 @@
           <span class="mode-txt"><b>Дурак</b><small>Подкидной и переводной на фишки</small></span>
           <span class="mode-cnt" id="cnt-durak"></span>
         </button>
+        <button type="button" role="tab" class="mode" data-lobby-tab="bj" aria-selected="false">
+          <span class="mode-ico" aria-hidden="true">21</span>
+          <span class="mode-txt"><b>Блэкджек</b><small>Против дилера, блэкджек платит 3:2</small></span>
+          <span class="mode-cnt" id="cnt-bj"></span>
+        </button>
       </div>
       <div class="filters" id="cash-filters" role="group" aria-label="Фильтр игр">
         <button type="button" class="pill is-active" data-filter="all">Все</button>
@@ -107,6 +116,7 @@
       <div class="table-list" id="table-list"></div>
       <div class="table-list" id="sng-list" hidden></div>
       <div class="table-list" id="durak-list" hidden></div>
+      <div class="table-list" id="bj-list" hidden></div>
     </div>
     <aside class="lobby-side">
       <section class="panel">
@@ -181,6 +191,67 @@
           <p><b>Переводной.</b> Пока ничего не побито, отбивающийся может положить карту того же достоинства и перевести атаку на следующего игрока.</p>
           <p><b>Лимит.</b> Не больше 6 карт за отбой (в первом — 5) и не больше, чем карт у отбивающегося.</p>
           <p><b>Как играть здесь.</b> Атакуете — нажмите на подсвеченную карту. Отбиваетесь — выберите карту, затем нажмите на карту на столе, которую бьёте. Три пропущенных хода подряд — поражение.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- BLACKJACK -->
+  <main id="bj-view" class="table-view bj-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          Лобби
+        </a>
+        <div class="table-title">
+          <b id="bj-name"></b>
+          <span id="bj-meta" class="muted"></span>
+        </div>
+        <span class="hand-no muted" id="bj-round"></span>
+      </div>
+      <div class="felt-wrap bj-wrap">
+        <div class="bj-felt" id="bj-felt">
+          <div class="bj-shoe" id="bj-shoe" title="Шуз"><div class="card back" aria-hidden="true"></div><span class="dk-count" id="bj-shoe-count"></span></div>
+          <div class="bj-dealer">
+            <div class="bj-dealer-label">Дилер</div>
+            <div class="bj-cards bj-dealer-cards" id="bj-dealer-cards" aria-label="Карты дилера"></div>
+            <span class="bj-total" id="bj-dealer-total" hidden></span>
+          </div>
+          <div class="bj-arc-text" aria-hidden="true"><b>Блэкджек платит 3 к 2</b><span>Дилер стоит на всех 17</span></div>
+          <div class="bj-spots" id="bj-spots"></div>
+        </div>
+      </div>
+      <div class="dk-hand-wrap">
+        <div class="dk-status" id="bj-status" role="status"></div>
+        <div class="ctrl bj-ctrl" id="bj-ctrl"></div>
+      </div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-bj-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-bj-tab="log" aria-selected="false">Лог</button>
+        <button type="button" role="tab" class="tab" data-bj-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="bj-chat-pane" class="side-pane">
+          <ul class="chat" id="bj-chat" aria-live="polite"></ul>
+          <form id="bj-chat-form" class="chat-form">
+            <label class="sr-only" for="bj-chat-input">Сообщение</label>
+            <input id="bj-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
+            <button class="icon-btn" type="submit" aria-label="Отправить">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </form>
+        </div>
+        <div id="bj-log-pane" class="side-pane" hidden><ul class="log" id="bj-log"></ul></div>
+        <div id="bj-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>Цель</b> — набрать больше очков, чем дилер, но не больше 21. Картинки — 10, туз — 1 или 11.</p>
+          <p><b>Блэкджек</b> — туз и десятка первыми двумя картами — платит 3 к 2. Обычный выигрыш — 1 к 1, равенство — ставка возвращается.</p>
+          <p><b>Дилер</b> добирает до 17 и останавливается на любых 17. С тузом или десяткой в открытую сразу проверяет блэкджек.</p>
+          <p><b>Удвоить</b> — удвоить ставку и получить ровно одну карту. <b>Разделить</b> — пару одинаковых по очкам карт на две руки, до четырёх рук. Тузы после деления получают по одной карте.</p>
+          <p><b>Клавиши:</b> H — взять, S — хватит, D — удвоить, P — разделить.</p>
+          <p>Используются 6 колод, после ¾ шуза колоды перемешиваются.</p>
         </div>
       </div>
     </aside>
@@ -365,5 +436,6 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="/play.js"></script>
 <script src="/durak.js"></script>
+<script src="/blackjack.js"></script>
 </body>
 </html>

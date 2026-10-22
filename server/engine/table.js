@@ -309,6 +309,7 @@ class Table {
     this._post(h.bbIdx, this.bb, 'BB');
     h.currentBet = this.bb;
     h.minRaise = this.bb;
+    h.raises = 1; // the big blind counts as the first bet: an open is a 2-bet, a re-raise a 3-bet
 
     const holeCount = this.game === 'PLO' ? 4 : 2;
     for (let r = 0; r < holeCount; r++) {
@@ -452,6 +453,7 @@ class Table {
         this._put(s, amount - s.bet);
         if (raiseSize >= h.minRaise) {
           h.minRaise = raiseSize;
+          h.raises = (h.raises || 0) + 1;
           // a full raise reopens the action for everyone else
           this.seats.forEach((p, j) => { if (p && j !== i && this._canAct(p)) p.acted = false; });
         }
@@ -493,6 +495,7 @@ class Table {
     }
     h.currentBet = 0;
     h.minRaise = this.bb;
+    h.raises = 0;
 
     const idx = STREETS.indexOf(h.street);
     if (idx === STREETS.length - 1) return this._showdown();
@@ -816,6 +819,7 @@ class Table {
       turnRemaining: h && !h.ended && h.toAct !== -1 ? Math.max(0, h.turnLimit - (this.now() - h.turnStarted)) : 0,
       actionTime: h && h.toAct !== -1 ? h.turnLimit : this.actionTime,
       currentBet: h ? h.currentBet : 0,
+      raises: h && !h.ended ? h.raises || 0 : 0,
       mySeat: me,
       seats: this.seats.map((s, i) => s && {
         name: s.name,

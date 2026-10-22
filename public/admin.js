@@ -93,7 +93,7 @@
     const main = $('#adm-main');
     const d = A.data;
     if (!d) return;
-    const view = { overview, users, tables, sng, durak, announce }[A.tab];
+    const view = { overview, users, tables, sng, durak, bj, announce }[A.tab];
     main.replaceChildren(...[view(d)].flat());
   }
 
@@ -116,6 +116,7 @@
         tile('Раздач идёт', s.activeHands, `${s.cashTables} кэш-столов`),
         tile('Турниры', s.sngRunning, `в регистрации: ${s.sngRegistering} игр.`),
         tile('Дурак', s.durakGames, `партий на ${s.durakTables} столах`),
+        tile('Блэкджек', s.bjPlayers, `игроков на ${s.bjTables} столах`),
         tile('Работает', uptime(s.uptimeMs)),
         tile('Память', `${s.memoryMb} МБ`)),
       h('h2', { class: 'h3 adm-h' }, 'Кто онлайн'),
@@ -270,6 +271,33 @@
         h('a', { class: 'btn btn-dark btn-sm', href: `/play#/durak/${t.id}`, target: '_blank', rel: 'noopener' }, 'Смотреть'),
         h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => run('admin:durak', { tableId: t.id, action: 'clearChat' }, 'Чат очищен') }, 'Очистить чат'),
         h('button', { type: 'button', class: 'btn btn-red btn-sm', onclick: () => { if (confirm(`Закрыть «${t.name}»? Ставки текущей партии вернутся.`)) run('admin:durak', { tableId: t.id, action: 'close' }, 'Стол закрыт'); } }, 'Закрыть')))))];
+  }
+
+  function bj(d) {
+    const form = h('form', { class: 'adm-form' },
+      h('input', { class: 'adm-input', name: 'name', placeholder: 'Название', maxlength: 24, 'aria-label': 'Название' }),
+      select('limits', d.options.bjLimits.map(([a, b], i) => [i, `Ставка ${fmt(a)}–${fmt(b)}`]), 1, 'Лимиты'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', name: 'permanent' }), 'Постоянный'),
+      h('button', { type: 'submit', class: 'btn btn-gold btn-sm' }, 'Создать стол'));
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = e.target;
+      run('admin:createBj', { name: f.name.value, limits: Number(f.limits.value), permanent: f.permanent.checked }, 'Стол создан');
+    });
+    const ST = { betting: 'Ставки', playing: 'Раздача', dealer: 'Ход дилера', result: 'Расчёт' };
+    return [form, h('div', { class: 'adm-list' }, d.bj.map((t) => h('div', { class: 'adm-row' },
+      h('div', { class: 'adm-row-main' },
+        h('b', null, t.name),
+        t.permanent ? h('span', { class: 'status registering' }, 'постоянный') : null,
+        h('span', { class: 'status ' + (t.status === 'betting' ? 'registering' : 'running') }, ST[t.status]),
+        h('span', { class: 'muted small' }, `Ставка ${fmt(t.minBet)}–${fmt(t.maxBet)} · ${t.players}/${t.maxSeats} · раздач ${t.roundNo}`),
+        h('div', { class: 'adm-chips' }, t.seats.filter(Boolean).map((s) => h('span', { class: 'pill adm-seat' },
+          `${s.name}${s.bet ? ` · ставка ${fmt(s.bet)}` : ''}${s.connected ? '' : ' · офлайн'}`,
+          h('button', { type: 'button', class: 'adm-x', 'aria-label': `Убрать ${s.name}`, onclick: () => { if (confirm(`Убрать ${s.name}? Ставка вернётся.`)) run('admin:bj', { tableId: t.id, action: 'kick', target: s.userId }, 'Игрок убран'); } }, '×'))))),
+      h('div', { class: 'adm-actions' },
+        h('a', { class: 'btn btn-dark btn-sm', href: `/play#/bj/${t.id}`, target: '_blank', rel: 'noopener' }, 'Смотреть'),
+        h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => run('admin:bj', { tableId: t.id, action: 'clearChat' }, 'Чат очищен') }, 'Очистить чат'),
+        h('button', { type: 'button', class: 'btn btn-red btn-sm', onclick: () => { if (confirm(`Закрыть «${t.name}»? Ставки вернутся игрокам.`)) run('admin:bj', { tableId: t.id, action: 'close' }, 'Стол закрыт'); } }, 'Закрыть')))))];
   }
 
   function announce(d) {

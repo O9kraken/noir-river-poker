@@ -339,3 +339,50 @@ test('админка и дурак через сокеты', async (t) => {
   const log = (await call(boss, 'admin:overview', {})).log;
   assert.ok(log.length >= 8, 'действия админа в журнале');
 });
+
+test('блэкджек через сокеты: ставка, ходы, расчёт, админ закрывает стол', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({
+    dataFile: path.join(dir, 'users.json'), adminNames: [],
+    bjOpts: { bettingTime: 40, allInDelay: 20, actionTime: 2000, dealerStepMs: 5, resultPause: 30 },
+  });
+  await new Promise((r) => srv.server.listen(0, r));
+  t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  const a = await post('/api/register', { name: 'Крупье', password: 'secret1' });
+  const b = await post('/api/register', { name: 'Игрок', password: 'secret1' });
+  let clients = [];
+  t.after(() => clients.forEach((c) => c.close()));
+  clients = await Promise.all([a, b].map(({ token }) => new Promise((resolve) => {
+    const c = connect(base, { auth: { token }, reconnection: false });
+    c.on('bj:state', (s) => { c.st = s; });
+    c.on('connect', () => resolve(c));
+  })));
+  const [admin, pl] = clients;
+  const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
+  const hello = await call(pl, 'hello', {});
+  assert.ok(hello.bj.length >= 3);
+  assert.ok((await call(pl, 'bj:sit', { tableId: 'bj-classic', seat: 2 })).ok);
+  assert.match((await call(pl, 'bj:bet', { tableId: 'bj-classic', amount: 5000 })).error, /Максимальная/);
+  assert.ok((await call(pl, 'bj:bet', { tableId: 'bj-classic', amount: 100 })).ok);
+  const user = () => Object.values(srv.store.data.users).find((u) => u.name === 'Игрок');
+  assert.equal(user().balance, 9900);
+  assert.equal(user().inPlay['bj:bj-classic'], 100, 'ставка учтена на случай падения');
+  const tbl = srv.bjTables.get('bj-classic');
+  // играем до результата: стоим всегда
+  for (let i = 0; i < 300 && tbl.status !== 'result'; i++) {
+    await new Promise((r) => setTimeout(r, 10));
+    if (pl.st && pl.st.you && pl.st.you.turn) { pl.st = null; await call(pl, 'bj:act', { tableId: 'bj-classic', type: 'stand' }); }
+  }
+  assert.equal(tbl.status, 'result');
+  assert.ok([0, 100, 200, 250].includes(user().balance - 9900), `выплата по правилам: ${user().balance - 9900}`);
+  assert.ok(!user().inPlay['bj:bj-classic'], 'после расчёта в игре ничего нет');
+  // админ: закрыть стол со ставкой — ставка вернётся
+  for (let i = 0; i < 100 && tbl.status !== 'betting'; i++) await new Promise((r) => setTimeout(r, 10));
+  const before = user().balance;
+  await call(pl, 'bj:bet', { tableId: 'bj-classic', amount: 50 });
+  assert.ok((await call(admin, 'admin:bj', { tableId: 'bj-classic', action: 'close' })).ok);
+  assert.equal(user().balance, before, 'ставка вернулась');
+  assert.ok(!srv.bjTables.has('bj-classic'));
+});

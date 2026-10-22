@@ -6,13 +6,17 @@
 <title>Админка — NOIR RIVER</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0A0D0C">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/play.css">
 </head>
 <body>
 <div class="app">
   <header class="topbar">
-    <a href="/play" class="brand"><span class="brand-mark" aria-hidden="true">♠&#xFE0E;</span><span class="brand-text">NOIR RIVER</span></a>
+    <a href="/play" class="brand"><img class="brand-mark" src="/brand/mark.svg" alt="" width="34" height="34"><span class="brand-text">NOIR <b>RIVER</b></span></a>
     <div class="topbar-right">
       <span class="status running" id="adm-live">онлайн</span>
       <a href="/play" class="btn btn-ghost btn-sm">К игре</a>
@@ -37,6 +41,7 @@
         <button type="button" role="tab" class="tab" data-adm-tab="tables" aria-selected="false">Покер</button>
         <button type="button" role="tab" class="tab" data-adm-tab="sng" aria-selected="false">Турниры</button>
         <button type="button" role="tab" class="tab" data-adm-tab="durak" aria-selected="false">Дурак</button>
+        <button type="button" role="tab" class="tab" data-adm-tab="bj" aria-selected="false">Блэкджек</button>
         <button type="button" role="tab" class="tab" data-adm-tab="announce" aria-selected="false">Объявления</button>
       </div>
       <section id="adm-main" class="adm-main"></section>

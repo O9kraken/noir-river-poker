@@ -394,3 +394,17 @@ test('турнир: уровни по раздачам', () => {
   }
   assert.deepEqual(bbs, [20, 30, 50, 50], 'каждую раздачу новый уровень, на последнем остаёмся');
 });
+
+test('счётчик рейзов: опен — 2-бет, ререйз — 3-бет', () => {
+  const { t, timers } = makeTable();
+  t.sit('a', 'A', 0, 5000); t.sit('b', 'B', 1, 5000); t.sit('c', 'C', 2, 5000);
+  timers.runOne();
+  assert.equal(t.publicState('a').raises, 1, 'большой блайнд — первая ставка');
+  t.act('a', 'raise', 60);
+  assert.equal(t.publicState('b').raises, 2, 'опен');
+  t.act('b', 'raise', 180);
+  assert.equal(t.publicState('c').raises, 3, '3-бет');
+  t.act('c', 'fold'); t.act('a', 'call');
+  assert.equal(t.hand.street, 'flop');
+  assert.equal(t.publicState('a').raises, 0, 'на новой улице счёт заново');
+});

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NOIR RIVER">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F3D88E"/>
+      <stop offset="1" stop-color="#C79A3E"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29.5" fill="#0C1311" stroke="url(#g)" stroke-width="2.5"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#C79A3E" stroke-opacity=".35" stroke-width="1"/>
+  <path fill="url(#g)" d="M32 12.5c0 0-15.5 11.6-15.5 22.4 0 5.8 4.3 9.7 9.3 9.7 2.7 0 4.6-1.1 5.4-2.7-.4 4.2-1.9 6.9-4.7 8.8h11c-2.8-1.9-4.3-4.6-4.7-8.8.8 1.6 2.7 2.7 5.4 2.7 5 0 9.3-3.9 9.3-9.7C48 24.1 32 12.5 32 12.5z"/>
+  <path fill="none" stroke="#0C1311" stroke-width="2.6" stroke-linecap="round" d="M14.5 35.2c3.3-3 6.4-3 9.6 0s6.4 3 9.6 0 6.4-3 9.6 0 5.4 2.6 7.2 1.2"/>
+</svg>

@@ -8,6 +8,7 @@ const { Table, GameError } = require('./engine/table');
 const { Store, StoreError } = require('./store');
 const { SitAndGo, TEMPLATES } = require('./tournament');
 const { DurakTable } = require('./durak/table');
+const { BlackjackTable } = require('./blackjack/table');
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'users.json');
@@ -25,7 +26,7 @@ const STARTED_AT = Date.now();
 function createServer({
   dataFile = DATA_FILE, actionTime = ACTION_TIME, tableOpts = {},
   sngTemplates = TEMPLATES, levelHands = Number(process.env.SNG_LEVEL_HANDS) || 0, sngLinger = 120000,
-  durakOpts = {}, adminNames = ADMIN_NAMES,
+  durakOpts = {}, bjOpts = {}, adminNames = ADMIN_NAMES,
 } = {}) {
   const store = new Store(dataFile, { adminNames });
   const app = express();
@@ -263,6 +264,58 @@ function createServer({
     setTimeout(() => { durakLobbyPending = false; io.to('lobby').emit('lobby:durak', durakList()); }, 250);
   }
 
+  // --- Blackjack ---
+  const bjTables = new Map();
+  let bjLobbyPending = false;
+  const BJ_LIMITS = [[5, 250], [10, 1000], [100, 10000], [500, 50000]];
+  const BJ_DEFAULTS = [
+    { id: 'bj-start', name: 'Новичок', minBet: 5, maxBet: 250 },
+    { id: 'bj-classic', name: 'Классика', minBet: 10, maxBet: 1000 },
+    { id: 'bj-vip', name: 'VIP-зал', minBet: 100, maxBet: 10000 },
+  ];
+  function makeBj(cfg) {
+    const id = cfg.id || 'bj' + crypto.randomBytes(4).toString('hex');
+    const key = 'bj:' + id;
+    const t = new BlackjackTable({ ...cfg, id }, {
+      charge: (u, a) => { try { store.withdraw(u, a); } catch (e) { return false; } pushProfile(u); return true; },
+      pay: (u, a) => { if (!u || !a) return; store.deposit(u, a); pushProfile(u); },
+      onInPlay: (u, a) => { store.setInPlay(u, key, a); },
+      onUpdate: (tt) => scheduleBjBroadcast(tt),
+    }, bjOpts);
+    bjTables.set(id, t);
+    broadcastBjLobby();
+    return t;
+  }
+  function getBj(id) {
+    const t = bjTables.get(String(id));
+    if (!t) throw new GameError('Стол не найден');
+    return t;
+  }
+  function bjList() { return [...bjTables.values()].map((t) => t.summary()); }
+  const pendingBj = new Set();
+  function scheduleBjBroadcast(t) {
+    if (pendingBj.has(t.id)) return;
+    pendingBj.add(t.id);
+    setImmediate(() => {
+      pendingBj.delete(t.id);
+      if (!bjTables.has(t.id)) return;
+      const room = io.sockets.adapter.rooms.get('bj:' + t.id);
+      if (room) {
+        for (const sid of room) {
+          const sock = io.sockets.sockets.get(sid);
+          if (sock) sock.emit('bj:state', t.publicState(sock.data.userId));
+        }
+      }
+      broadcastBjLobby();
+    });
+  }
+  function broadcastBjLobby() {
+    if (bjLobbyPending) return;
+    bjLobbyPending = true;
+    setTimeout(() => { bjLobbyPending = false; io.to('lobby').emit('lobby:bj', bjList()); }, 250);
+  }
+  BJ_DEFAULTS.forEach((d) => makeBj({ ...d, permanent: true }));
+
   // remove idle player-created tables
   const cleanup = setInterval(() => {
     const now = Date.now();
@@ -271,6 +324,13 @@ function createServer({
         t.destroy();
         tables.delete(t.id);
         broadcastLobby();
+      }
+    }
+    for (const t of bjTables.values()) {
+      if (!t.permanent && t.playerCount() === 0 && now - t.lastActivity > 10 * 60 * 1000) {
+        t.destroy();
+        bjTables.delete(t.id);
+        broadcastBjLobby();
       }
     }
     for (const t of durakTables.values()) {
@@ -288,6 +348,7 @@ function createServer({
       if (!t.tournament && t.seatOf(target) !== -1) t.standUp(target);
     }
     for (const t of durakTables.values()) if (t.seatOf(target) !== -1) t.leave(target);
+    for (const t of bjTables.values()) if (t.seatOf(target) !== -1) t.leave(target);
     for (const x of sngs.values()) {
       if (x.status === 'registering' && x.players.some((p) => p.userId === target)) x.unregister(target);
     }
@@ -316,6 +377,7 @@ function createServer({
     }
     for (const t of tables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
     for (const t of durakTables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
+    for (const t of bjTables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
 
     let lastChat = 0;
     const on = (event, handler) => {
@@ -342,6 +404,8 @@ function createServer({
       durak: durakList(),
       myDurak: [...durakTables.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
       durakStakes: DURAK_STAKES,
+      bj: bjList(),
+      myBj: [...bjTables.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
       announcement: store.data.announcement,
       leaderboard: store.leaderboard(),
     }));
@@ -481,6 +545,32 @@ function createServer({
       if (clean) t.addChat(socket.data.name, clean);
     });
 
+    // ----- blackjack -----
+    on('bj:watch', ({ tableId }) => {
+      const t = getBj(tableId);
+      socket.join('bj:' + t.id);
+      return { state: t.publicState(userId) };
+    });
+    on('bj:unwatch', ({ tableId }) => { socket.leave('bj:' + String(tableId)); });
+    on('bj:sit', ({ tableId, seat }) => {
+      const t = getBj(tableId);
+      t.sit(userId, socket.data.name, Math.floor(Number(seat)));
+      socket.join('bj:' + t.id);
+    });
+    on('bj:leave', ({ tableId }) => { getBj(tableId).leave(userId); });
+    on('bj:bet', ({ tableId, amount }) => { getBj(tableId).bet(userId, amount); });
+    on('bj:clear', ({ tableId }) => { getBj(tableId).clearBet(userId); });
+    on('bj:rebet', ({ tableId }) => { getBj(tableId).rebet(userId); });
+    on('bj:act', ({ tableId, type }) => {
+      if (!['hit', 'stand', 'double', 'split'].includes(type)) throw new GameError('Неизвестное действие');
+      getBj(tableId).act(userId, type);
+    });
+    on('bj:chat', ({ tableId, text }) => {
+      const t = getBj(tableId);
+      const clean = chatText(text);
+      if (clean) t.addChat(socket.data.name, clean);
+    });
+
     on('table:chat', ({ tableId, text }) => {
       const t = getTable(tableId);
       const clean = chatText(text);
@@ -518,6 +608,8 @@ function createServer({
           sngRegistering: [...sngs.values()].filter((x) => x.status === 'registering').reduce((a, x) => a + x.players.length, 0),
           durakTables: durakTables.size,
           durakGames: [...durakTables.values()].filter((t) => t.status === 'playing').length,
+          bjTables: bjTables.size,
+          bjPlayers: [...bjTables.values()].reduce((a, t) => a + t.playerCount(), 0),
           uptimeMs: Date.now() - STARTED_AT,
           memoryMb: Math.round(process.memoryUsage().rss / 1048576),
         },
@@ -532,9 +624,13 @@ function createServer({
           ...t.summary(), gameNo: t.gameNo, pot: t.pot, chat: t.chat.length,
           seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, ready: x.ready, connected: x.connected }),
         })),
+        bj: [...bjTables.values()].map((t) => ({
+          ...t.summary(), roundNo: t.roundNo, chat: t.chat.length,
+          seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, bet: x.bet, connected: x.connected }),
+        })),
         announcement: store.data.announcement,
         log: store.data.adminLog.slice(-100).reverse(),
-        options: { stakes: STAKES, seats: SEAT_OPTIONS, blindEvery: BLIND_EVERY_OPTIONS, durakStakes: DURAK_STAKES },
+        options: { stakes: STAKES, seats: SEAT_OPTIONS, blindEvery: BLIND_EVERY_OPTIONS, durakStakes: DURAK_STAKES, bjLimits: BJ_LIMITS },
       };
     });
 
@@ -682,6 +778,37 @@ function createServer({
       return { tableId: t.id };
     });
 
+    admin('admin:bj', ({ tableId, action, target }) => {
+      const t = getBj(tableId);
+      switch (action) {
+        case 'close':
+          io.to('bj:' + t.id).emit('notice', { type: 'closed', tableId: t.id, text: `Стол «${t.name}» закрыт администратором, ставки возвращены` });
+          t.destroy();
+          bjTables.delete(t.id);
+          broadcastBjLobby();
+          audit(`Закрыл стол блэкджека «${t.name}»`);
+          break;
+        case 'kick': {
+          const name = (store.get(target) || {}).name || '?';
+          t.leave(String(target));
+          notice(String(target), `Администратор убрал вас из-за стола «${t.name}»`);
+          audit(`Убрал ${name} из-за стола блэкджека «${t.name}»`);
+          break;
+        }
+        case 'clearChat': t.chat = []; t._update(); audit(`Очистил чат стола блэкджека «${t.name}»`); break;
+        default: throw new GameError('Неизвестное действие');
+      }
+    });
+
+    admin('admin:createBj', ({ name, limits, permanent }) => {
+      const lim = BJ_LIMITS[Number(limits)];
+      if (!lim) throw new GameError('Неверные лимиты');
+      const clean = String(name || '').trim().slice(0, 24) || 'Блэкджек';
+      const t = makeBj({ name: clean, minBet: lim[0], maxBet: lim[1], permanent: !!permanent });
+      audit(`Создал стол блэкджека «${clean}» (${lim[0]}–${lim[1]})`);
+      return { tableId: t.id };
+    });
+
     admin('admin:announce', ({ text }) => {
       const a = store.setAnnouncement(text);
       io.emit('announce', a);
@@ -691,7 +818,7 @@ function createServer({
     socket.on('disconnect', () => {
       const room = io.sockets.adapter.rooms.get('user:' + userId);
       if (room && room.size > 0) return; // another tab is still open
-      const seated = [...tables.values(), ...durakTables.values()].filter((t) => t.seatOf(userId) !== -1);
+      const seated = [...tables.values(), ...durakTables.values(), ...bjTables.values()].filter((t) => t.seatOf(userId) !== -1);
       if (!seated.length) return;
       seated.forEach((t) => t.setConnected(userId, false));
       disconnectTimers.set(userId, setTimeout(() => {
@@ -701,6 +828,7 @@ function createServer({
           if (t.seatOf(userId) !== -1 && !t.tournament) t.standUp(userId);
         }
         for (const t of durakTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
+        for (const t of bjTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
       }, RECONNECT_GRACE));
     });
   });
@@ -710,13 +838,14 @@ function createServer({
     for (const x of sngs.values()) x.shutdown();
     for (const t of tables.values()) t.destroy();
     for (const t of durakTables.values()) t.destroy();
+    for (const t of bjTables.values()) t.destroy();
     for (const timer of disconnectTimers.values()) clearTimeout(timer);
     store.saveNow();
     io.close();
     server.close();
   }
 
-  return { app, server, io, store, tables, sngs, durakTables, shutdown };
+  return { app, server, io, store, tables, sngs, durakTables, bjTables, shutdown };
 }
 
 if (require.main === module) {

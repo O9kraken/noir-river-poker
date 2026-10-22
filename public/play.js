@@ -222,6 +222,8 @@
     myTables: new Set(),
     durak: [],
     myDurak: new Set(),
+    bj: [],
+    myBj: new Set(),
     durakStakes: [],
     announcement: null,
     filter: 'all',
@@ -333,6 +335,8 @@
       S.leaderboard = res.leaderboard;
       S.durak = res.durak || [];
       S.myDurak = new Set(res.myDurak || []);
+      S.bj = res.bj || [];
+      S.myBj = new Set(res.myBj || []);
       S.durakStakes = res.durakStakes || [];
       setAnnouncement(res.announcement);
       fillDurakForm();
@@ -341,6 +345,7 @@
       fillCreateForm();
       S.tableId = null; // force re-watch after reconnect
       if (window.DurakUI) window.DurakUI.reset();
+      if (window.BjUI) window.BjUI.reset();
       route();
     });
     socket.on('connect_error', (err) => {
@@ -365,6 +370,8 @@
     });
     socket.on('sng:result', (e) => showSngResult(e));
     socket.on('lobby:durak', (list) => { S.durak = list; renderLobby(); });
+    socket.on('lobby:bj', (list) => { S.bj = list; renderLobby(); });
+    socket.on('bj:state', (st) => { if (window.BjUI) window.BjUI.onState(st); });
     socket.on('durak:state', (st) => { if (window.DurakUI) window.DurakUI.onState(st); });
     socket.on('announce', (a) => setAnnouncement(a));
     socket.on('notice', (n) => {
@@ -378,6 +385,21 @@
 
   async function route() {
     if (!S.socket) return;
+    const bm = location.hash.match(/^#\/bj\/([\w-]+)/);
+    if (bm) {
+      if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
+      S.tableId = null;
+      S.ts = null;
+      if (window.DurakUI) window.DurakUI.close();
+      $('#lobby').hidden = true;
+      $('#table-view').hidden = true;
+      $('#durak-view').hidden = true;
+      $('#bj-view').hidden = false;
+      if (window.BjUI) window.BjUI.open(bm[1]);
+      return;
+    }
+    $('#bj-view').hidden = true;
+    if (window.BjUI) window.BjUI.close();
     const dm = location.hash.match(/^#\/durak\/([\w-]+)/);
     if (dm) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
@@ -462,10 +484,13 @@
     $('#create-btn').hidden = tab === 'sng';
     $('#sng-list').hidden = tab !== 'sng';
     $('#durak-list').hidden = tab !== 'durak';
-    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки' }[tab];
+    $('#bj-list').hidden = tab !== 'bj';
+    $('#create-btn').hidden = tab === 'sng' || tab === 'bj';
+    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек' }[tab];
     if (tab === 'cash') renderCashList();
     else if (tab === 'sng') renderSngList();
-    else renderDurakList();
+    else if (tab === 'durak') renderDurakList();
+    else renderBjList();
     renderMyTables();
     const seatedCash = S.tables.reduce((a, t) => a + t.players, 0);
     const sngWaiting = S.sngs.filter((x) => x.status === 'registering').reduce((a, x) => a + x.players.length, 0);
@@ -474,6 +499,7 @@
     $('#cnt-cash').textContent = `${seatedCash} за столами`;
     $('#cnt-sng').textContent = sngLive ? `${sngLive} идут · ${sngWaiting} ждут` : `${sngWaiting} ждут старта`;
     $('#cnt-durak').textContent = `${durakPlayers} за столами`;
+    $('#cnt-bj').textContent = `${S.bj.reduce((a, t) => a + t.players, 0)} за столами`;
     if (S.me) {
       const hr = new Date().getHours();
       const part = hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -500,6 +526,27 @@
         stats: [['Ставка', fmt(t.stake)], ['Игроков', `до ${t.maxPlayers}`]],
         fill: { n: t.players, max: t.maxPlayers, label: `${t.players} из ${t.maxPlayers}` },
         action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/durak/${t.id}` }, mine ? 'Вернуться' : 'Открыть стол'),
+      }));
+    }
+  }
+
+  const BJ_STATUS = { betting: 'Ставки', playing: 'Раздача', dealer: 'Ход дилера', result: 'Расчёт' };
+  function renderBjList() {
+    const list = $('#bj-list');
+    list.replaceChildren();
+    if (!S.bj.length) { list.append(h('div', { class: 'empty' }, 'Столов нет.')); return; }
+    for (const t of S.bj.slice().sort((a, b) => a.minBet - b.minBet)) {
+      const mine = S.myBj.has(t.id);
+      list.append(tcard({
+        mine,
+        badge: '21',
+        badgeCls: 'dk-badge',
+        kind: 'Блэкджек · 6 колод',
+        status: { cls: t.status === 'betting' ? 'registering' : 'running', text: BJ_STATUS[t.status] },
+        title: t.name,
+        stats: [['Ставка', `${fmt(t.minBet)}–${fmt(t.maxBet)}`], ['Выплата', '3 : 2']],
+        fill: { n: t.players, max: t.maxSeats, label: `${t.players} из ${t.maxSeats} боксов` },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/bj/${t.id}` }, mine ? 'Вернуться' : 'Открыть стол'),
       }));
     }
   }
@@ -626,7 +673,8 @@
     const sng = S.sngs.filter((x) => x.tableId && x.status === 'running' && S.myTables.has(x.tableId))
       .map((x) => ({ id: x.tableId, name: x.name, meta: `Sit & Go · ур. ${x.level}` }));
     const dk = S.durak.filter((t) => S.myDurak.has(t.id)).map((t) => ({ id: t.id, href: `#/durak/${t.id}`, name: t.name, meta: `Дурак · ${fmt(t.stake)}` }));
-    const all = cash.concat(sng).concat(dk);
+    const bjs = S.bj.filter((t) => S.myBj.has(t.id)).map((t) => ({ id: t.id, href: `#/bj/${t.id}`, name: t.name, meta: `Блэкджек · ${fmt(t.minBet)}+` }));
+    const all = cash.concat(sng).concat(dk).concat(bjs);
     if (!all.length) mine.append(h('p', { class: 'muted' }, 'Вы пока не сидите за столом.'));
     for (const t of all) mine.append(h('a', { href: t.href || `#/table/${t.id}` }, h('span', null, t.name), h('span', { class: 'muted' }, t.meta)));
   }
@@ -1220,13 +1268,35 @@
     actions.append(raiseBtn);
 
     const potAfterCall = t.pot + turn.toCall;
-    const preset = (lbl, v) => h('button', { type: 'button', class: 'pill', onclick: () => setVal(v) }, lbl);
-    const presets = h('div', { class: 'presets' },
+    const preset = (lbl, v, cls = '') => {
+      const val = Math.max(turn.minTo, Math.min(turn.maxTo, Math.round(v)));
+      return h('button', { type: 'button', class: 'pill ' + cls, title: `${verb} ${fmt(val)}`, onclick: () => setVal(val) },
+        lbl, h('small', null, fmt(val)));
+    };
+    // multipliers of the bet we face; unopened preflop — of the big blind
+    const preflop = t.street === 'preflop';
+    const unopened = preflop ? t.currentBet <= t.bb : t.currentBet === 0;
+    const base = unopened ? t.bb : t.currentBet;
+    const mult = unopened && !preflop ? [] : [2, 2.5, 3, 4];
+    const multRow = h('div', { class: 'presets presets-mult' },
+      mult.length ? h('span', { class: 'presets-label' }, unopened ? 'от BB' : 'от ставки') : null,
+      mult.map((k) => preset(`×${String(k).replace('.', ',')}`, base * k)));
+    // the next re-raise in the sequence: 3-bet against an open, 4-bet against a 3-bet...
+    const n = (t.raises || 0) + 1;
+    let raiseBtn3 = null;
+    if (n >= 3 && t.currentBet > 0) {
+      const factor = n === 3 ? 3 : n === 4 ? 2.3 : 2.2;
+      raiseBtn3 = preset(n <= 5 ? `${n}-бет` : 'Ре-рейз', t.currentBet * factor, 'pill-3bet');
+    }
+    const potRow = h('div', { class: 'presets' },
+      raiseBtn3,
       preset('Мин', turn.minTo),
-      preset('½ банка', t.currentBet + Math.round(potAfterCall / 2)),
-      preset('¾ банка', t.currentBet + Math.round(potAfterCall * 0.75)),
+      unopened && !preflop ? preset('⅓ банка', t.currentBet + potAfterCall / 3) : null,
+      preset('½ банка', t.currentBet + potAfterCall / 2),
+      preset('¾ банка', t.currentBet + potAfterCall * 0.75),
       preset('Банк', t.currentBet + potAfterCall),
       preset(t.game === 'PLO' ? 'Макс' : 'Олл-ин', turn.maxTo));
+    const presets = h('div', { class: 'presets-wrap' }, mult.length ? multRow : null, potRow);
 
     return h('div', { class: 'ctrl' },
       h('div', { class: 'raise' }, h('div', { class: 'raise-row' }, num, slider), presets),
