@@ -274,6 +274,13 @@
     myDurak: new Set(),
     bj: [],
     myBj: new Set(),
+    rl: [],
+    myRl: new Set(),
+    rlLimits: [],
+    ck: [],
+    myCk: new Set(),
+    ckStakes: [],
+    ckClocks: [],
     private: [],
     bjLimits: [],
     durakStakes: [],
@@ -396,6 +403,14 @@
       S.bjLimits = res.bjLimits || [];
       fillBjForm();
       S.myBj = new Set(res.myBj || []);
+      S.rl = res.rl || [];
+      S.myRl = new Set(res.myRl || []);
+      S.rlLimits = res.rlLimits || [];
+      S.ck = res.ck || [];
+      S.myCk = new Set(res.myCk || []);
+      S.ckStakes = res.ckStakes || [];
+      S.ckClocks = res.ckClocks || [];
+      fillExtraForms();
       S.durakStakes = res.durakStakes || [];
       setAnnouncement(res.announcement);
       fillDurakForm();
@@ -430,6 +445,10 @@
     socket.on('sng:result', (e) => showSngResult(e));
     socket.on('lobby:durak', (list) => { S.durak = list; renderLobby(); });
     socket.on('lobby:bj', (list) => { S.bj = list; renderLobby(); });
+    socket.on('lobby:rl', (list) => { S.rl = list; renderLobby(); });
+    socket.on('lobby:ck', (list) => { S.ck = list; renderLobby(); });
+    socket.on('rl:state', (st) => { if (window.RouletteUI) window.RouletteUI.onState(st); });
+    socket.on('ck:state', (st) => { if (window.CheckersUI) window.CheckersUI.onState(st); });
     socket.on('lobby:private', (list) => { S.private = list; renderLobby(); });
     if (window.SocialUI) window.SocialUI.bind(socket);
     socket.on('bj:state', (st) => { if (window.BjUI) window.BjUI.onState(st); });
@@ -444,8 +463,22 @@
   // ================= routing =================
   window.addEventListener('hashchange', route);
 
+  const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI };
   async function route() {
     if (!S.socket) return;
+    const xm = location.hash.match(/^#\/(rl|ck)\/([\w-]+)/);
+    for (const [k, ui] of Object.entries(EXTRA_VIEWS)) if (ui() && (!xm || xm[1] !== k)) { ui().close(); $(`#${k}-view`).hidden = true; }
+    if (xm) {
+      if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
+      S.tableId = null;
+      S.ts = null;
+      if (window.DurakUI) window.DurakUI.close();
+      if (window.BjUI) window.BjUI.close();
+      for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view', '#profile-view']) $(v).hidden = true;
+      $(`#${xm[1]}-view`).hidden = false;
+      if (EXTRA_VIEWS[xm[1]]()) EXTRA_VIEWS[xm[1]]().open(xm[2]);
+      return;
+    }
     const pm = location.hash.match(/^#\/profile(?:\/(.+))?$/);
     if (pm) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
@@ -577,11 +610,15 @@
     $('#sng-list').hidden = tab !== 'sng';
     $('#durak-list').hidden = tab !== 'durak';
     $('#bj-list').hidden = tab !== 'bj';
+    $('#rl-list').hidden = tab !== 'rl';
+    $('#ck-list').hidden = tab !== 'ck';
     $('#create-btn-label').textContent = tab === 'sng' ? 'Создать турнир' : 'Создать стол';
-    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек' }[tab];
+    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки на фишки' }[tab];
     if (tab === 'cash') renderCashList();
     else if (tab === 'sng') renderSngList();
     else if (tab === 'durak') renderDurakList();
+    else if (tab === 'rl') renderRlList();
+    else if (tab === 'ck') renderCkList();
     else renderBjList();
     renderMyTables();
     const seatedCash = S.tables.reduce((a, t) => a + t.players, 0);
@@ -592,6 +629,8 @@
     $('#cnt-sng').textContent = sngLive ? `${sngLive} идут · ${sngWaiting} ждут` : `${sngWaiting} ждут старта`;
     $('#cnt-durak').textContent = `${durakPlayers} за столами`;
     $('#cnt-bj').textContent = `${S.bj.reduce((a, t) => a + t.players, 0)} за столами`;
+    $('#cnt-rl').textContent = `${S.rl.reduce((a, t) => a + t.players, 0)} у колеса`;
+    $('#cnt-ck').textContent = `${S.ck.filter((t) => t.status === 'playing').length} партий идёт`;
     if (S.me) {
       const hr = new Date().getHours();
       const part = hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
@@ -644,6 +683,84 @@
       }));
     }
   }
+
+  const RED_NUMS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+  const numColor = (n) => (n === 0 ? 'g' : RED_NUMS.has(n) ? 'r' : 'b');
+  const RL_STATUS = { betting: 'Ставки', spinning: 'Колесо крутится', result: 'Выплаты' };
+  function renderRlList() {
+    const list = $('#rl-list');
+    list.replaceChildren();
+    const rows = S.rl.concat(S.private.filter((x) => x.kind === 'rl')).sort((a, b) => (b.private - a.private) || a.minBet - b.minBet);
+    if (!rows.length) { list.append(h('div', { class: 'empty' }, 'Столов нет.')); return; }
+    for (const t of rows) {
+      const mine = S.myRl.has(t.id);
+      list.append(tcard({
+        mine,
+        priv: t.private ? t.owner : null,
+        badge: '0',
+        badgeCls: 'dk-badge rl-badge',
+        kind: 'Европейская · одно зеро',
+        status: { cls: t.status === 'betting' ? 'registering' : 'running', text: RL_STATUS[t.status] },
+        title: t.name,
+        stats: [['Фишка от', fmt(t.minBet)], ['За спин до', fmt(t.maxBet)]],
+        names: null,
+        fill: { n: t.players, max: t.maxSeats, label: `${t.players} из ${t.maxSeats} у стола` },
+        sub: t.last && t.last.length ? h('span', { class: 'rl-last' }, t.last.map((n) => h('i', { class: 'rl-n ' + numColor(n) }, n))) : null,
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/rl/${t.id}` }, mine ? 'Вернуться' : 'К колесу'),
+      }));
+    }
+  }
+  const CK_STATUS = { waiting: 'Ждут игроков', playing: 'Идёт партия', result: 'Итоги' };
+  function renderCkList() {
+    const list = $('#ck-list');
+    list.replaceChildren();
+    const rows = S.ck.concat(S.private.filter((x) => x.kind === 'ck')).sort((a, b) => (b.private - a.private) || a.stake - b.stake);
+    if (!rows.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
+    for (const t of rows) {
+      const mine = S.myCk.has(t.id);
+      list.append(tcard({
+        mine,
+        priv: t.private ? t.owner : null,
+        badge: '⛀',
+        badgeCls: 'dk-badge ck-badge',
+        kind: `Русские шашки · ${t.clockMin} мин`,
+        status: { cls: t.status === 'playing' ? 'running' : 'registering', text: CK_STATUS[t.status] },
+        title: t.name,
+        stats: [['Ставка', fmt(t.stake)], ['Банк', fmt(t.stake * 2)]],
+        fill: { n: t.players, max: 2, label: t.players === 2 ? 'оба игрока на месте' : t.players ? 'ждём соперника' : 'доска свободна' },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/ck/${t.id}` }, mine ? 'Вернуться' : t.players < 2 ? 'Сесть за доску' : 'Смотреть'),
+      }));
+    }
+  }
+  function fillExtraForms() {
+    const a = $('#rl-limits');
+    a.replaceChildren(...S.rlLimits.map(([x, y], i) => h('option', { value: i }, `фишка от ${fmt(x)}, за спин до ${fmt(y)}`)));
+    a.value = S.rlLimits.length > 1 ? '1' : '0';
+    const b = $('#ck-stake');
+    b.replaceChildren(...S.ckStakes.map((x) => h('option', { value: x }, `${fmt(x)} с каждого · банк ${fmt(x * 2)}`)));
+    b.value = S.ckStakes.includes(250) ? '250' : String(S.ckStakes[0] || '');
+    const c = $('#ck-clock');
+    c.replaceChildren(...S.ckClocks.map((x) => h('option', { value: x }, `${x} минут на партию + 3 с за ход`)));
+    c.value = S.ckClocks.includes(5) ? '5' : String(S.ckClocks[0] || '');
+  }
+  $('#rl-create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const res = await call('rl:create', { name: f.name.value, limits: Number(f.limits.value), private: f.private.checked });
+    if (!res) return;
+    $('#modal-rl-create').close();
+    f.name.value = '';
+    location.hash = `#/rl/${res.tableId}`;
+  });
+  $('#ck-create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const res = await call('ck:create', { name: f.name.value, stake: Number(f.stake.value), clock: Number(f.clock.value), private: f.private.checked });
+    if (!res) return;
+    $('#modal-ck-create').close();
+    f.name.value = '';
+    location.hash = `#/ck/${res.tableId}`;
+  });
 
   function fillBjForm() {
     const sel = $('#bj-limits');
@@ -811,7 +928,9 @@
       .map((x) => ({ id: x.tableId, name: x.name, meta: `Sit & Go · ур. ${x.level}` }));
     const dk = S.durak.filter((t) => S.myDurak.has(t.id)).map((t) => ({ id: t.id, href: `#/durak/${t.id}`, name: t.name, meta: `Дурак · ${fmt(t.stake)}` }));
     const bjs = S.bj.filter((t) => S.myBj.has(t.id)).map((t) => ({ id: t.id, href: `#/bj/${t.id}`, name: t.name, meta: `Блэкджек · ${fmt(t.minBet)}+` }));
-    const all = cash.concat(sng).concat(dk).concat(bjs);
+    const rls = S.rl.filter((t) => S.myRl.has(t.id)).map((t) => ({ id: t.id, href: `#/rl/${t.id}`, name: t.name, meta: `Рулетка · ${fmt(t.minBet)}+` }));
+    const cks = S.ck.filter((t) => S.myCk.has(t.id)).map((t) => ({ id: t.id, href: `#/ck/${t.id}`, name: t.name, meta: `Шашки · ${fmt(t.stake)}` }));
+    const all = cash.concat(sng).concat(dk).concat(bjs).concat(rls).concat(cks);
     if (!all.length) mine.append(h('p', { class: 'muted' }, 'Вы пока не сидите за столом.'));
     for (const t of all) mine.append(h('a', { href: t.href || `#/table/${t.id}` }, h('span', null, t.name), h('span', { class: 'muted' }, t.meta)));
   }
@@ -846,6 +965,8 @@
   $('#create-btn').addEventListener('click', () => {
     if (S.lobbyTab === 'durak') { $('#modal-durak-create').showModal(); return; }
     if (S.lobbyTab === 'bj') { $('#modal-bj-create').showModal(); return; }
+    if (S.lobbyTab === 'rl') { $('#modal-rl-create').showModal(); return; }
+    if (S.lobbyTab === 'ck') { $('#modal-ck-create').showModal(); return; }
     if (S.lobbyTab === 'sng') { openSngCreate(); return; }
     $('#create-error').textContent = '';
     $('#modal-create').showModal();

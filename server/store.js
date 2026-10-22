@@ -22,6 +22,8 @@ function emptyStats() {
     sng: { played: 0, won: 0, itm: 0, prizes: 0, buyins: 0 },
     durak: { games: 0, wins: 0, losses: 0, draws: 0, net: 0 },
     bj: { rounds: 0, wins: 0, losses: 0, pushes: 0, blackjacks: 0, net: 0, biggestWin: 0 },
+    roulette: { spins: 0, wins: 0, net: 0, straight: 0, biggestWin: 0 },
+    checkers: { games: 0, wins: 0, losses: 0, draws: 0, net: 0 },
   };
 }
 
@@ -195,6 +197,12 @@ class Store {
     } else if (kind === 'bj') {
       bump('bjRounds');
       if (f.net > 0) bump('bjWins');
+    } else if (kind === 'roulette') {
+      bump('rlSpins');
+      if (f.net > 0) bump('rlWins');
+    } else if (kind === 'checkers') {
+      bump('ckGames');
+      if (f.win) bump('ckWins');
     }
     if (kind === 'poker') {
       const p = st.poker;
@@ -239,6 +247,24 @@ class Store {
       p.blackjacks += f.blackjacks || 0;
       if (f.net > p.biggestWin) p.biggestWin = f.net;
       entry = { kind, table: f.table, net: f.net, text: f.blackjacks ? 'Блэкджек!' : f.net > 0 ? 'Выигрыш' : f.net < 0 ? 'Проигрыш' : 'Ничья' };
+    } else if (kind === 'roulette') {
+      const p = st.roulette;
+      p.spins += 1;
+      p.net += f.net;
+      if (f.net > 0) p.wins += 1;
+      if (f.straight) p.straight += 1;
+      if (f.net > p.biggestWin) p.biggestWin = f.net;
+      // spins at one table are grouped like poker hands
+      const last = u.recent[0];
+      if (last && last.kind === 'roulette' && last.table === f.table && Date.now() - last.t < 60 * 60 * 1000) {
+        last.spins = (last.spins || 1) + 1; last.net += f.net; last.t = Date.now(); last.text = `${last.spins} спинов`;
+      } else entry = { kind, table: f.table, net: f.net, spins: 1, text: `Выпало ${f.number}` };
+    } else if (kind === 'checkers') {
+      const p = st.checkers;
+      p.games += 1;
+      p.net += f.net;
+      if (f.draw) p.draws += 1; else if (f.win) p.wins += 1; else p.losses += 1;
+      entry = { kind, table: f.table, net: f.net, text: f.draw ? 'Ничья' : f.win ? 'Победа' : 'Поражение' };
     }
     if (entry) {
       u.recent.unshift({ t: Date.now(), ...entry });
@@ -570,6 +596,8 @@ const ACHIEVEMENTS = [
   { id: 'durak10', title: 'Не дурак', text: 'Выйти первым в 10 партиях дурака', reward: 3000, ok: (s) => s.durak.wins >= 10, progress: (s) => [s.durak.wins, 10] },
   { id: 'natural', title: 'Двадцать одно', text: 'Получить блэкджек', reward: 500, ok: (s) => s.bj.blackjacks >= 1 },
   { id: 'natural10', title: 'Любимец шуза', text: '10 блэкджеков', reward: 3000, ok: (s) => s.bj.blackjacks >= 10, progress: (s) => [s.bj.blackjacks, 10] },
+  { id: 'straight', title: 'В яблочко', text: 'Выиграть ставку на одно число в рулетке', reward: 1000, ok: (s) => s.roulette.straight >= 1 },
+  { id: 'ck10', title: 'Гроссмейстер', text: 'Выиграть 10 партий в шашки', reward: 3000, ok: (s) => s.checkers.wins >= 10, progress: (s) => [s.checkers.wins, 10] },
   { id: 'rich', title: 'Состоятельный', text: 'Накопить 50 000 фишек', reward: 5000, ok: (s, u, chips) => chips >= 50000, progress: (s, u, chips) => [chips, 50000] },
   { id: 'social', title: 'Своя компания', text: 'Добавить 3 друзей', reward: 1500, ok: (s, u) => u.friends.length >= 3, progress: (s, u) => [u.friends.length, 3] },
 ];
@@ -583,6 +611,8 @@ const QUESTS = [
   { id: 'durakwin', group: 'other', title: 'Не остаться дураком', text: 'Выйти из партии в дурака первым', metric: 'durakWins', target: 1, reward: 700 },
   { id: 'bj10', group: 'other', title: 'За столом дилера', text: 'Сыграть 10 раундов блэкджека', metric: 'bjRounds', target: 10, reward: 600 },
   { id: 'bjwin3', group: 'other', title: 'Обыграть дилера', text: 'Выиграть 3 раунда в блэкджеке', metric: 'bjWins', target: 3, reward: 700 },
+  { id: 'rl10', group: 'other', title: 'Колесо фортуны', text: 'Сделать ставки в 10 спинах рулетки', metric: 'rlSpins', target: 10, reward: 600 },
+  { id: 'ckwin', group: 'other', title: 'Дамка в деле', text: 'Выиграть партию в шашки', metric: 'ckWins', target: 1, reward: 900 },
   { id: 'sng1', group: 'any', title: 'Турнирный день', text: 'Сыграть турнир Sit & Go', metric: 'sngPlayed', target: 1, reward: 900 },
   { id: 'itm', group: 'any', title: 'В призах', text: 'Занять призовое место в турнире', metric: 'sngItm', target: 1, reward: 1200 },
 ];

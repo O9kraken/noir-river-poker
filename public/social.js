@@ -3,7 +3,7 @@
   const NR = window.NR;
   const { $, $$, h, fmt, toast, call, Sound, S } = NR;
 
-  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go' };
+  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go', roulette: 'Рулетка', checkers: 'Шашки' };
   const HAND_NAMES = ['Старшая карта', 'Пара', 'Две пары', 'Сет', 'Стрит', 'Флеш', 'Фулл-хаус', 'Каре', 'Стрит-флеш', 'Роял-флеш'];
   const SYMBOLS = ['', 's', 'h', 'd', 'c', 'crown', 'star', 'bolt', 'moon', 'flame'];
   const HUES = [0, 25, 45, 90, 150, 185, 210, 250, 285, 320];
@@ -221,7 +221,21 @@
           stat('Раундов', fmt(s.bj.rounds)),
           stat('Выигрыши', fmt(s.bj.wins), pct(s.bj.wins, s.bj.rounds)),
           stat('Блэкджеков', fmt(s.bj.blackjacks)),
-          stat('Итог', signed(s.bj.net)))));
+          stat('Итог', signed(s.bj.net)))),
+      s.roulette ? h('article', { class: 'pcard' },
+        h('h2', { class: 'h3' }, 'Рулетка'),
+        h('div', { class: 'pstats' },
+          stat('Спинов', fmt(s.roulette.spins)),
+          stat('В плюс', fmt(s.roulette.wins), pct(s.roulette.wins, s.roulette.spins)),
+          stat('Ставок на число', fmt(s.roulette.straight), 'выиграло'),
+          stat('Итог', signed(s.roulette.net)))) : null,
+      s.checkers ? h('article', { class: 'pcard' },
+        h('h2', { class: 'h3' }, 'Шашки'),
+        h('div', { class: 'pstats' },
+          stat('Партий', fmt(s.checkers.games)),
+          stat('Победы', fmt(s.checkers.wins), pct(s.checkers.wins, s.checkers.games)),
+          stat('Ничьи', fmt(s.checkers.draws)),
+          stat('Итог', signed(s.checkers.net)))) : null);
 
     const ach = p.achievements;
     const doneN = ach.filter((a) => a.done).length;
@@ -246,7 +260,7 @@
       p.recent.length
         ? h('ul', { class: 'recent' }, p.recent.map((r) => h('li', null,
           h('span', { class: 'rk' }, KIND[r.kind]),
-          h('span', { class: 'rt' }, h('b', null, r.kind === 'poker' && r.hands ? `${r.hands} ${plural(r.hands, 'раздача', 'раздачи', 'раздач')}${r.best ? ` · лучшая рука: ${r.best}` : ''}` : r.text), h('small', null, `${r.table} · ${new Date(r.t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`)),
+          h('span', { class: 'rt' }, h('b', null, r.kind === 'roulette' && r.spins > 1 ? `${r.spins} ${plural(r.spins, 'спин', 'спина', 'спинов')}` : r.kind === 'poker' && r.hands ? `${r.hands} ${plural(r.hands, 'раздача', 'раздачи', 'раздач')}${r.best ? ` · лучшая рука: ${r.best}` : ''}` : r.text), h('small', null, `${r.table} · ${new Date(r.t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`)),
           h('span', { class: 'rn ' + (r.net > 0 ? 'plus' : r.net < 0 ? 'minus' : '') }, signed(r.net)))))
         : h('p', { class: 'muted' }, 'Пока пусто — сыграйте партию в любой из игр.'));
 

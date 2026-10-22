@@ -568,6 +568,8 @@ test('задания дня, награды за достижения, своя 
   for (let i = 0; i < 12; i++) srv.store.recordGame(uid, 'bj', { table: 'b', net: 5 });
   for (let i = 0; i < 3; i++) srv.store.recordGame(uid, 'durak', { table: 'd', net: 10 });
   srv.store.recordGame(uid, 'sng', { table: 's', place: 1, total: 2, prize: 100, buyIn: 50 });
+  for (let i = 0; i < 10; i++) srv.store.recordGame(uid, 'roulette', { table: 'r', net: 10, number: 5 });
+  srv.store.recordGame(uid, 'checkers', { table: 'c', net: 100, win: true });
   pr = await call('progress:get', {});
   assert.ok(pr.quests.every((q) => q.done));
   const before = srv.store.get(uid).balance;
@@ -648,4 +650,63 @@ test('игрок создаёт турнир за фишки: фонд орга�
   await call(own, 'sng:create', { name: 'Первый', game: 'NLH', seats: 6, buyIn: 100, startStack: 1500 });
   await call(own, 'sng:create', { name: 'Второй', game: 'NLH', seats: 6, buyIn: 100, startStack: 1500 });
   assert.match((await call(own, 'sng:create', { name: 'Третий', game: 'NLH', seats: 6, buyIn: 100, startStack: 1500 })).error, /2 открытых/);
+});
+
+test('рулетка и шашки через сокеты: лобби, ставка, партия на фишки, приглашения', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({ dataFile: path.join(dir, 'u.json'), adminNames: ['Админ'], rlOpts: { bettingTime: 60, spinTime: 30, resultPause: 30, randomInt: () => 7 }, ckOpts: { resultPause: 50 } });
+  await new Promise((r) => srv.server.listen(0, r));
+  let cl = [];
+  t.after(() => { cl.forEach((x) => x.close()); try { srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const regs = [];
+  for (const n of ['Админ', 'Соня']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1' }) }).then((r) => r.json()));
+  cl = await Promise.all(regs.map(({ token }) => new Promise((resolve) => { const s = connect(base, { auth: { token }, reconnection: false }); s.on('connect', () => resolve(s)); })));
+  const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
+  const [a, b] = cl;
+  const [aid, bid] = regs.map((r) => r.user.id);
+  const hello = await call(a, 'hello', {});
+  assert.equal(hello.rl.length, 3);
+  assert.equal(hello.ck.length, 3);
+
+  // roulette: bet on 7 and red, wheel lands on 7
+  await call(a, 'rl:watch', { tableId: 'rl-euro' });
+  assert.ok((await call(a, 'rl:sit', { tableId: 'rl-euro' })).ok);
+  assert.ok((await call(a, 'rl:bet', { tableId: 'rl-euro', spot: 'n7', amount: 100 })).ok);
+  await call(a, 'rl:bet', { tableId: 'rl-euro', spot: 'red', amount: 50 });
+  assert.match((await call(a, 'rl:bet', { tableId: 'rl-euro', spot: 'n99', amount: 50 })).error, /Нет такой ставки/);
+  assert.equal(srv.store.get(aid).balance, 9850);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(srv.store.get(aid).balance, 9850 + 3600 + 100);
+  assert.equal(srv.store.get(aid).stats.roulette.straight, 1);
+
+  // checkers: private table, invite, play until resignation
+  const cr = await call(a, 'ck:create', { name: 'Партия', stake: 500, clock: 5, private: true });
+  assert.ok(cr.tableId);
+  await call(a, 'ck:sit', { tableId: cr.tableId, seat: 0 });
+  await call(b, 'ck:sit', { tableId: cr.tableId, seat: 1 });
+  await call(a, 'ck:ready', { tableId: cr.tableId, value: true });
+  await call(b, 'ck:ready', { tableId: cr.tableId, value: true });
+  const tbl = srv.extra.ck.map.get(cr.tableId);
+  assert.equal(tbl.status, 'playing');
+  const white = tbl.colors.w === 0 ? a : b;
+  const black = white === a ? b : a;
+  const st = (await call(white, 'ck:watch', { tableId: cr.tableId })).state;
+  assert.equal(st.legal.length, 7);
+  assert.ok((await call(white, 'ck:move', { tableId: cr.tableId, path: st.legal[2] })).ok);
+  assert.match((await call(white, 'ck:move', { tableId: cr.tableId, path: st.legal[0] })).error, /соперника/);
+  await call(black, 'ck:resign', { tableId: cr.tableId });
+  const wid = white === a ? aid : bid;
+  const bal = srv.store.get(wid).balance;
+  assert.equal(srv.store.get(wid).stats.checkers.wins, 1);
+  assert.ok(bal >= 10000);
+  // friends + invite to a checkers table
+  await call(a, 'friends:add', { name: 'Соня' });
+  await call(b, 'friends:accept', { id: aid });
+  const got = new Promise((r) => b.once('invite', r));
+  assert.ok((await call(a, 'friends:invite', { id: bid, href: `#/ck/${cr.tableId}` })).ok);
+  assert.equal((await got).game, 'Шашки');
+  // admin closes a roulette table
+  assert.ok((await call(a, 'admin:extra', { kind: 'rl', tableId: 'rl-vip', action: 'close' })).ok);
+  assert.ok(!srv.extra.rl.map.has('rl-vip'));
 });

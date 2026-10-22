@@ -10,6 +10,8 @@ const { Store, StoreError, AVATAR_MAX_BYTES } = require('./store');
 const { SitAndGo, TEMPLATES, validateTemplate, DAY } = require('./tournament');
 const { DurakTable } = require('./durak/table');
 const { BlackjackTable } = require('./blackjack/table');
+const { RouletteTable } = require('./roulette/table');
+const { CheckersTable } = require('./checkers/table');
 
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'users.json');
@@ -21,13 +23,16 @@ const STAKES = [[1, 2], [5, 10], [10, 20], [25, 50], [50, 100], [100, 200], [500
 const SEAT_OPTIONS = [2, 6, 9];
 const BLIND_EVERY_OPTIONS = [0, 3, 5, 10];
 const DURAK_STAKES = [50, 100, 250, 500, 1000, 5000];
+const RL_LIMITS = [[5, 500], [10, 2000], [100, 20000]];
+const CK_STAKES = [50, 100, 250, 500, 1000, 5000];
+const CK_CLOCKS = [3, 5, 10];
 const ADMIN_NAMES = (process.env.ADMIN_NAMES || '').split(',').map((x) => x.trim()).filter(Boolean);
 const STARTED_AT = Date.now();
 
 function createServer({
   dataFile = DATA_FILE, actionTime = ACTION_TIME, tableOpts = {},
   sngTemplates = TEMPLATES, levelHands = Number(process.env.SNG_LEVEL_HANDS) || 0, sngLinger = 120000,
-  durakOpts = {}, bjOpts = {}, adminNames = ADMIN_NAMES, store: givenStore = null,
+  durakOpts = {}, bjOpts = {}, rlOpts = {}, ckOpts = {}, adminNames = ADMIN_NAMES, store: givenStore = null,
 } = {}) {
   const store = givenStore || new Store(dataFile, { adminNames });
   const app = express();
@@ -435,6 +440,73 @@ function createServer({
   }
   BJ_DEFAULTS.forEach((d) => makeBj({ ...d, permanent: true }));
 
+  // --- roulette & checkers share the same plumbing ---
+  const extra = {}; // kind -> { map, make, get, list, broadcastLobby, title }
+  function registerKind(kind, Ctor, title, opts, onEnd) {
+    const map = new Map();
+    let lobbyPending = false;
+    const pend = new Set();
+    const list = () => [...map.values()].filter((t) => !t.private).map((t) => t.summary());
+    function broadcastLobby() {
+      if (lobbyPending) return;
+      lobbyPending = true;
+      setTimeout(() => { lobbyPending = false; io.to('lobby').emit('lobby:' + kind, list()); }, 250);
+    }
+    function schedule(t) {
+      if (pend.has(t.id)) return;
+      pend.add(t.id);
+      setImmediate(() => {
+        pend.delete(t.id);
+        if (!map.has(t.id)) return;
+        const room = io.sockets.adapter.rooms.get(kind + ':' + t.id);
+        if (room) {
+          for (const sid of room) {
+            const sock = io.sockets.sockets.get(sid);
+            if (sock) sock.emit(kind + ':state', t.publicState(sock.data.userId));
+          }
+        }
+        broadcastLobby();
+        if (t.private) schedulePrivate(t);
+      });
+    }
+    function make(cfg) {
+      const id = cfg.id || newId(kind, cfg.private);
+      const key = kind + ':' + id;
+      const t = new Ctor({ ...cfg, id }, {
+        charge: (u, a) => { try { store.withdraw(u, a); } catch (e) { return false; } pushProfile(u); return true; },
+        pay: (u, a) => { if (!u || !a) return; store.deposit(u, a); pushProfile(u); },
+        onInPlay: (u, a) => { store.setInPlay(u, key, a); },
+        onUpdate: schedule,
+        onRoundEnd: (tt, r) => { onEnd(tt, r); r.forEach((x) => x.userId && pushProfile(x.userId)); },
+        onGameEnd: (tt, r) => { onEnd(tt, r); r.forEach((x) => x.userId && pushProfile(x.userId)); },
+      }, opts);
+      decorate(t, cfg);
+      map.set(id, t);
+      broadcastLobby();
+      return t;
+    }
+    const get = (id) => { const t = map.get(String(id)); if (!t) throw new GameError('Стол не найден'); return t; };
+    extra[kind] = { map, make, get, list, broadcastLobby, title };
+    return extra[kind];
+  }
+  const RL = registerKind('rl', RouletteTable, 'Рулетка', rlOpts, (tt, results) => {
+    for (const r of results) if (r.userId) store.recordGame(r.userId, 'roulette', { table: tt.name, net: r.net, number: tt.result, straight: r.straight && r.net > 0 });
+  });
+  const CK = registerKind('ck', CheckersTable, 'Шашки', ckOpts, (tt, results) => {
+    for (const r of results) if (r.userId) store.recordGame(r.userId, 'checkers', { table: tt.name, net: r.net, win: r.win, draw: r.draw });
+  });
+  [
+    { id: 'rl-club', name: 'Для своих', minBet: 5, maxBet: 500 },
+    { id: 'rl-euro', name: 'Монте-Карло', minBet: 10, maxBet: 2000 },
+    { id: 'rl-vip', name: 'Высокие ставки', minBet: 100, maxBet: 20000 },
+  ].forEach((d) => RL.make({ ...d, permanent: true }));
+  [
+    { id: 'ck-club', name: 'Клубная доска', stake: 100, clockMs: 5 * 60000 },
+    { id: 'ck-blitz', name: 'Блиц', stake: 250, clockMs: 3 * 60000 },
+    { id: 'ck-big', name: 'На интерес', stake: 1000, clockMs: 10 * 60000 },
+  ].forEach((d) => CK.make({ ...d, permanent: true }));
+  const extraTables = () => Object.values(extra).flatMap((k) => [...k.map.values()]);
+
   // remove idle player-created tables
   const cleanup = setInterval(() => {
     const now = Date.now();
@@ -459,12 +531,17 @@ function createServer({
         broadcastDurakLobby();
       }
     }
+    for (const k of Object.values(extra)) {
+      for (const t of k.map.values()) {
+        if (!t.permanent && t.playerCount() === 0 && now - t.lastActivity > 10 * 60 * 1000) { t.destroy(); k.map.delete(t.id); k.broadcastLobby(); }
+      }
+    }
   }, 60000);
 
   // --- private tables & friends ---
-  const KIND_OF = (t) => (t.kind === 'durak' ? 'durak' : t.kind === 'bj' ? 'bj' : 'poker');
-  const HREF_OF = (t) => (t.kind === 'durak' ? `#/durak/${t.id}` : t.kind === 'bj' ? `#/bj/${t.id}` : `#/table/${t.id}`);
-  const allTables = () => [...tables.values(), ...durakTables.values(), ...bjTables.values()];
+  const KIND_OF = (t) => (t.kind === 'durak' || t.kind === 'bj' || extra[t.kind] ? t.kind : 'poker');
+  const HREF_OF = (t) => (KIND_OF(t) === 'poker' ? `#/table/${t.id}` : `#/${t.kind}/${t.id}`);
+  const allTables = () => [...tables.values(), ...durakTables.values(), ...bjTables.values(), ...extraTables()];
 
   /** Private tables a player may see in the lobby: own, friends', or where they sit. */
   function privateList(uid) {
@@ -520,7 +597,7 @@ function createServer({
     pushProfile(uid);
     for (const t of allTables()) {
       if (t.seatOf(uid) === -1) continue;
-      if (t.kind === 'durak' || t.kind === 'bj') t._update(); else t.onUpdate(t);
+      if (t.kind === 'durak' || t.kind === 'bj' || extra[t.kind]) t._update(); else t.onUpdate(t);
     }
     presenceChanged(uid);
   }
@@ -534,6 +611,7 @@ function createServer({
     }
     for (const t of durakTables.values()) if (t.seatOf(target) !== -1) t.leave(target);
     for (const t of bjTables.values()) if (t.seatOf(target) !== -1) t.leave(target);
+    for (const t of extraTables()) if (t.seatOf(target) !== -1) t.leave(target);
     for (const x of sngs.values()) {
       if (x.status === 'registering' && x.players.some((p) => p.userId === target)) x.unregister(target);
     }
@@ -563,6 +641,7 @@ function createServer({
     for (const t of tables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
     for (const t of durakTables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
     for (const t of bjTables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
+    for (const t of extraTables()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
     presenceChanged(userId);
 
     let lastChat = 0;
@@ -597,6 +676,13 @@ function createServer({
       leaderboard: store.leaderboard(),
       private: privateList(userId),
       bjLimits: BJ_LIMITS,
+      rl: RL.list(),
+      myRl: [...RL.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
+      rlLimits: RL_LIMITS,
+      ck: CK.list(),
+      myCk: [...CK.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
+      ckStakes: CK_STAKES,
+      ckClocks: CK_CLOCKS,
     }));
 
     // ----- profile -----
@@ -664,14 +750,14 @@ function createServer({
     on('friends:invite', ({ id, href }) => {
       const fid = String(id);
       if (!store.areFriends(userId, fid)) throw new GameError('Приглашать можно только друзей');
-      const m = /^#\/(table|durak|bj)\/([\w-]+)$/.exec(String(href || ''));
+      const m = /^#\/(table|durak|bj|rl|ck)\/([\w-]+)$/.exec(String(href || ''));
       if (!m) throw new GameError('Неверная ссылка');
-      const t = m[1] === 'table' ? tables.get(m[2]) : m[1] === 'durak' ? durakTables.get(m[2]) : bjTables.get(m[2]);
+      const t = m[1] === 'table' ? tables.get(m[2]) : m[1] === 'durak' ? durakTables.get(m[2]) : m[1] === 'bj' ? bjTables.get(m[2]) : extra[m[1]].map.get(m[2]);
       if (!t) throw new GameError('Стол не найден');
       if (Date.now() - lastInvite < 1500) throw new GameError('Не так быстро');
       lastInvite = Date.now();
       if (!isOnline(fid)) throw new GameError('Друг сейчас не в сети');
-      const game = { poker: t.tournament ? 'Sit & Go' : 'Покер', durak: 'Дурак', bj: 'Блэкджек' }[KIND_OF(t)];
+      const game = { poker: t.tournament ? 'Sit & Go' : 'Покер', durak: 'Дурак', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки' }[KIND_OF(t)];
       io.to('user:' + fid).emit('invite', { from: store.brief(userId), href, title: t.name, game });
     });
 
@@ -885,6 +971,62 @@ function createServer({
       if (clean) t.addChat(socket.data.name, clean, hueOf(userId));
     });
 
+    // ----- roulette & checkers -----
+    for (const [kind, K] of Object.entries(extra)) {
+      on(kind + ':watch', ({ tableId }) => {
+        const t = K.get(tableId);
+        socket.join(kind + ':' + t.id);
+        return { state: t.publicState(userId) };
+      });
+      on(kind + ':unwatch', ({ tableId }) => { socket.leave(kind + ':' + String(tableId)); });
+      on(kind + ':sit', ({ tableId, seat }) => {
+        const t = K.get(tableId);
+        let idx = Math.floor(Number(seat));
+        if (kind === 'rl' && !(idx >= 0)) idx = t.freeSeat();
+        if (idx === -1) throw new GameError('Все места заняты');
+        t.sit(userId, socket.data.name, idx);
+        socket.join(kind + ':' + t.id);
+        presenceChanged(userId);
+      });
+      on(kind + ':leave', ({ tableId }) => { K.get(tableId).leave(userId); presenceChanged(userId); });
+      on(kind + ':chat', ({ tableId, text }) => {
+        const t = K.get(tableId);
+        const clean = chatText(text);
+        if (clean) t.addChat(socket.data.name, clean, hueOf(userId));
+      });
+    }
+    const ownCount = (K) => [...K.map.values()].filter((t) => t.createdBy === userId).length;
+    on('rl:create', ({ name, limits, private: priv }) => {
+      if (RL.map.size >= MAX_TABLES) throw new GameError('Слишком много столов');
+      const lim = RL_LIMITS[Number(limits)];
+      if (!lim) throw new GameError('Неверные лимиты');
+      if (ownCount(RL) >= 3) throw new GameError('Можно создать не больше 3 столов');
+      const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Рулетка у ${socket.data.name}`;
+      const t = RL.make({ name: clean, minBet: lim[0], maxBet: lim[1], createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
+      return { tableId: t.id };
+    });
+    on('rl:bet', ({ tableId, spot, amount }) => { RL.get(tableId).bet(userId, String(spot), amount); });
+    on('rl:undo', ({ tableId }) => { RL.get(tableId).undo(userId); });
+    on('rl:clear', ({ tableId }) => { RL.get(tableId).clear(userId); });
+    on('rl:rebet', ({ tableId, double }) => { RL.get(tableId).rebet(userId, !!double); });
+    on('ck:create', ({ name, stake, clock, private: priv }) => {
+      if (CK.map.size >= MAX_TABLES) throw new GameError('Слишком много столов');
+      const st = Number(stake);
+      const cl = Number(clock);
+      if (!CK_STAKES.includes(st) || !CK_CLOCKS.includes(cl)) throw new GameError('Неверные параметры стола');
+      if (ownCount(CK) >= 3) throw new GameError('Можно создать не больше 3 столов');
+      const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Шашки у ${socket.data.name}`;
+      const t = CK.make({ name: clean, stake: st, clockMs: cl * 60000, createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
+      return { tableId: t.id };
+    });
+    on('ck:ready', ({ tableId, value }) => { CK.get(tableId).setReady(userId, !!value); });
+    on('ck:move', ({ tableId, path }) => { CK.get(tableId).move(userId, Array.isArray(path) ? path.slice(0, 20).map(Number) : []); });
+    on('ck:resign', ({ tableId }) => { CK.get(tableId).resign(userId); });
+    on('ck:draw', ({ tableId }) => { CK.get(tableId).offerDraw(userId); });
+    on('ck:declineDraw', ({ tableId }) => { CK.get(tableId).declineDraw(userId); });
+
     on('table:chat', ({ tableId, text }) => {
       const t = getTable(tableId);
       const clean = chatText(text);
@@ -941,6 +1083,10 @@ function createServer({
         bj: [...bjTables.values()].map((t) => ({
           ...t.summary(), roundNo: t.roundNo, chat: t.chat.length,
           seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, bet: x.bet, connected: x.connected }),
+        })),
+        extra: extraTables().map((t) => ({
+          ...t.summary(), title: extra[t.kind].title, chat: t.chat.length,
+          seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, connected: x.connected }),
         })),
         announcement: store.data.announcement,
         log: store.data.adminLog.slice(-100).reverse(),
@@ -1134,6 +1280,31 @@ function createServer({
       return { tableId: t.id };
     });
 
+    admin('admin:extra', ({ kind, tableId, action, target }) => {
+      const K = extra[kind];
+      if (!K) throw new GameError('Нет такой игры');
+      const t = K.get(tableId);
+      switch (action) {
+        case 'close':
+          io.to(kind + ':' + t.id).emit('notice', { type: 'closed', tableId: t.id, text: `Стол «${t.name}» закрыт администратором, ставки возвращены` });
+          t.destroy();
+          K.map.delete(t.id);
+          K.broadcastLobby();
+          audit(`Закрыл стол «${t.name}» (${K.title})`);
+          break;
+        case 'kick': {
+          const s = t.seats.find((x) => x && x.userId === target);
+          if (!s) throw new GameError('Игрока нет за столом');
+          t.leave(s.userId);
+          notice(s.userId, `Администратор убрал вас со стола «${t.name}»`);
+          audit(`Убрал ${s.name} со стола «${t.name}» (${K.title})`);
+          break;
+        }
+        case 'clearChat': t.chat = []; t._update(); audit(`Очистил чат стола «${t.name}» (${K.title})`); break;
+        default: throw new GameError('Неизвестное действие');
+      }
+    });
+
     admin('admin:bj', ({ tableId, action, target }) => {
       const t = getBj(tableId);
       switch (action) {
@@ -1175,7 +1346,7 @@ function createServer({
       const room = io.sockets.adapter.rooms.get('user:' + userId);
       if (room && room.size > 0) return; // another tab is still open
       presenceChanged(userId);
-      const seated = [...tables.values(), ...durakTables.values(), ...bjTables.values()].filter((t) => t.seatOf(userId) !== -1);
+      const seated = allTables().filter((t) => t.seatOf(userId) !== -1);
       if (!seated.length) return;
       seated.forEach((t) => t.setConnected(userId, false));
       disconnectTimers.set(userId, setTimeout(() => {
@@ -1186,6 +1357,7 @@ function createServer({
         }
         for (const t of durakTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
         for (const t of bjTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
+        for (const t of extraTables()) if (t.seatOf(userId) !== -1) t.leave(userId);
       }, RECONNECT_GRACE));
     });
   });
@@ -1196,6 +1368,7 @@ function createServer({
     for (const t of tables.values()) t.destroy();
     for (const t of durakTables.values()) t.destroy();
     for (const t of bjTables.values()) t.destroy();
+    for (const t of extraTables()) t.destroy();
     for (const timer of disconnectTimers.values()) clearTimeout(timer);
     const done = store.flush();
     io.close();
@@ -1203,7 +1376,7 @@ function createServer({
     return done;
   }
 
-  return { app, server, io, store, tables, sngs, durakTables, bjTables, shutdown };
+  return { app, server, io, store, tables, sngs, durakTables, bjTables, extra, shutdown };
 }
 
 /** Production start: PostgreSQL when DATABASE_URL is set, otherwise the JSON file. */

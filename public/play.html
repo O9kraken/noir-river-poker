@@ -112,6 +112,20 @@
             <span class="mode-cnt" id="cnt-bj"></span>
           </span>
         </button>
+        <button type="button" role="tab" class="mode" data-lobby-tab="rl" aria-selected="false">
+          <img class="mode-art" src="/art/roulette.webp" alt="" width="1600" height="1000" decoding="async">
+          <span class="mode-cap">
+            <span class="mode-txt"><b>Рулетка</b><small>Европейская, одно зеро, общий стол</small></span>
+            <span class="mode-cnt" id="cnt-rl"></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="mode" data-lobby-tab="ck" aria-selected="false">
+          <img class="mode-art" src="/art/checkers.webp" alt="" width="1600" height="1000" decoding="async">
+          <span class="mode-cap">
+            <span class="mode-txt"><b>Шашки</b><small>Русские шашки один на&nbsp;один на&nbsp;ставку</small></span>
+            <span class="mode-cnt" id="cnt-ck"></span>
+          </span>
+        </button>
       </div>
       <div class="filters" id="cash-filters" role="group" aria-label="Фильтр игр">
         <button type="button" class="pill is-active" data-filter="all">Все</button>
@@ -122,6 +136,8 @@
       <div class="table-list" id="sng-list" hidden></div>
       <div class="table-list" id="durak-list" hidden></div>
       <div class="table-list" id="bj-list" hidden></div>
+      <div class="table-list" id="rl-list" hidden></div>
+      <div class="table-list" id="ck-list" hidden></div>
     </div>
     <aside class="lobby-side">
       <section class="panel quests-panel" id="quests-panel" aria-live="polite">
@@ -294,6 +310,115 @@
           <p><b>Клавиши:</b> H — взять, S — хватит, D — удвоить, P — разделить.</p>
           <p>Используются 6 колод, после ¾ шуза колоды перемешиваются.</p>
         </div>
+      </div>
+    </aside>
+  </main>
+
+  <main id="rl-view" class="table-view rl-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span class="btn-label">Лобби</span>
+        </a>
+        <div class="table-title"><b id="rl-name"></b><span id="rl-meta" class="muted"></span></div>
+        <span class="hand-no muted" id="rl-spin"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
+      </div>
+      <div class="rl-stage">
+        <div class="rl-wheel-box">
+          <div class="rl-wheel-wrap">
+            <svg class="rl-wheel" id="rl-wheel" viewBox="-110 -110 220 220" aria-hidden="true"></svg>
+            <div class="rl-pointer" aria-hidden="true"></div>
+            <div class="rl-result" id="rl-result" aria-live="polite"></div>
+          </div>
+          <div class="rl-history" id="rl-history" aria-label="Последние номера"></div>
+        </div>
+        <div class="rl-board-box">
+          <div class="rl-status" id="rl-status" role="status"></div>
+          <div class="rl-board" id="rl-board" role="grid" aria-label="Поле для ставок"></div>
+          <div class="rl-players" id="rl-players"></div>
+        </div>
+      </div>
+      <div class="rl-ctrl" id="rl-ctrl"></div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-rl-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-rl-tab="log" aria-selected="false">Лог</button>
+        <button type="button" role="tab" class="tab" data-rl-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="rl-chat-pane" class="side-pane">
+          <ul class="chat" id="rl-chat" aria-live="polite"></ul>
+          <form id="rl-chat-form" class="chat-form">
+            <label class="sr-only" for="rl-chat-input">Сообщение</label>
+            <input id="rl-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
+            <button class="icon-btn" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </form>
+        </div>
+        <div id="rl-log-pane" class="side-pane" hidden><ol class="log" id="rl-log"></ol></div>
+        <div id="rl-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>Европейская рулетка</b>: 37 ячеек, от 0 до 36, одно зеро.</p>
+          <p><b>Число</b> платит 35 к 1. <b>Дюжина</b> и <b>колонна</b> — 2 к 1. <b>Красное/чёрное, чёт/нечет, 1–18/19–36</b> — 1 к 1.</p>
+          <p>При зеро ставки на равные шансы, дюжины и колонны проигрывают — в этом и есть преимущество казино: 1 из 37, около 2,7%.</p>
+          <p>Таймер ставок запускается с первой фишкой на столе. Когда он кончается, колесо крутится и ставок больше нет.</p>
+          <p>Номер выпадает на сервере криптостойким генератором до начала анимации.</p></div>
+      </div>
+    </aside>
+  </main>
+
+  <main id="ck-view" class="table-view ck-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span class="btn-label">Лобби</span>
+        </a>
+        <div class="table-title"><b id="ck-name"></b><span id="ck-meta" class="muted"></span></div>
+        <span class="hand-no muted" id="ck-game"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
+      </div>
+      <div class="ck-stage">
+        <div class="ck-player top" id="ck-top"></div>
+        <div class="ck-board-wrap">
+          <div class="ck-board" id="ck-board" role="grid" aria-label="Шашечная доска"></div>
+          <div class="ck-banner" id="ck-banner" hidden></div>
+        </div>
+        <div class="ck-player bottom" id="ck-bottom"></div>
+        <div class="dk-status ck-status" id="ck-status" role="status"></div>
+        <div class="ck-ctrl" id="ck-ctrl"></div>
+      </div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-ck-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-ck-tab="log" aria-selected="false">Ходы</button>
+        <button type="button" role="tab" class="tab" data-ck-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="ck-chat-pane" class="side-pane">
+          <ul class="chat" id="ck-chat" aria-live="polite"></ul>
+          <form id="ck-chat-form" class="chat-form">
+            <label class="sr-only" for="ck-chat-input">Сообщение</label>
+            <input id="ck-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
+            <button class="icon-btn" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </form>
+        </div>
+        <div id="ck-log-pane" class="side-pane" hidden><ol class="log" id="ck-log"></ol></div>
+        <div id="ck-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>Русские шашки.</b> Простые ходят вперёд по диагонали на одно поле, бьют и вперёд, и назад.</p>
+          <p><b>Бить обязательно</b>, и взятие нужно довести до конца. Если вариантов несколько — выбираете любой.</p>
+          <p><b>Дамка</b> ходит и бьёт на любое расстояние по диагонали. Простая, дошедшая до последней горизонтали во время взятия, продолжает бить уже как дамка.</p>
+          <p>Сбитые шашки снимаются после хода — одну шашку нельзя бить дважды («турецкий удар»).</p>
+          <p><b>Победа</b> — у соперника не осталось шашек или ходов, кончилось время, он сдался или ушёл. <b>Ничья</b> — по согласию, 15 ходов только дамками без взятий или трёхкратное повторение позиции.</p>
+          <p>Ставка списывается с обоих, когда оба нажали «Готов». Победитель забирает банк, при ничьей ставки возвращаются. Цвет меняется каждую партию.</p></div>
       </div>
     </aside>
   </main>
@@ -479,6 +604,33 @@
   </form>
 </dialog>
 
+<dialog id="modal-rl-create" class="modal">
+  <form method="dialog" class="form" id="rl-create-form">
+    <h2 class="h2">Новый стол: рулетка</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Рулетка у друзей"></label>
+    <label class="field"><span>Лимиты</span><select name="limits" id="rl-limits"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Отмена</button>
+      <button type="submit" class="btn btn-gold" value="ok">Создать</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="modal-ck-create" class="modal">
+  <form method="dialog" class="form" id="ck-create-form">
+    <h2 class="h2">Новая доска: шашки</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Партия на интерес"></label>
+    <label class="field"><span>Ставка</span><select name="stake" id="ck-stake"></select></label>
+    <label class="field"><span>Контроль времени</span><select name="clock" id="ck-clock"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватная доска</b><small>Не видна в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Отмена</button>
+      <button type="submit" class="btn btn-gold" value="ok">Создать</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="modal-invite" class="modal">
   <div class="form">
     <h2 class="h2">Пригласить за стол</h2>
@@ -565,5 +717,7 @@
 <script src="/social.js"></script>
 <script src="/odds.js"></script>
 <script src="/progress.js"></script>
+<script src="/roulette.js"></script>
+<script src="/checkers.js"></script>
 </body>
 </html>
