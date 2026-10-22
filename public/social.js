@@ -3,7 +3,7 @@
   const NR = window.NR;
   const { $, $$, h, fmt, toast, call, Sound, S } = NR;
 
-  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go', roulette: 'Рулетка', checkers: 'Шашки' };
+  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go', roulette: 'Рулетка', checkers: 'Шашки', wheel: 'Колесо', season: 'Сезон' };
   const HAND_NAMES = ['Старшая карта', 'Пара', 'Две пары', 'Сет', 'Стрит', 'Флеш', 'Фулл-хаус', 'Каре', 'Стрит-флеш', 'Роял-флеш'];
   const SYMBOLS = ['', 's', 'h', 'd', 'c', 'crown', 'star', 'bolt', 'moon', 'flame'];
   const HUES = [0, 25, 45, 90, 150, 185, 210, 250, 285, 320];
@@ -92,7 +92,7 @@
       h('a', { class: 'btn btn-gold btn-sm', href: inv.href, onclick: () => card.remove() }, 'Присоединиться'),
       h('button', { type: 'button', class: 'icon-btn sm', 'aria-label': 'Закрыть', onclick: () => card.remove() }, '×'));
     box.append(card);
-    NR.Sound.play('turn');
+    NR.Sound.play('ping');
     setTimeout(() => card.remove(), 25000);
   }
 
@@ -191,10 +191,15 @@
           where ? h('a', { class: 'btn btn-dark btn-sm', href: where.href }, `Сейчас: ${where.name}`) : null,
           p.me ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: toggleEditor }, 'Сменить аватар') : null)),
       h('div', { class: 'phead-chips' },
-        h('small', null, 'Фишек'), h('b', null, fmt(p.chips)), h('span', null, `${p.rank} место из ${p.players}`)));
+        h('small', null, 'Фишек'), h('b', null, fmt(p.chips)), h('span', null, `${p.rank} место из ${p.players}`),
+        p.seasonWins ? h('span', { class: 'phead-season' }, `🏆 чемпион недели × ${p.seasonWins}`) : null));
 
     const editor = p.me ? avatarEditor(p) : null;
 
+    const elo = (k) => {
+      const r = p.ratings && p.ratings[k];
+      return r && r.games ? stat('Рейтинг Эло', String(r.r), `пик ${r.peak}`) : null;
+    };
     const games = h('section', { class: 'pgrid' },
       h('article', { class: 'pcard' },
         h('h2', { class: 'h3' }, 'Покер'),
@@ -218,7 +223,8 @@
           stat('Партий', fmt(s.durak.games)),
           stat('Вышел первым', fmt(s.durak.wins), pct(s.durak.wins, s.durak.games)),
           stat('Остался дураком', fmt(s.durak.losses)),
-          stat('Итог', signed(s.durak.net)))),
+          stat('Итог', signed(s.durak.net)),
+          elo('durak'))),
       h('article', { class: 'pcard' },
         h('h2', { class: 'h3' }, 'Блэкджек'),
         h('div', { class: 'pstats' },
@@ -239,7 +245,8 @@
           stat('Партий', fmt(s.checkers.games)),
           stat('Победы', fmt(s.checkers.wins), pct(s.checkers.wins, s.checkers.games)),
           stat('Ничьи', fmt(s.checkers.draws)),
-          stat('Итог', signed(s.checkers.net)))) : null);
+          stat('Итог', signed(s.checkers.net)),
+          elo('checkers'))) : null);
 
     const ach = p.achievements;
     const doneN = ach.filter((a) => a.done).length;
@@ -420,7 +427,7 @@
     socket.on('connect', () => loadFriends());
     if (socket.connected) loadFriends();
     socket.on('friends:dirty', () => { clearTimeout(dirtyTimer); dirtyTimer = setTimeout(loadFriends, 300); });
-    socket.on('friends:request', (e) => { toast(`${e.from.name} хочет добавить вас в друзья`); Sound.play('turn'); loadFriends(); });
+    socket.on('friends:request', (e) => { toast(`${e.from.name} хочет добавить вас в друзья`); Sound.play('ping'); loadFriends(); });
     socket.on('invite', showInvite);
   }
   setInterval(() => { if (S.socket && S.socket.connected && !document.hidden) loadFriends(); }, 30000);

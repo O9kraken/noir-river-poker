@@ -42,7 +42,10 @@
   <header class="topbar">
     <a href="#/" class="brand"><img class="brand-mark" src="/brand/mark.svg" alt="" width="34" height="34"><span class="brand-text">NOIR <b>RIVER</b></span></a>
     <div class="topbar-right">
-      <button type="button" class="btn btn-ghost btn-sm" id="bonus-btn" hidden>Бонус +<span id="bonus-amount"></span></button>
+      <button type="button" class="btn btn-ghost btn-sm wheel-btn" id="bonus-btn" hidden aria-label="Колесо фортуны">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg>
+        <span class="btn-label">Колесо</span><i class="wheel-dot" aria-hidden="true"></i>
+      </button>
       <div class="wallet" title="Баланс / за столами">
         <span class="chip-icon" aria-hidden="true"></span>
         <span><b id="me-balance">0</b><small id="me-inplay"></small></span>
@@ -136,6 +139,10 @@
         <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg></span>
         <span class="gnav-txt"><b>Все игры</b><small>каталог</small></span>
       </a>
+      <a class="gnav-all gnav-rt" href="#/ratings">
+        <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21V11M16 21V7M12 21V3M4 21h16"/></svg></span>
+        <span class="gnav-txt"><b>Рейтинги</b><small>сезон недели</small></span>
+      </a>
       <div class="gnav-list" role="tablist" aria-orientation="vertical" aria-label="Выбор игры">
         <button type="button" role="tab" class="gnav-item is-active" data-lobby-tab="cash" aria-selected="true">
           <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 2.5C9.5 6.5 4 9 4 13.2c0 2.9 3.3 4.3 6.2 2.3L8.8 21h6.4l-1.4-5.5c2.9 2 6.2.6 6.2-2.3C20 9 14.5 6.5 12 2.5z"/></svg></span>
@@ -223,6 +230,7 @@
         </div>
         <ul class="quest-list" id="ach-list"></ul>
       </section>
+      <section class="panel app-panel" id="app-panel" aria-label="Уведомления и приложение"></section>
       <section class="panel friends-panel" id="friends-panel">
         <div class="panel-head">
           <h2 class="h3">Друзья</h2>
@@ -241,7 +249,7 @@
         <div id="my-tables" class="my-tables"><p class="muted">Вы пока не сидите за столом.</p></div>
       </section>
       <section class="panel">
-        <h2 class="h3">Лидеры по фишкам</h2>
+        <div class="panel-head"><h2 class="h3">Лидеры по фишкам</h2><a class="small" href="#/ratings">рейтинги →</a></div>
         <ol id="leaderboard" class="leaderboard"></ol>
       </section>
       <section class="panel panel-quiet">
@@ -249,6 +257,45 @@
         <dl class="rules-list" id="rules-list"></dl>
       </section>
     </aside>
+  </main>
+
+  <!-- RATINGS -->
+  <main id="ratings-view" class="ratings-page" hidden>
+    <div class="games-head">
+      <a href="#/" class="btn btn-ghost btn-sm"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Лобби</a>
+      <div>
+        <p class="eyebrow">Рейтинги</p>
+        <h1 class="h1">Сезон и лучшие игроки</h1>
+      </div>
+    </div>
+    <div class="tabs rt-tabs" role="tablist">
+      <button type="button" role="tab" class="tab is-active" data-rt-tab="season" aria-selected="true">Сезон недели</button>
+      <button type="button" role="tab" class="tab" data-rt-tab="elo" aria-selected="false">Рейтинг Эло</button>
+    </div>
+    <section id="rt-season" class="rt-grid">
+      <div class="panel rt-hero">
+        <div class="rt-hero-top">
+          <div><h2 class="h2" id="rt-label">Сезон</h2><p class="muted small" id="rt-ends"></p></div>
+          <div class="rt-prizes" id="rt-prizes"></div>
+        </div>
+        <p class="muted small" id="rt-rule"></p>
+        <div class="filters rt-games" id="rt-games" role="group" aria-label="Игра"></div>
+        <p class="rt-mine" id="rt-mine"></p>
+        <div class="rt-scroll"><table class="rt-table" id="rt-table"></table></div>
+      </div>
+      <aside class="panel rt-side">
+        <h2 class="h3">Прошлые сезоны</h2>
+        <ul class="rt-history" id="rt-history"></ul>
+      </aside>
+    </section>
+    <section id="rt-elo" class="rt-grid" hidden>
+      <div class="panel rt-hero">
+        <div class="filters rt-games" id="rt-elo-games" role="group" aria-label="Игра"></div>
+        <p class="muted small">Эло меняется после каждой партии на фишки: победа над сильным соперником даёт больше очков. Тренировки с компьютером не считаются.</p>
+        <div class="rt-scroll"><table class="rt-table" id="rt-elo-table"></table></div>
+      </div>
+      <aside class="panel rt-side" id="rt-elo-me"></aside>
+    </section>
   </main>
 
   <!-- PROFILE -->
@@ -726,6 +773,37 @@
   </form>
 </dialog>
 
+<dialog id="modal-wheel" class="modal wheel-modal">
+  <div class="form">
+    <h2 class="h2">Колесо фортуны</h2>
+    <div class="wheel-stage" id="wheel-stage"></div>
+    <div class="wheel-result" id="wheel-result" role="status" hidden></div>
+    <p class="muted small wheel-note" id="wheel-note"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Закрыть</button>
+      <button type="button" class="btn btn-gold" id="wheel-spin">Крутить колесо</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="modal-practice" class="modal">
+  <form method="dialog" class="form" id="practice-form">
+    <h2 class="h2" id="practice-title">Игра с компьютером</h2>
+    <p class="muted small">Тренировка без фишек: баланс, статистика и рейтинг не меняются.</p>
+    <fieldset class="seg-field">
+      <legend>Сложность</legend>
+      <div class="seg" id="practice-level"></div>
+    </fieldset>
+    <label class="field" id="practice-variant-field"><span>Игра</span><select name="variant" id="practice-variant"></select></label>
+    <label class="field" id="practice-bots-field"><span>Соперников</span><select name="bots" id="practice-bots"></select></label>
+    <label class="field" id="practice-clock-field"><span>Время на партию</span><select name="clock" id="practice-clock"><option value="5">5 минут</option><option value="10" selected>10 минут</option></select></label>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Отмена</button>
+      <button type="submit" class="btn btn-gold" value="ok">Играть</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="modal-invite" class="modal">
   <div class="form">
     <h2 class="h2">Пригласить за стол</h2>
@@ -815,5 +893,9 @@
 <script src="/roulette.js"></script>
 <script src="/checkers.js"></script>
 <script src="/dm.js"></script>
+<script src="/fx.js"></script>
+<script src="/notify.js"></script>
+<script src="/wheel.js"></script>
+<script src="/ratings.js"></script>
 </body>
 </html>

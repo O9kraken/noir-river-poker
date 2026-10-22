@@ -145,7 +145,7 @@
     }
     if (D.open && !D.with) openList();
     if (e.msg.from !== S.me.id && e.from) {
-      Sound.play('turn');
+      Sound.play('ping');
       toast(`${e.from.name}: ${e.msg.text.length > 60 ? e.msg.text.slice(0, 60) + '…' : e.msg.text}`);
     }
   }

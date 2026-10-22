@@ -106,7 +106,7 @@
     if (!st) return;
     document.title = `${st.name} — шашки — NOIR RIVER`;
     $('#ck-name').textContent = st.name;
-    $('#ck-meta').textContent = `Русские шашки · ставка ${fmt(st.stake)} · ${st.clockMin}\u00a0мин\u00a0+\u00a03\u00a0с`;
+    $('#ck-meta').textContent = `Русские шашки · ${st.practice ? 'против компьютера, без ставки' : `ставка ${fmt(st.stake)}`} · ${st.clockMin}\u00a0мин\u00a0+\u00a03\u00a0с`;
     $('#ck-game').textContent = st.gameNo ? `Партия #${st.gameNo}` : '';
 
     // squares: highlights
@@ -184,7 +184,7 @@
       const clockMs = st.clock && color ? st.clock[color] : null;
       const running = st.clock && st.clock.running && st.clock.running === color;
       const cnt = st.counts && color ? st.counts[color] : null;
-      box.replaceChildren(h('div', { class: 'ck-pl' + (running ? ' turn' : '') + (s.connected ? '' : ' off') },
+      box.replaceChildren(h('div', { class: 'ck-pl' + (running ? ' turn' : '') + (s.connected ? '' : ' off'), 'data-seat': i },
         NR.avatarEl(s.name, s.avatar, 'sm'),
         h('div', { class: 'ck-pl-main' },
           h('b', { class: 'ck-pl-name' }, s.name, i === st.mySeat ? h('span', { class: 'muted' }, ' · вы') : null),
@@ -203,7 +203,7 @@
       ban.replaceChildren(
         h('b', null, st.result.winner ? (myWin ? 'Победа!' : myLoss ? 'Поражение' : `Победа ${st.result.winner === 'w' ? 'белых' : 'чёрных'}`) : 'Ничья'),
         h('span', null, myWin || !st.myColor ? (REASON_ME[st.result.reason] || '') : st.result.text ? st.result.text[0].toUpperCase() + st.result.text.slice(1) : ''),
-        myWin ? h('small', null, `+${fmt(st.stake)} фишек`) : null);
+        myWin && st.stake ? h('small', null, `+${fmt(st.stake)} фишек`) : null);
     } else ban.hidden = true;
 
     renderStatus();
@@ -218,7 +218,7 @@
     const el = $('#ck-status');
     if (st.status === 'waiting') {
       const n = st.seats.filter(Boolean).length;
-      el.textContent = n < 2 ? 'Ждём соперника — позовите друга кнопкой «Пригласить»' : st.mySeat >= 0 ? `Нажмите «Готов» — ставка ${fmt(st.stake)} спишется, когда готовы оба` : 'Игроки готовятся к партии';
+      el.textContent = n < 2 ? 'Ждём соперника — позовите друга кнопкой «Пригласить»' : st.mySeat >= 0 ? (st.practice ? 'Нажмите «Готов» — компьютер уже ждёт' : `Нажмите «Готов» — ставка ${fmt(st.stake)} спишется, когда готовы оба`) : 'Игроки готовятся к партии';
       return;
     }
     if (st.status === 'result') { el.textContent = 'Следующая партия — когда оба нажмут «Готов»'; return; }
@@ -234,7 +234,7 @@
     const btns = [];
     const me = st.mySeat >= 0 ? st.seats[st.mySeat] : null;
     if (me && st.status === 'waiting') {
-      btns.push(h('button', { type: 'button', class: 'btn ' + (me.ready ? 'btn-ghost' : 'btn-gold'), onclick: () => send('ck:ready', { value: !me.ready }) }, me.ready ? 'Не готов' : `Готов · ставка ${fmt(st.stake)}`));
+      btns.push(h('button', { type: 'button', class: 'btn ' + (me.ready ? 'btn-ghost' : 'btn-gold'), onclick: () => send('ck:ready', { value: !me.ready }) }, me.ready ? 'Не готов' : st.stake ? `Готов · ставка ${fmt(st.stake)}` : 'Готов'));
       btns.push(h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => send('ck:leave') }, 'Встать из-за доски'));
     }
     if (me && st.status === 'playing') {
@@ -244,7 +244,7 @@
       } else {
         btns.push(h('button', { type: 'button', class: 'btn btn-dark', disabled: st.drawOffer === st.myColor, onclick: () => send('ck:draw') }, st.drawOffer === st.myColor ? 'Ничья предложена' : 'Предложить ничью'));
       }
-      btns.push(h('button', { type: 'button', class: 'btn btn-red', onclick: () => { if (confirm(`Сдаться? Ставка ${fmt(st.stake)} уйдёт сопернику.`)) send('ck:resign'); } }, 'Сдаться'));
+      btns.push(h('button', { type: 'button', class: 'btn btn-red', onclick: () => { if (confirm(st.stake ? `Сдаться? Ставка ${fmt(st.stake)} уйдёт сопернику.` : 'Сдаться?')) send('ck:resign'); } }, 'Сдаться'));
     }
     if (me && st.status === 'result') btns.push(h('button', { type: 'button', class: 'btn btn-gold', onclick: () => send('ck:ready', { value: true }) }, 'Ещё партию'));
     box.replaceChildren(...btns);

@@ -217,7 +217,7 @@
     }
 
     // players
-    $('#rl-players').replaceChildren(...st.seats.map((s, i) => s && h('div', { class: 'rl-pl' + (i === st.mySeat ? ' me' : '') + (s.connected ? '' : ' off') },
+    $('#rl-players').replaceChildren(...st.seats.map((s, i) => s && h('div', { class: 'rl-pl' + (i === st.mySeat ? ' me' : '') + (s.connected ? '' : ' off'), 'data-seat': i },
       NR.avatarEl(s.name, s.avatar, 'sm'),
       h('span', { class: 'rl-pl-name' }, s.name),
       s.net != null && st.status === 'result'

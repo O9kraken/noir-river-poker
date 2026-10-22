@@ -232,6 +232,10 @@
             this.tone(660, 0.18, 'sine', 0.07, delay);
             this.tone(990, 0.25, 'sine', 0.06, delay + 0.12);
             break;
+          case 'ping':
+            this.tone(880, 0.16, 'sine', 0.06, delay);
+            this.tone(1320, 0.22, 'sine', 0.05, delay + 0.1);
+            break;
           case 'tick': this.tone(1400, 0.04, 'square', 0.025, delay); break;
           case 'win': [523, 659, 784, 1047].forEach((f, k) => this.tone(f, 0.4, 'sine', 0.06, delay + k * 0.09)); break;
           case 'bigwin': [523, 659, 784, 1047, 1319].forEach((f, k) => this.tone(f, 0.55, 'triangle', 0.07, delay + k * 0.1)); break;
@@ -410,6 +414,7 @@
       S.myCk = new Set(res.myCk || []);
       S.ckStakes = res.ckStakes || [];
       S.ckClocks = res.ckClocks || [];
+      S.botLevels = res.botLevels || null;
       fillExtraForms();
       S.durakStakes = res.durakStakes || [];
       setAnnouncement(res.announcement);
@@ -467,15 +472,19 @@
   async function route() {
     if (!S.socket) return;
     const gm = location.hash === '#/games';
+    const rt = location.hash === '#/ratings';
     $('#games-view').hidden = !gm;
-    if (gm) {
+    $('#ratings-view').hidden = !rt;
+    if (!rt && window.RatingsUI) window.RatingsUI.close();
+    if (gm || rt) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
       S.tableId = null;
       S.ts = null;
       for (const ui of [window.DurakUI, window.BjUI, window.RouletteUI, window.CheckersUI]) if (ui) ui.close();
       for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view', '#rl-view', '#ck-view', '#profile-view']) $(v).hidden = true;
-      document.title = 'Все игры — NOIR RIVER';
-      renderLobby();
+      document.title = gm ? 'Все игры — NOIR RIVER' : 'Рейтинги — NOIR RIVER';
+      if (gm) renderLobby(); else if (window.RatingsUI) window.RatingsUI.open();
+      window.scrollTo(0, 0);
       return;
     }
     const xm = location.hash.match(/^#\/(rl|ck)\/([\w-]+)/);
@@ -570,17 +579,12 @@
       avatarEl(S.me.name, S.me.avatar, 'sm'),
       h('span', { class: 'me-name-text' }, S.me.name),
       S.me.friendRequests ? h('span', { class: 'badge', title: 'Заявки в друзья' }, S.me.friendRequests) : null].filter(Boolean));
-    $('#bonus-btn').hidden = !S.me.bonusAvailable;
+    if (window.Wheel) window.Wheel.onMe(S.me);
     const db = $('#dm-badge');
     if (db) { db.textContent = S.me.dmUnread > 99 ? '99+' : String(S.me.dmUnread || ''); db.hidden = !S.me.dmUnread; }
     $('#admin-link').hidden = S.me.role !== 'admin';
-    $('#bonus-amount').textContent = fmt(S.me.bonusAmount);
   }
 
-  $('#bonus-btn').addEventListener('click', async () => {
-    const res = await call('bonus:claim');
-    if (res) { toast(`Начислено ${fmt(res.amount)} фишек`); Sound.play('win'); }
-  });
 
   // ================= lobby =================
   function bindFilters() {
@@ -640,6 +644,8 @@
     else if (tab === 'rl') renderRlList();
     else if (tab === 'ck') renderCkList();
     else renderBjList();
+    const PRACTICE_LIST = { cash: ['#table-list', 'poker'], durak: ['#durak-list', 'durak'], ck: ['#ck-list', 'ck'] };
+    if (PRACTICE_LIST[tab]) $(PRACTICE_LIST[tab][0]).prepend(practiceCard(PRACTICE_LIST[tab][1]));
     renderMyTables();
     const seatedCash = S.tables.reduce((a, t) => a + t.players, 0);
     const sngWaiting = S.sngs.filter((x) => x.status === 'registering').reduce((a, x) => a + x.players.length, 0);
@@ -664,7 +670,7 @@
     const list = $('#durak-list');
     list.replaceChildren();
     if (!S.durak.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
-    const rows = S.durak.concat(S.private.filter((t) => t.kind === 'durak')).sort((a, b) => (b.private - a.private) || a.stake - b.stake || b.players - a.players);
+    const rows = S.durak.concat(S.private.filter((t) => t.kind === 'durak' && !t.practice)).sort((a, b) => (b.private - a.private) || a.stake - b.stake || b.players - a.players);
     for (const t of rows) {
       const mine = S.myDurak.has(t.id);
       list.append(tcard({
@@ -734,7 +740,7 @@
   function renderCkList() {
     const list = $('#ck-list');
     list.replaceChildren();
-    const rows = S.ck.concat(S.private.filter((x) => x.kind === 'ck')).sort((a, b) => (b.private - a.private) || a.stake - b.stake);
+    const rows = S.ck.concat(S.private.filter((x) => x.kind === 'ck' && !x.practice)).sort((a, b) => (b.private - a.private) || a.stake - b.stake);
     if (!rows.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
     for (const t of rows) {
       const mine = S.myCk.has(t.id);
@@ -860,7 +866,7 @@
 
   function renderCashList() {
     const list = $('#table-list');
-    const rows = S.tables.concat(S.private.filter((t) => t.kind === 'poker' && !t.tournament))
+    const rows = S.tables.concat(S.private.filter((t) => t.kind === 'poker' && !t.tournament && !t.practice))
       .filter((t) => S.filter === 'all' || t.game === S.filter)
       .filter((t) => !S.freeOnly || t.players < t.maxSeats)
       .sort((a, b) => (b.private - a.private) || a.bb - b.bb || b.players - a.players);
@@ -950,7 +956,8 @@
     const bjs = S.bj.filter((t) => S.myBj.has(t.id)).map((t) => ({ id: t.id, href: `#/bj/${t.id}`, name: t.name, meta: `Блэкджек · ${fmt(t.minBet)}+` }));
     const rls = S.rl.filter((t) => S.myRl.has(t.id)).map((t) => ({ id: t.id, href: `#/rl/${t.id}`, name: t.name, meta: `Рулетка · ${fmt(t.minBet)}+` }));
     const cks = S.ck.filter((t) => S.myCk.has(t.id)).map((t) => ({ id: t.id, href: `#/ck/${t.id}`, name: t.name, meta: `Шашки · ${fmt(t.stake)}` }));
-    const all = cash.concat(sng).concat(dk).concat(bjs).concat(rls).concat(cks);
+    const pr = S.private.filter((t) => t.practice).map((t) => ({ id: t.id, href: t.href, name: t.name, meta: 'с компьютером' }));
+    const all = cash.concat(sng).concat(dk).concat(bjs).concat(rls).concat(cks).concat(pr);
     if (!all.length) mine.append(h('p', { class: 'muted' }, 'Вы пока не сидите за столом.'));
     for (const t of all) mine.append(h('a', { href: t.href || `#/table/${t.id}` }, h('span', null, t.name), h('span', { class: 'muted' }, t.meta)));
   }
@@ -967,6 +974,54 @@
     if (!S.token || $('#lobby').hidden) return;
     fetch('/api/leaderboard').then((r) => r.json()).then((lb) => { S.leaderboard = lb; renderLeaderboard(); }).catch(() => {});
   }, 30000);
+
+  // ================= practice with the computer =================
+  const PRACTICE = {
+    poker: { title: 'Покер с компьютером', variants: [['NLH', 'Холдем NL'], ['PLO', 'Омаха PL'], ['SD', 'Шорт-дек 6+'], ['LHE', 'Холдем Limit']], bots: [1, 2, 3, 4, 5], defBots: 3 },
+    durak: { title: 'Дурак с компьютером', variants: [['podkidnoy', 'Подкидной'], ['perevodnoy', 'Переводной']], bots: [1, 2, 3, 4], defBots: 2 },
+    ck: { title: 'Шашки с компьютером', variants: null, bots: null },
+  };
+  const BOT_ICON = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3.5"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 15.5h5M2 12v3M22 12v3"/></svg>';
+  function practiceCard(game) {
+    const kindOf = { poker: 'poker', durak: 'durak', ck: 'ck' }[game];
+    const existing = S.private.find((t) => t.practice && t.kind === kindOf);
+    const ico = h('span', { class: 'practice-ico' });
+    ico.innerHTML = BOT_ICON;
+    return h('div', { class: 'practice-card' },
+      ico,
+      h('div', { class: 'practice-txt' }, h('b', null, 'Сыграть с компьютером'), h('small', null, 'Тренировка без фишек — баланс, статистика и рейтинг не меняются')),
+      h('div', { class: 'practice-act' },
+        existing ? h('a', { class: 'btn btn-ghost btn-sm', href: existing.href }, 'Вернуться') : null,
+        h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => openPractice(game) }, existing ? 'Новая' : 'Тренировка')));
+  }
+  let practiceGame = 'poker';
+  function openPractice(game) {
+    practiceGame = game;
+    const P = PRACTICE[game];
+    $('#practice-title').textContent = P.title;
+    const levels = S.botLevels || [{ id: 'easy', name: 'Новичок' }, { id: 'normal', name: 'Любитель' }, { id: 'hard', name: 'Мастер' }];
+    let saved = 'normal';
+    try { saved = localStorage.getItem('nr_bot_level') || 'normal'; } catch (e) { /* ignore */ }
+    $('#practice-level').replaceChildren(...levels.map((l) => h('label', null,
+      h('input', { type: 'radio', name: 'level', value: l.id, checked: l.id === saved }), h('span', null, l.name))));
+    $('#practice-variant-field').hidden = !P.variants;
+    if (P.variants) $('#practice-variant').replaceChildren(...P.variants.map(([v, n]) => h('option', { value: v }, n)));
+    $('#practice-bots-field').hidden = !P.bots;
+    if (P.bots) $('#practice-bots').replaceChildren(...P.bots.map((n) => h('option', { value: n, selected: n === P.defBots }, `${n} ${n === 1 ? 'бот' : n < 5 ? 'бота' : 'ботов'}`)));
+    $('#practice-clock-field').hidden = game !== 'ck';
+    $('#modal-practice').showModal();
+  }
+  $('#practice-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const level = (f.querySelector('input[name=level]:checked') || {}).value || 'normal';
+    try { localStorage.setItem('nr_bot_level', level); } catch (err) { /* ignore */ }
+    const res = await call('practice:create', { game: practiceGame, level, variant: f.variant.value, bots: Number(f.bots.value), clock: Number(f.clock.value) });
+    if (!res) return;
+    $('#modal-practice').close();
+    if (res.kind === 'poker') S.myTables.add(res.id);
+    location.hash = res.href;
+  });
 
   // ================= create table =================
   function fillCreateForm() {
@@ -1070,16 +1125,18 @@
     if (!t || !S.me) return;
     let min;
     let max;
+    // practice tables use free chips: the balance doesn't limit the buy-in
+    const bal = t.practice ? Infinity : S.me.balance;
     if (mode === 'sit') {
       min = t.minBuyIn;
-      max = Math.min(t.maxBuyIn, S.me.balance);
+      max = Math.min(t.maxBuyIn, bal);
     } else {
       const stack = t.you ? t.you.stack : 0;
       min = stack < t.minBuyIn ? t.minBuyIn - stack : 1;
-      max = Math.min(t.maxBuyIn - stack, S.me.balance);
+      max = Math.min(t.maxBuyIn - stack, bal);
     }
     if (max < min) {
-      toast(S.me.bonusAvailable ? 'Не хватает фишек — заберите ежедневный бонус' : 'Не хватает фишек на балансе', true);
+      toast(S.me.bonusAvailable ? 'Не хватает фишек — крутните колесо фортуны' : 'Не хватает фишек на балансе', true);
       return;
     }
     buyinCtx = { mode, seat };
@@ -1090,7 +1147,7 @@
     range.value = mode === 'sit' ? clamp(t.bb * 100, min, max) : max;
     $('#buyin-title').textContent = mode === 'sit' ? `Место ${seat + 1}: бай-ин` : 'Докупить фишки';
     $('#buyin-range').textContent = `${GAME_NAMES[t.game]} · блайнды ${fmt(t.sb)}/${fmt(t.bb)} · от ${fmt(min)} до ${fmt(max)}`;
-    $('#buyin-balance').textContent = `На балансе: ${fmt(S.me.balance)}`;
+    $('#buyin-balance').textContent = t.practice ? 'Тренировочные фишки — баланс не меняется' : `На балансе: ${fmt(S.me.balance)}`;
     $('#buyin-submit').textContent = mode === 'sit' ? 'Сесть за стол' : 'Докупить';
     $('#buyin-error').textContent = '';
     updateBuyinOut();
@@ -1137,7 +1194,7 @@
       const g = seatGeometry(i, t);
       const r = {};
       r.g = g;
-      r.root = h('div', { class: 'seat', style: `left:${g.seat.x}%;top:${g.seat.y}%` });
+      r.root = h('div', { class: 'seat', style: `left:${g.seat.x}%;top:${g.seat.y}%`, 'data-seat': i });
       const hole = gameInfo(t.game).hole;
       r.cards = h('div', { class: 'seat-cards' + (hole >= 4 ? ' plo' : '') + (hole >= 5 ? ' plo5' : '') });
       r.avatar = h('div', { class: 'avatar', 'aria-hidden': 'true' });
@@ -1250,6 +1307,7 @@
     setText($('#t-name'), t.name);
     setText($('#t-meta'), t.tournament
       ? `Sit & Go · ${GAME_NAMES[t.game]}`
+      : t.practice ? `${GAME_NAMES[t.game]} · ${fmt(t.sb)}/${fmt(t.bb)} · с компьютером`
       : `${GAME_NAMES[t.game]} · ${fmt(t.sb)}/${fmt(t.bb)} · бай-ин ${fmt(t.minBuyIn)}–${fmt(t.maxBuyIn)}`);
     setText($('#t-hand'), t.handNo ? `Раздача #${t.handNo}` : '');
     renderTourneyBar();

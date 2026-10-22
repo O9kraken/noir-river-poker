@@ -3,7 +3,20 @@ const crypto = require('crypto');
 const { FileBackend } = require('./persist');
 
 const START_BALANCE = 10000;
-const DAILY_BONUS = 2000;
+const DAILY_BONUS = 2000; // average-ish prize of the daily wheel, kept for old clients
+// Daily fortune wheel: sectors in the order they are drawn on the wheel, weight = relative chance.
+const WHEEL = [
+  { amount: 1000, weight: 22 }, { amount: 3000, weight: 10 }, { amount: 500, weight: 18 }, { amount: 7500, weight: 3 },
+  { amount: 1500, weight: 20 }, { amount: 2000, weight: 14 }, { amount: 25000, weight: 1 }, { amount: 5000, weight: 5 },
+  { amount: 1000, weight: 22 }, { amount: 2000, weight: 14 }, { amount: 500, weight: 18 }, { amount: 3000, weight: 10 },
+];
+const WHEEL_TOTAL = WHEEL.reduce((a, s) => a + s.weight, 0);
+const RATING_START = 1200;
+const RATED = ['checkers', 'durak'];
+const SEASON_GAMES = ['poker', 'sng', 'durak', 'bj', 'roulette', 'checkers'];
+const SEASON_PRIZES = [5000, 3000, 1500];
+const SEASON_MIN_GAMES = 10;
+const SEASON_KEEP = 12;
 const BONUS_INTERVAL = 24 * 60 * 60 * 1000;
 const TOKEN_TTL = 30 * 24 * 60 * 60 * 1000;
 const NAME_RE = /^[A-Za-zА-Яа-яЁё0-9_\- ]{3,16}$/;
@@ -51,6 +64,8 @@ class Store {
     }
     if (!Array.isArray(this.data.sngTemplates)) this.data.sngTemplates = [];
     if (!this.data.dms || typeof this.data.dms !== 'object') this.data.dms = {};
+    if (!Array.isArray(this.data.seasonHistory)) this.data.seasonHistory = [];
+    if (!this.data.season || typeof this.data.season !== 'object') this.data.season = newSeason();
     for (const u of Object.values(this.data.users)) this._upgrade(u);
     // Chips left on tables when the server stopped go back to balances.
     for (const u of Object.values(this.data.users)) {
@@ -92,7 +107,7 @@ class Store {
     const role = this.adminNames.includes(lower) || (!this.adminNames.length && !hasAdmin) ? 'admin' : 'player';
     this.data.users[id] = {
       id, name, nameLower: lower, salt, hash: this._hashPassword(password, salt), role, banned: false, muted: false,
-      balance: START_BALANCE, inPlay: {}, lastBonus: Date.now(), created: Date.now(),
+      balance: START_BALANCE, inPlay: {}, lastBonus: 0, created: Date.now(), // the wheel is free on day one
       handsWon: 0, biggestPot: 0,
     };
     this._upgrade(this.data.users[id]);
@@ -139,7 +154,7 @@ class Store {
     return {
       id: u.id, name: u.name, balance: u.balance, inPlay,
       bonusAvailable: Date.now() >= nextBonus, nextBonusIn: Math.max(0, nextBonus - Date.now()),
-      bonusAmount: DAILY_BONUS, handsWon: u.stats.poker.won, biggestPot: u.stats.poker.biggestPot,
+      bonusAmount: DAILY_BONUS, wheel: WHEEL.map((w) => w.amount), handsWon: u.stats.poker.won, biggestPot: u.stats.poker.biggestPot,
       role: u.role || 'player', muted: !!u.muted, avatar: u.avatar,
       friendRequests: u.friendReq.in.length,
       rewardsReady: this.rewardsReady(userId),
@@ -160,6 +175,10 @@ class Store {
     u.friendReq ||= { in: [], out: [] };
     u.achClaimed ||= [];
     u.quests ||= null;
+    u.rating ||= {};
+    for (const k of RATED) {
+      if (!u.rating[k] || typeof u.rating[k] !== 'object') u.rating[k] = { r: RATING_START, games: 0, peak: RATING_START };
+    }
   }
 
   _chips(u) { return u.balance + Object.values(u.inPlay || {}).reduce((a, b) => a + b, 0); }
@@ -267,6 +286,10 @@ class Store {
       p.net += f.net;
       if (f.draw) p.draws += 1; else if (f.win) p.wins += 1; else p.losses += 1;
       entry = { kind, table: f.table, net: f.net, text: f.draw ? 'Ничья' : f.win ? 'Победа' : 'Поражение' };
+    }
+    if (SEASON_GAMES.includes(kind)) {
+      const net = kind === 'sng' ? f.prize - f.buyIn : f.tournament ? 0 : (f.net || 0);
+      this._seasonAdd(userId, kind, net);
     }
     if (entry) {
       u.recent.unshift({ t: Date.now(), ...entry });
@@ -385,6 +408,8 @@ class Store {
       recent: u.recent.slice(0, 25),
       history: Object.entries(u.history).sort(([a], [b]) => (a < b ? -1 : 1)).map(([d, v]) => ({ d, v })),
       friends: u.friends.length,
+      ratings: Object.fromEntries(RATED.map((k) => [k, u.rating[k]])),
+      seasonWins: u.seasonWins || 0,
     };
   }
 
@@ -532,14 +557,134 @@ class Store {
     this.save();
   }
 
+  /** Spin the daily wheel: the server picks the sector, the client only animates it. */
   claimBonus(userId) {
-    const u = this.data.users[userId];
-    if (Date.now() < u.lastBonus + BONUS_INTERVAL) throw new StoreError('Бонус уже получен, загляните позже');
-    u.balance += DAILY_BONUS;
+    const u = this.findUser(userId);
+    if (Date.now() < u.lastBonus + BONUS_INTERVAL) throw new StoreError('Колесо уже крутили, загляните позже');
+    let roll = crypto.randomInt(WHEEL_TOTAL);
+    let sector = 0;
+    while (roll >= WHEEL[sector].weight) { roll -= WHEEL[sector].weight; sector += 1; }
+    const amount = WHEEL[sector].amount;
+    u.balance += amount;
     u.lastBonus = Date.now();
+    u.recent.unshift({ t: Date.now(), kind: 'wheel', net: amount, text: 'Колесо фортуны' });
+    if (u.recent.length > RECENT_MAX) u.recent.length = RECENT_MAX;
     this.snapshot(userId);
     this.save();
-    return DAILY_BONUS;
+    return { amount, sector, nextIn: BONUS_INTERVAL };
+  }
+
+  // ---------- ratings (Elo) ----------
+
+  /**
+   * Update Elo after a rated game.
+   * results: [{ userId, score }] where a higher score is a better finish (equal = draw).
+   * Multi-player games are scored as every pair playing each other, K split across opponents.
+   */
+  applyRatings(kind, results) {
+    if (!RATED.includes(kind)) return [];
+    const players = results.filter((r) => this.data.users[r.userId]);
+    if (players.length < 2) return [];
+    const before = players.map((p) => this.data.users[p.userId].rating[kind].r);
+    const delta = players.map(() => 0);
+    for (let i = 0; i < players.length; i++) {
+      const g = this.data.users[players[i].userId].rating[kind].games;
+      const K = (g < 20 ? 40 : 24) / (players.length - 1);
+      for (let j = 0; j < players.length; j++) {
+        if (i === j) continue;
+        const expected = 1 / (1 + 10 ** ((before[j] - before[i]) / 400));
+        const actual = players[i].score > players[j].score ? 1 : players[i].score < players[j].score ? 0 : 0.5;
+        delta[i] += K * (actual - expected);
+      }
+    }
+    const out = players.map((p, i) => {
+      const rt = this.data.users[p.userId].rating[kind];
+      const d = Math.round(delta[i]);
+      rt.r = Math.max(100, rt.r + d);
+      rt.games += 1;
+      rt.peak = Math.max(rt.peak, rt.r);
+      return { userId: p.userId, rating: rt.r, delta: d };
+    });
+    this.save();
+    return out;
+  }
+
+  ratingTable(kind, n = 50) {
+    if (!RATED.includes(kind)) throw new StoreError('Нет такого рейтинга');
+    return Object.values(this.data.users)
+      .filter((u) => u.rating[kind].games > 0 && !u.banned)
+      .map((u) => ({ id: u.id, name: u.name, avatar: u.avatar, rating: u.rating[kind].r, games: u.rating[kind].games, peak: u.rating[kind].peak }))
+      .sort((a, b) => b.rating - a.rating || b.games - a.games)
+      .slice(0, n);
+  }
+
+  // ---------- weekly seasons ----------
+
+  _seasonAdd(userId, kind, net) {
+    this.seasonTick();
+    const sc = this.data.season.scores;
+    const row = sc[userId] || (sc[userId] = { total: 0, games: 0, by: {} });
+    row.total += net;
+    row.games += 1;
+    const g = row.by[kind] || (row.by[kind] = { net: 0, games: 0 });
+    g.net += net;
+    g.games += 1;
+  }
+
+  /** Close the season when the week is over: pay the top 3 and start a new one. Returns the closed season or null. */
+  seasonTick(now = Date.now()) {
+    const cur = this.data.season;
+    if (now < cur.end) return null;
+    const standings = this._standings(cur, 'total');
+    const winners = [];
+    let place = 0;
+    for (const row of standings) {
+      if (place >= SEASON_PRIZES.length) break;
+      if (row.games < SEASON_MIN_GAMES || row.net <= 0) continue;
+      const u = this.data.users[row.id];
+      if (!u || u.banned) continue;
+      const prize = SEASON_PRIZES[place];
+      u.balance += prize;
+      u.seasonWins = (u.seasonWins || 0) + (place === 0 ? 1 : 0);
+      u.recent.unshift({ t: now, kind: 'season', net: prize, text: `Сезон ${cur.label}: ${place + 1} место` });
+      if (u.recent.length > RECENT_MAX) u.recent.length = RECENT_MAX;
+      winners.push({ id: u.id, name: u.name, avatar: u.avatar, place: place + 1, net: row.net, prize });
+      place += 1;
+    }
+    const closed = { id: cur.id, label: cur.label, start: cur.start, end: cur.end, winners, players: Object.keys(cur.scores).length };
+    this.data.seasonHistory.unshift(closed);
+    if (this.data.seasonHistory.length > SEASON_KEEP) this.data.seasonHistory.length = SEASON_KEEP;
+    this.data.season = newSeason(now);
+    this.save();
+    return closed;
+  }
+
+  _standings(season, game) {
+    return Object.entries(season.scores)
+      .map(([id, row]) => {
+        const u = this.data.users[id];
+        if (!u) return null;
+        const part = game === 'total' ? { net: row.total, games: row.games } : row.by[game];
+        if (!part || !part.games) return null;
+        return { id, name: u.name, avatar: u.avatar, net: part.net, games: part.games };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.net - a.net || b.games - a.games);
+  }
+
+  seasonView(game = 'total', userId = null) {
+    this.seasonTick();
+    if (game !== 'total' && !SEASON_GAMES.includes(game)) throw new StoreError('Нет такой игры');
+    const s = this.data.season;
+    const all = this._standings(s, game);
+    const meIdx = userId ? all.findIndex((r) => r.id === userId) : -1;
+    return {
+      id: s.id, label: s.label, start: s.start, end: s.end, endsIn: Math.max(0, s.end - Date.now()),
+      prizes: SEASON_PRIZES, minGames: SEASON_MIN_GAMES, game,
+      top: all.slice(0, 50).map((r, i) => ({ ...r, place: i + 1 })),
+      me: meIdx >= 0 ? { ...all[meIdx], place: meIdx + 1 } : null,
+      history: this.data.seasonHistory.slice(0, 6),
+    };
   }
 
   // ---------- admin ----------
@@ -653,6 +798,8 @@ const ACHIEVEMENTS = [
   { id: 'natural10', title: 'Любимец шуза', text: '10 блэкджеков', reward: 3000, ok: (s) => s.bj.blackjacks >= 10, progress: (s) => [s.bj.blackjacks, 10] },
   { id: 'straight', title: 'В яблочко', text: 'Выиграть ставку на одно число в рулетке', reward: 1000, ok: (s) => s.roulette.straight >= 1 },
   { id: 'ck10', title: 'Гроссмейстер', text: 'Выиграть 10 партий в шашки', reward: 3000, ok: (s) => s.checkers.wins >= 10, progress: (s) => [s.checkers.wins, 10] },
+  { id: 'season1', title: 'Чемпион недели', text: 'Победить в еженедельном сезоне', reward: 5000, ok: (s, u) => (u.seasonWins || 0) >= 1 },
+  { id: 'elo1400', title: 'Мастер доски', text: 'Поднять рейтинг в шашках до 1400', reward: 3000, ok: (s, u) => u.rating.checkers.peak >= 1400, progress: (s, u) => [u.rating.checkers.peak, 1400] },
   { id: 'rich', title: 'Состоятельный', text: 'Накопить 50 000 фишек', reward: 5000, ok: (s, u, chips) => chips >= 50000, progress: (s, u, chips) => [chips, 50000] },
   { id: 'social', title: 'Своя компания', text: 'Добавить 3 друзей', reward: 1500, ok: (s, u) => u.friends.length >= 3, progress: (s, u) => [u.friends.length, 3] },
 ];
@@ -690,6 +837,17 @@ function sniffImage(b) {
   return null;
 }
 
+/** Week starting on Monday 00:00 Moscow time. */
+function newSeason(now = Date.now()) {
+  const msk = new Date(now + 3 * 3600 * 1000);
+  const dow = (msk.getUTCDay() + 6) % 7; // Monday = 0
+  const startMsk = Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), msk.getUTCDate() - dow);
+  const start = startMsk - 3 * 3600 * 1000;
+  const end = start + 7 * 24 * 3600 * 1000;
+  const fmtD = (t) => new Date(t + 3 * 3600 * 1000).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: 'UTC' }).replace('.', '');
+  return { id: dayKey(start + 1), label: `${fmtD(start)} – ${fmtD(end - 1)}`, start, end, scores: {} };
+}
+
 function achievements(u) {
   const chips = u.balance + Object.values(u.inPlay || {}).reduce((a, b) => a + b, 0);
   return ACHIEVEMENTS.map((a) => {
@@ -699,4 +857,4 @@ function achievements(u) {
   });
 }
 
-module.exports = { Store, StoreError, START_BALANCE, DAILY_BONUS, AVATAR_SYMBOLS, AVATAR_MAX_BYTES, QUESTS, dayKey };
+module.exports = { Store, StoreError, START_BALANCE, DAILY_BONUS, WHEEL, RATED, SEASON_PRIZES, SEASON_MIN_GAMES, newSeason, AVATAR_SYMBOLS, AVATAR_MAX_BYTES, QUESTS, dayKey };

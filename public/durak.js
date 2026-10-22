@@ -57,7 +57,7 @@
     if (!st) return;
     document.title = `${st.name} — дурак — NOIR RIVER`;
     $('#dk-name').textContent = st.name;
-    $('#dk-meta').textContent = `${VARIANTS[st.variant]} · ставка ${fmt(st.stake)} · до ${st.maxPlayers} игроков`;
+    $('#dk-meta').textContent = st.practice ? `${VARIANTS[st.variant]} · против компьютера, без ставки` : `${VARIANTS[st.variant]} · ставка ${fmt(st.stake)} · до ${st.maxPlayers} игроков`;
     $('#dk-game').textContent = st.gameNo ? `Партия #${st.gameNo}` : '';
 
     renderSeats(st);
@@ -213,7 +213,7 @@
     const you = st.you;
     let text = '';
     if (st.mySeat === -1) text = st.status === 'playing' ? 'Идёт партия — можно наблюдать.' : 'Выберите свободное место, чтобы сыграть.';
-    else if (st.status === 'waiting') text = you.ready ? 'Вы готовы. Ждём остальных…' : `Нажмите «Готов» — ставка ${fmt(st.stake)} спишется при раздаче.`;
+    else if (st.status === 'waiting') text = you.ready ? 'Вы готовы. Ждём остальных…' : (st.practice ? 'Нажмите «Готов» — компьютерные соперники уже ждут.' : `Нажмите «Готов» — ставка ${fmt(st.stake)} спишется при раздаче.`);
     else if (st.status === 'countdown') text = 'Сейчас раздадим карты…';
     else if (st.status === 'result') {
       const r = st.result;
@@ -251,7 +251,7 @@
       box.append(
         you.ready
           ? h('button', { type: 'button', class: 'btn btn-dark', onclick: () => call('durak:ready', { tableId: D.id, value: false }) }, 'Не готов')
-          : h('button', { type: 'button', class: 'btn btn-gold', onclick: ready }, `Готов · ${fmt(st.stake)}`),
+          : h('button', { type: 'button', class: 'btn btn-gold', onclick: ready }, st.stake ? `Готов · ${fmt(st.stake)}` : 'Готов'),
         h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: leave }, 'Встать'));
       return;
     }
