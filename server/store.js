@@ -50,6 +50,7 @@ class Store {
       if (this.data.announcement === undefined) this.data.announcement = null;
     }
     if (!Array.isArray(this.data.sngTemplates)) this.data.sngTemplates = [];
+    if (!this.data.dms || typeof this.data.dms !== 'object') this.data.dms = {};
     for (const u of Object.values(this.data.users)) this._upgrade(u);
     // Chips left on tables when the server stopped go back to balances.
     for (const u of Object.values(this.data.users)) {
@@ -142,6 +143,7 @@ class Store {
       role: u.role || 'player', muted: !!u.muted, avatar: u.avatar,
       friendRequests: u.friendReq.in.length,
       rewardsReady: this.rewardsReady(userId),
+      dmUnread: this.dmUnread(userId),
     };
   }
 
@@ -449,6 +451,59 @@ class Store {
 
   friendsOf(userId) { const u = this.data.users[userId]; return u ? u.friends.slice() : []; }
 
+  // ---------- private messages between friends ----------
+
+  _dmKey(a, b) { return a < b ? `${a}|${b}` : `${b}|${a}`; }
+
+  dmSend(from, to, text) {
+    const me = this.findUser(from);
+    if (!this.data.users[to]) throw new StoreError('Игрок не найден');
+    if (!me.friends.includes(to)) throw new StoreError('Писать можно только друзьям');
+    if (me.muted) throw new StoreError('Администратор запретил вам писать сообщения');
+    const clean = String(text || '').replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, 500);
+    if (!clean) throw new StoreError('Пустое сообщение');
+    const key = this._dmKey(from, to);
+    const conv = this.data.dms[key] || (this.data.dms[key] = { msgs: [], read: {} });
+    const msg = { id: crypto.randomBytes(5).toString('hex'), from, text: clean, t: Date.now() };
+    conv.msgs.push(msg);
+    if (conv.msgs.length > DM_KEEP) conv.msgs.splice(0, conv.msgs.length - DM_KEEP);
+    conv.read[from] = msg.t;
+    this.save();
+    return msg;
+  }
+
+  dmHistory(userId, otherId) {
+    const conv = this.data.dms[this._dmKey(userId, otherId)];
+    return conv ? conv.msgs.slice() : [];
+  }
+
+  dmMarkRead(userId, otherId) {
+    const conv = this.data.dms[this._dmKey(userId, otherId)];
+    if (!conv || !conv.msgs.length) return false;
+    const last = conv.msgs[conv.msgs.length - 1].t;
+    if ((conv.read[userId] || 0) >= last) return false;
+    conv.read[userId] = last;
+    this.save();
+    return true;
+  }
+
+  /** Conversations of a player with friends, newest first. */
+  dmList(userId) {
+    const out = [];
+    for (const [key, conv] of Object.entries(this.data.dms)) {
+      const [a, b] = key.split('|');
+      if (a !== userId && b !== userId) continue;
+      const other = a === userId ? b : a;
+      if (!this.data.users[other] || !conv.msgs.length) continue;
+      const seen = conv.read[userId] || 0;
+      const last = conv.msgs[conv.msgs.length - 1];
+      out.push({ id: other, last: { text: last.text, t: last.t, mine: last.from === userId }, unread: conv.msgs.filter((m) => m.from !== userId && m.t > seen).length });
+    }
+    return out.sort((x, y) => y.last.t - x.last.t);
+  }
+
+  dmUnread(userId) { return this.dmList(userId).reduce((a, c) => a + c.unread, 0); }
+
   brief(userId) {
     const u = this.data.users[userId];
     return u ? { id: u.id, name: u.name, avatar: u.avatar } : null;
@@ -626,6 +681,7 @@ function pickQuests(userId, day) {
 }
 
 const AVATAR_MAX_BYTES = 1024 * 1024;
+const DM_KEEP = 200;
 function sniffImage(b) {
   if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
   if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';

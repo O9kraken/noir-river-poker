@@ -52,6 +52,10 @@
       <button type="button" class="icon-btn deck-btn" id="deck-btn" aria-pressed="true" title="Четырёхцветная колода">
         <span aria-hidden="true"><i class="ds">♠&#xFE0E;</i><i class="dh">♥&#xFE0E;</i><i class="dd">♦&#xFE0E;</i><i class="dc">♣&#xFE0E;</i></span>
       </button>
+      <button type="button" class="icon-btn dm-btn" id="dm-btn" aria-label="Личные сообщения" title="Личные сообщения">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.8 7L4 20.5l1.4-4.7A8 8 0 1 1 21 12z"/></svg>
+        <span class="badge dm-badge" id="dm-badge" hidden></span>
+      </button>
       <button type="button" class="icon-btn" id="sound-btn" aria-label="Выключить звук" aria-pressed="false">
         <svg class="ico-on" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
         <svg class="ico-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m23 9-6 6M17 9l6 6"/></svg>
@@ -70,8 +74,119 @@
     </button>
   </div>
 
+  <!-- ALL GAMES -->
+  <main id="games-view" class="games-page" hidden>
+    <div class="games-head">
+      <a href="#/" class="btn btn-ghost btn-sm"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Лобби</a>
+      <div>
+        <p class="eyebrow">Каталог</p>
+        <h1 class="h1">Все игры клуба</h1>
+      </div>
+    </div>
+    <div class="modes games-grid">
+      <button type="button" class="mode" data-go-tab="cash">
+        <img class="mode-art" src="/art/poker.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Покер</b><small>Холдем, Омаха, шорт-дек — садитесь в&nbsp;любой момент</small></span>
+          <span class="mode-cnt" data-cnt="cash"></span>
+        </span>
+      </button>
+      <button type="button" class="mode" data-go-tab="sng">
+        <img class="mode-art" src="/art/tournament.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Турниры</b><small>Sit &amp; Go и&nbsp;турниры по&nbsp;расписанию</small></span>
+          <span class="mode-cnt" data-cnt="sng"></span>
+        </span>
+      </button>
+      <button type="button" class="mode" data-go-tab="durak">
+        <img class="mode-art" src="/art/durak.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Дурак</b><small>Подкидной и&nbsp;переводной на&nbsp;фишки</small></span>
+          <span class="mode-cnt" data-cnt="durak"></span>
+        </span>
+      </button>
+      <button type="button" class="mode" data-go-tab="bj">
+        <img class="mode-art" src="/art/blackjack.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Блэкджек</b><small>Против дилера, блэкджек платит 3:2</small></span>
+          <span class="mode-cnt" data-cnt="bj"></span>
+        </span>
+      </button>
+      <button type="button" class="mode" data-go-tab="rl">
+        <img class="mode-art" src="/art/roulette.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Рулетка</b><small>Европейская, одно зеро, общий стол</small></span>
+          <span class="mode-cnt" data-cnt="rl"></span>
+        </span>
+      </button>
+      <button type="button" class="mode" data-go-tab="ck">
+        <img class="mode-art" src="/art/checkers.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Шашки</b><small>Русские шашки один на&nbsp;один на&nbsp;ставку</small></span>
+          <span class="mode-cnt" data-cnt="ck"></span>
+        </span>
+      </button>
+    </div>
+  </main>
+
   <!-- LOBBY -->
   <main id="lobby" class="lobby" hidden>
+    <nav class="game-nav" aria-label="Игры">
+      <a class="gnav-all" href="#/games">
+        <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg></span>
+        <span class="gnav-txt"><b>Все игры</b><small>каталог</small></span>
+      </a>
+      <div class="gnav-list" role="tablist" aria-orientation="vertical" aria-label="Выбор игры">
+        <button type="button" role="tab" class="gnav-item is-active" data-lobby-tab="cash" aria-selected="true">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 2.5C9.5 6.5 4 9 4 13.2c0 2.9 3.3 4.3 6.2 2.3L8.8 21h6.4l-1.4-5.5c2.9 2 6.2.6 6.2-2.3C20 9 14.5 6.5 12 2.5z"/></svg></span>
+          <span class="gnav-txt"><b>Покер</b><small data-cnt="cash"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/poker.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Покер</b><small>Холдем, Омаха, шорт-дек — садитесь в&nbsp;любой момент</small><i data-cnt="cash"></i></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="sng" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 3M17 6h3a3 3 0 0 1-3 3"/></svg></span>
+          <span class="gnav-txt"><b>Турниры</b><small data-cnt="sng"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/tournament.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Турниры</b><small>Sit &amp; Go и&nbsp;турниры по&nbsp;расписанию</small><i data-cnt="sng"></i></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="durak" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="11" height="15" rx="2" transform="rotate(-12 8 13)"/><rect x="9" y="4" width="11" height="15" rx="2" transform="rotate(8 14 11)"/></svg></span>
+          <span class="gnav-txt"><b>Дурак</b><small data-cnt="durak"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/durak.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Дурак</b><small>Подкидной и&nbsp;переводной на&nbsp;фишки</small><i data-cnt="durak"></i></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="bj" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="800" fill="currentColor" stroke="none" font-family="Manrope, sans-serif">21</text></svg></span>
+          <span class="gnav-txt"><b>Блэкджек</b><small data-cnt="bj"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/blackjack.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Блэкджек</b><small>Против дилера, блэкджек платит 3:2</small><i data-cnt="bj"></i></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="rl" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3v4.5M12 16.5V21M3 12h4.5M16.5 12H21"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
+          <span class="gnav-txt"><b>Рулетка</b><small data-cnt="rl"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/roulette.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Рулетка</b><small>Европейская, одно зеро, общий стол</small><i data-cnt="rl"></i></span>
+          </span>
+        </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="ck" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="9" rx="8" ry="3.5"/><path d="M4 9v4c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5V9"/><path d="M4 13v3c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5v-3"/></svg></span>
+          <span class="gnav-txt"><b>Шашки</b><small data-cnt="ck"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/checkers.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Шашки</b><small>Русские шашки один на&nbsp;один на&nbsp;ставку</small><i data-cnt="ck"></i></span>
+          </span>
+        </button>
+      </div>
+    </nav>
     <div class="lobby-main">
       <div class="lobby-head">
         <div>
@@ -81,50 +196,6 @@
         <button type="button" class="btn btn-gold" id="create-btn">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           <span id="create-btn-label">Создать стол</span>
-        </button>
-      </div>
-      <div class="modes lobby-tabs" role="tablist" aria-label="Режим игры">
-        <button type="button" role="tab" class="mode is-active" data-lobby-tab="cash" aria-selected="true">
-          <img class="mode-art" src="/art/poker.webp" alt="" width="1600" height="1000" decoding="async">
-          <span class="mode-cap">
-            <span class="mode-txt"><b>Покер</b><small>Холдем, Омаха, шорт-дек — садитесь в&nbsp;любой момент</small></span>
-            <span class="mode-cnt" id="cnt-cash"></span>
-          </span>
-        </button>
-        <button type="button" role="tab" class="mode" data-lobby-tab="sng" aria-selected="false">
-          <img class="mode-art" src="/art/tournament.webp" alt="" width="1600" height="1000" decoding="async">
-          <span class="mode-cap">
-            <span class="mode-txt"><b>Турниры</b><small>Sit &amp; Go и&nbsp;турниры по&nbsp;расписанию</small></span>
-            <span class="mode-cnt" id="cnt-sng"></span>
-          </span>
-        </button>
-        <button type="button" role="tab" class="mode" data-lobby-tab="durak" aria-selected="false">
-          <img class="mode-art" src="/art/durak.webp" alt="" width="1600" height="1000" decoding="async">
-          <span class="mode-cap">
-            <span class="mode-txt"><b>Дурак</b><small>Подкидной и&nbsp;переводной на&nbsp;фишки</small></span>
-            <span class="mode-cnt" id="cnt-durak"></span>
-          </span>
-        </button>
-        <button type="button" role="tab" class="mode" data-lobby-tab="bj" aria-selected="false">
-          <img class="mode-art" src="/art/blackjack.webp" alt="" width="1600" height="1000" decoding="async">
-          <span class="mode-cap">
-            <span class="mode-txt"><b>Блэкджек</b><small>Против дилера, блэкджек платит 3:2</small></span>
-            <span class="mode-cnt" id="cnt-bj"></span>
-          </span>
-        </button>
-        <button type="button" role="tab" class="mode" data-lobby-tab="rl" aria-selected="false">
-          <img class="mode-art" src="/art/roulette.webp" alt="" width="1600" height="1000" decoding="async">
-          <span class="mode-cap">
-            <span class="mode-txt"><b>Рулетка</b><small>Европейская, одно зеро, общий стол</small></span>
-            <span class="mode-cnt" id="cnt-rl"></span>
-          </span>
-        </button>
-        <button type="button" role="tab" class="mode" data-lobby-tab="ck" aria-selected="false">
-          <img class="mode-art" src="/art/checkers.webp" alt="" width="1600" height="1000" decoding="async">
-          <span class="mode-cap">
-            <span class="mode-txt"><b>Шашки</b><small>Русские шашки один на&nbsp;один на&nbsp;ставку</small></span>
-            <span class="mode-cnt" id="cnt-ck"></span>
-          </span>
         </button>
       </div>
       <div class="filters" id="cash-filters" role="group" aria-label="Фильтр игр">
@@ -490,6 +561,30 @@
   </main>
 </div>
 
+<aside class="dm-drawer" id="dm-drawer" aria-label="Личные сообщения" hidden>
+  <div class="dm-pane" id="dm-list-pane">
+    <header class="dm-head">
+      <h2 class="h3">Сообщения</h2>
+      <button type="button" class="icon-btn" data-dm-close aria-label="Закрыть"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <ul class="dm-list" id="dm-list"></ul>
+  </div>
+  <div class="dm-pane" id="dm-chat-pane" hidden>
+    <header class="dm-head">
+      <button type="button" class="icon-btn" id="dm-back" aria-label="Ко всем диалогам"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <a class="dm-who" id="dm-who"></a>
+      <button type="button" class="icon-btn" data-dm-close aria-label="Закрыть"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="dm-msgs" id="dm-msgs" aria-live="polite"></div>
+    <div class="dm-typing" id="dm-typing" hidden>печатает…</div>
+    <form class="dm-form" id="dm-form">
+      <label class="sr-only" for="dm-input">Сообщение</label>
+      <textarea id="dm-input" rows="1" maxlength="500" placeholder="Сообщение…"></textarea>
+      <button class="btn btn-gold btn-sm" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+    </form>
+  </div>
+</aside>
+
 <!-- MODALS -->
 <dialog id="modal-create" class="modal">
   <form method="dialog" class="form" id="create-form">
@@ -719,5 +814,6 @@
 <script src="/progress.js"></script>
 <script src="/roulette.js"></script>
 <script src="/checkers.js"></script>
+<script src="/dm.js"></script>
 </body>
 </html>

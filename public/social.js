@@ -54,7 +54,9 @@
           h('a', { href: profileHref(f.name), class: 'friend-main' },
             h('span', { class: 'av-wrap' }, NR.avatarEl(f.name, f.avatar, 'sm'), h('i', { class: 'dot', 'aria-label': f.online ? 'онлайн' : 'не в сети' })),
             h('span', { class: 'friend-txt' }, h('b', null, f.name), h('small', null, f.online ? (whereText(f.where) || 'в лобби') : 'не в сети'))),
-          w ? h('a', { class: 'btn btn-dark btn-sm', href: w.href, title: `Открыть стол «${w.name}»` }, 'К столу') : null);
+          w ? h('a', { class: 'btn btn-dark btn-sm', href: w.href, title: `Открыть стол «${w.name}»` }, 'К столу') : null,
+          h('button', { type: 'button', class: 'icon-btn friend-dm', title: `Написать ${f.name}`, 'aria-label': `Написать ${f.name}`, onclick: () => window.DM && window.DM.open(f.id) },
+            h('span', { 'aria-hidden': 'true', class: 'friend-dm-ico' })));
       }),
       ...F.outgoing.map((u) => h('li', { class: 'friend pending' },
         h('a', { href: profileHref(u.name), class: 'friend-main' }, NR.avatarEl(u.name, u.avatar, 'sm'), h('span', { class: 'friend-txt' }, h('b', null, u.name), h('small', null, 'заявка отправлена'))),
@@ -169,7 +171,9 @@
 
     let relation = null;
     if (!p.me) {
-      if (p.friend) relation = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: async () => { if (confirm(`Удалить ${p.name} из друзей?`)) { await act('friends:remove', p.id); openProfile(p.name); } } }, 'Удалить из друзей');
+      if (p.friend) relation = h('span', { class: 'phead-pair' },
+        h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => window.DM && window.DM.open(p.id) }, 'Написать'),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: async () => { if (confirm(`Удалить ${p.name} из друзей?`)) { await act('friends:remove', p.id); openProfile(p.name); } } }, 'Удалить из друзей'));
       else if (p.incoming) relation = h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: async () => { await act('friends:accept', p.id, `${p.name} теперь ваш друг`); openProfile(p.name); } }, 'Принять заявку');
       else if (p.requested) relation = h('span', { class: 'status registering' }, 'Заявка отправлена');
       else relation = h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: async () => { const r = await call('friends:add', { name: p.name }); if (r) { setFriends(r); toast('Заявка отправлена'); openProfile(p.name); } } }, 'Добавить в друзья');

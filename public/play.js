@@ -466,6 +466,18 @@
   const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI };
   async function route() {
     if (!S.socket) return;
+    const gm = location.hash === '#/games';
+    $('#games-view').hidden = !gm;
+    if (gm) {
+      if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
+      S.tableId = null;
+      S.ts = null;
+      for (const ui of [window.DurakUI, window.BjUI, window.RouletteUI, window.CheckersUI]) if (ui) ui.close();
+      for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view', '#rl-view', '#ck-view', '#profile-view']) $(v).hidden = true;
+      document.title = 'Все игры — NOIR RIVER';
+      renderLobby();
+      return;
+    }
     const xm = location.hash.match(/^#\/(rl|ck)\/([\w-]+)/);
     for (const [k, ui] of Object.entries(EXTRA_VIEWS)) if (ui() && (!xm || xm[1] !== k)) { ui().close(); $(`#${k}-view`).hidden = true; }
     if (xm) {
@@ -559,6 +571,8 @@
       h('span', { class: 'me-name-text' }, S.me.name),
       S.me.friendRequests ? h('span', { class: 'badge', title: 'Заявки в друзья' }, S.me.friendRequests) : null].filter(Boolean));
     $('#bonus-btn').hidden = !S.me.bonusAvailable;
+    const db = $('#dm-badge');
+    if (db) { db.textContent = S.me.dmUnread > 99 ? '99+' : String(S.me.dmUnread || ''); db.hidden = !S.me.dmUnread; }
     $('#admin-link').hidden = S.me.role !== 'admin';
     $('#bonus-amount').textContent = fmt(S.me.bonusAmount);
   }
@@ -593,6 +607,11 @@
     $('#rules-list').replaceChildren(...Object.values(GAMES).flatMap((g) => [h('dt', null, g.name), h('dd', null, g.rules || '')]));
   }
   $('#filter-free').addEventListener('change', (e) => { S.freeOnly = e.target.checked; renderLobby(); });
+  $$('[data-go-tab]').forEach((b) => b.addEventListener('click', () => {
+    S.lobbyTab = b.dataset.goTab;
+    $$('[data-lobby-tab]').forEach((x) => { const on = x.dataset.lobbyTab === S.lobbyTab; x.classList.toggle('is-active', on); x.setAttribute('aria-selected', on); });
+    location.hash = '#/';
+  }));
   $$('[data-lobby-tab]').forEach((tab) => tab.addEventListener('click', () => {
     S.lobbyTab = tab.dataset.lobbyTab;
     $$('[data-lobby-tab]').forEach((x) => { x.classList.toggle('is-active', x === tab); x.setAttribute('aria-selected', x === tab); });
@@ -603,6 +622,7 @@
     return h('div', { class: 'seats-dots', 'aria-hidden': 'true' }, Array.from({ length: n }, (_, i) => h('i', { class: i < on ? 'on' : '' })));
   }
 
+  const setCnt = (k, text) => $$(`[data-cnt="${k}"]`).forEach((el) => { el.textContent = text; });
   function renderLobby() {
     const tab = S.lobbyTab;
     $('#table-list').hidden = tab !== 'cash';
@@ -625,12 +645,12 @@
     const sngWaiting = S.sngs.filter((x) => x.status === 'registering').reduce((a, x) => a + x.players.length, 0);
     const sngLive = S.sngs.filter((x) => x.status === 'running').length;
     const durakPlayers = S.durak.reduce((a, t) => a + t.players, 0);
-    $('#cnt-cash').textContent = `${seatedCash} за столами`;
-    $('#cnt-sng').textContent = sngLive ? `${sngLive} идут · ${sngWaiting} ждут` : `${sngWaiting} ждут старта`;
-    $('#cnt-durak').textContent = `${durakPlayers} за столами`;
-    $('#cnt-bj').textContent = `${S.bj.reduce((a, t) => a + t.players, 0)} за столами`;
-    $('#cnt-rl').textContent = `${S.rl.reduce((a, t) => a + t.players, 0)} у колеса`;
-    $('#cnt-ck').textContent = `${S.ck.filter((t) => t.status === 'playing').length} партий идёт`;
+    setCnt('cash', `${seatedCash} за столами`);
+    setCnt('sng', sngLive ? `${sngLive} идут · ${sngWaiting} ждут` : `${sngWaiting} ждут старта`);
+    setCnt('durak', `${durakPlayers} за столами`);
+    setCnt('bj', `${S.bj.reduce((a, t) => a + t.players, 0)} за столами`);
+    setCnt('rl', `${S.rl.reduce((a, t) => a + t.players, 0)} у колеса`);
+    setCnt('ck', `${S.ck.filter((t) => t.status === 'playing').length} партий идёт`);
     if (S.me) {
       const hr = new Date().getHours();
       const part = hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';

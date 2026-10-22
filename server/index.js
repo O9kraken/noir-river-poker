@@ -697,6 +697,32 @@ function createServer({
       p.where = p.me || p.friend ? whereIs(p.id) : [];
       return { profile: p };
     });
+    // ----- private messages -----
+    let lastDm = 0;
+    on('dm:list', () => ({ list: store.dmList(userId).map((c) => ({ ...c, friend: store.brief(c.id), online: isOnline(c.id) })) }));
+    on('dm:history', ({ id }) => {
+      const fid = String(id || '');
+      const friend = store.brief(fid);
+      if (!friend) throw new GameError('Игрок не найден');
+      if (store.dmMarkRead(userId, fid)) pushProfile(userId);
+      return { friend: { ...friend, online: isOnline(fid), isFriend: store.areFriends(userId, fid) }, messages: store.dmHistory(userId, fid) };
+    });
+    on('dm:send', ({ id, text }) => {
+      const fid = String(id || '');
+      if (Date.now() - lastDm < 400) throw new GameError('Не так быстро');
+      const msg = store.dmSend(userId, fid, text);
+      lastDm = Date.now();
+      io.to('user:' + fid).emit('dm:new', { with: userId, from: store.brief(userId), msg });
+      io.to('user:' + userId).emit('dm:new', { with: fid, msg });
+      pushProfile(fid);
+      return { msg };
+    });
+    on('dm:read', ({ id }) => { if (store.dmMarkRead(userId, String(id || ''))) pushProfile(userId); });
+    on('dm:typing', ({ id }) => {
+      const fid = String(id || '');
+      if (store.areFriends(userId, fid)) io.to('user:' + fid).emit('dm:typing', { with: userId });
+    });
+
     on('progress:get', () => store.progress(userId));
     on('quest:claim', ({ id }) => {
       const reward = store.claimQuest(userId, String(id));

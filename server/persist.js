@@ -27,7 +27,7 @@ class FileBackend {
   flush() { return Promise.resolve(); }
 }
 
-const META_KEYS = ['adminLog', 'announcement', 'sngTemplates'];
+const META_KEYS = ['adminLog', 'announcement', 'sngTemplates', 'dms'];
 
 class PgBackend {
   /** @param {import('pg').Pool} pool */
