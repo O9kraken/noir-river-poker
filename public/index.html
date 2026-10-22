@@ -5,202 +5,327 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NOIR RIVER — покер, рулетка, шашки и дурак с друзьями</title>
 <meta name="description" content="Покер в пяти вариантах, турниры, дурак, блэкджек, рулетка и шашки на игровые фишки. Садитесь за стол с друзьями прямо в браузере.">
-<meta name="theme-color" content="#0A0D0C">
+<meta name="theme-color" content="#070A09">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <link rel="preload" href="/art/hero.webp" as="image" fetchpriority="high">
+<link rel="preload" href="/fonts/unbounded-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/manrope-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/fonts/fonts.css">
 <link rel="stylesheet" href="/fonts/landing-fonts.css">
-<link rel="preload" href="/fonts/cormorant-garamond-cyrillic-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/landing.css">
 <script src="/landing.js" defer></script>
 </head>
 <body>
-<div class="page">
-  <div class="guides wrap" aria-hidden="true"><i></i><i></i></div>
+<div class="frame">
 
-  <!-- HERO -->
+  <!-- ================= HERO ================= -->
   <header class="hero" id="top">
     <img class="hero-photo" src="/art/hero.webp" alt="" width="1920" height="1080" fetchpriority="high">
     <div class="hero-shade" aria-hidden="true"></div>
 
-    <nav class="wrap topnav" aria-label="Разделы">
-      <div class="pills">
-        <a class="pill is-active" href="#top">Главная</a>
-        <a class="pill" href="#games">Игры</a>
-        <a class="pill" href="#fair">Честно</a>
-        <a class="pill" href="#faq">Вопросы</a>
+    <nav class="hbar" aria-label="Главное меню">
+      <div class="menu">
+        <button type="button" class="burger" id="menu-btn" aria-expanded="false" aria-controls="menu-panel" aria-label="Открыть меню"><i></i><i></i><i></i></button>
+        <div class="menu-panel" id="menu-panel" hidden>
+          <a href="#club">Клуб</a>
+          <a href="#games">Игры</a>
+          <a href="#new">Новое</a>
+          <a href="#fair">Честная игра</a>
+          <a href="#faq">Вопросы</a>
+        </div>
       </div>
+      <a class="logo" href="#top" aria-label="NOIR RIVER — наверх">
+        <img src="/brand/mark.svg" alt="" width="34" height="34">
+        <span class="logo-txt"><b>NOIR <em>RIVER</em></b><small>клуб карточных игр</small></span>
+      </a>
       <a class="member" id="member" href="/play">
         <span class="member-text">Войти в&nbsp;клуб</span>
-        <i class="member-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></i>
+        <i class="member-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i>
       </a>
     </nav>
 
-    <div class="wrap hero-grid">
-      <p class="tagline"><span class="cap">Г</span>де азарт встречает дружбу, а&nbsp;каждая раздача честная.</p>
-      <div class="hero-center">
-        <h1 class="wordmark" aria-label="NOIR RIVER">NOIR <span>RIVER</span></h1>
-        <p class="hero-sub">Покер, рулетка, шашки, дурак и&nbsp;блэкджек для&nbsp;своей компании</p>
-        <a class="orb" href="/play"><span class="orb-in">Играть</span></a>
+    <p class="kicker hero-kicker">Честные раздачи<br>Вечера с&nbsp;друзьями</p>
+
+    <h1 class="mega" aria-label="NOIR RIVER">
+      <span class="mega-a" aria-hidden="true">N<span class="chip-o"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.6s-7.2 5.4-7.2 10.4c0 2.7 2 4.5 4.3 4.5 1.3 0 2.1-.5 2.5-1.2-.2 1.9-.9 3.2-2.2 4.1h5.2c-1.3-.9-2-2.2-2.2-4.1.4.7 1.2 1.2 2.5 1.2 2.3 0 4.3-1.8 4.3-4.5 0-5-7.2-10.4-7.2-10.4z"/></svg></span>IR</span>
+      <span class="mega-b" aria-hidden="true">RIVER</span>
+    </h1>
+
+    <div class="hero-left">
+      <p class="hero-lead">Карточный клуб<br>для своей компании.</p>
+      <p class="hero-text">Покер, турниры, дурак, блэкджек, рулетка и&nbsp;шашки в&nbsp;браузере. Играем на&nbsp;фишки&nbsp;— на&nbsp;деньги не&nbsp;играем.</p>
+      <a class="cta" href="/play" data-auth-cta><span>Начать играть</span><i aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i></a>
+      <div class="trust">
+        <span class="trust-faces" aria-hidden="true">
+          <img src="/art/poker.webp" alt="" width="1600" height="1000">
+          <img src="/art/durak.webp" alt="" width="1600" height="1000">
+          <img src="/art/roulette.webp" alt="" width="1600" height="1000">
+        </span>
+        <span><b>6 игр</b><br>в&nbsp;одном клубе</span>
       </div>
-      <ul class="suits" aria-hidden="true"><li>♠&#xFE0E;</li><li class="r">♥&#xFE0E;</li><li class="r">♦&#xFE0E;</li><li>♣&#xFE0E;</li></ul>
-      <a class="scroll" href="#about">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M6 14l6 6 6-6"/></svg>
-        Листайте вниз
-      </a>
     </div>
+
+    <p class="script hero-script" aria-hidden="true">Ваш ход,<br><span>партнёр</span><i></i></p>
+
+    <ul class="hero-stats">
+      <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg></i><span>Шесть<br>игр</span></li>
+      <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></i><span>Честная<br>тасовка</span></li>
+      <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.3-5.5 6.5-5.5s5.7 2.1 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.9.7 3.1 2.4 3.5 5.2"/></svg></i><span>Столы<br>для своих</span></li>
+    </ul>
+
+    <a class="watch" href="#games">
+      <i aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M8 5.5v13l10.5-6.5z"/></svg></i>
+      <span>Смотреть<br>игры</span>
+    </a>
+
+    <div class="notch"><span class="notch-in"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2.6s-7.2 5.4-7.2 10.4c0 2.7 2 4.5 4.3 4.5 1.3 0 2.1-.5 2.5-1.2-.2 1.9-.9 3.2-2.2 4.1h5.2c-1.3-.9-2-2.2-2.2-4.1.4.7 1.2 1.2 2.5 1.2 2.3 0 4.3-1.8 4.3-4.5 0-5-7.2-10.4-7.2-10.4z"/></svg>Наш клуб</span></div>
   </header>
 
   <main>
-    <section class="wrap trio" id="about" aria-label="О клубе">
-      <h2 class="trio-a">Кто мы?</h2>
-      <p class="trio-b"><span class="cap">М</span>ы&nbsp;закрытый клуб для своих: покер, турниры, дурак, блэкджек, рулетка и&nbsp;шашки на&nbsp;игровые фишки. Без скачивания&nbsp;— с&nbsp;компьютера, планшета или телефона.</p>
-      <div class="trio-c">
-        <p class="trio-title">Станьте частью игры</p>
-        <a class="joined" href="/play" data-auth-cta>
-          <span>Регистрация</span>
-          <i aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i>
-        </a>
+    <!-- ================= CLUB ================= -->
+    <section class="club" id="club" aria-labelledby="club-h">
+      <a class="tile" href="/play" style="grid-area: a">
+        <span class="tile-tag">Покер</span>
+        <img src="/art/poker.webp" alt="Пара тузов, борд и фишки на зелёном сукне" width="1600" height="1000" loading="lazy">
+        <span class="tile-cap"><b>Пять вариантов от&nbsp;холдема до&nbsp;Омахи-5</b><i class="arrow" aria-hidden="true"></i></span>
+      </a>
+      <a class="tile" href="/play" style="grid-area: b">
+        <span class="tile-tag">Турниры</span>
+        <img src="/art/tournament.webp" alt="Золотой кубок турнира и фишки" width="1600" height="1000" loading="lazy">
+        <span class="tile-cap"><b>Sit &amp; Go по&nbsp;своим правилам</b><i class="arrow" aria-hidden="true"></i></span>
+      </a>
+
+      <div class="club-center" style="grid-area: c">
+        <h2 class="h2" id="club-h">Карты, фишки и&nbsp;друзья&nbsp;—<br><em>в&nbsp;одном клубе.</em></h2>
+        <p class="sub">Шесть игр прямо в&nbsp;браузере, честная тасовка на&nbsp;сервере и&nbsp;столы только для своих. Никаких денег&nbsp;— только фишки и&nbsp;азарт.</p>
+        <span class="ring" aria-hidden="true"><img src="/brand/mark.svg" alt="" width="40" height="40"></span>
+        <img class="club-art" src="/art/center.webp" alt="Башня золотых фишек и пара тузов под лампой" width="1400" height="800" loading="lazy">
       </div>
-    </section>
 
-    <!-- GAMES -->
-    <section class="games" id="games" aria-label="Игры">
-      <article class="feat">
-        <h2 class="feat-title"><span>Больше, чем</span> просто покер</h2>
-        <div class="feat-media"><img src="/art/poker.webp" alt="Пара тузов, борд и фишки на зелёном сукне" width="1600" height="1000" loading="lazy"></div>
-        <div class="glass">
-          <span class="chip-label">01 · Покер</span>
-          <p class="glass-lead">Садитесь за&nbsp;стол в&nbsp;любой момент: блайнды от&nbsp;1/2 до&nbsp;500/1000.</p>
-          <hr>
-          <ul class="glass-list">
-            <li><i aria-hidden="true">5</i><div><b>Пять вариантов</b><span>Холдем NL и&nbsp;Limit, шорт-дек 6+, Омаха и&nbsp;Омаха-5</span></div></li>
-            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></i><div><b>Шансы на&nbsp;столе</b><span>Эквити и&nbsp;вероятность каждой комбинации</span></div></li>
-          </ul>
-          <a class="glass-link" href="/play">Сесть за&nbsp;стол <span aria-hidden="true">→</span></a>
+      <a class="tile" href="/play" style="grid-area: d">
+        <span class="tile-tag">Рулетка</span>
+        <img src="/art/roulette.webp" alt="Колесо рулетки и фишки на поле для ставок" width="1600" height="1000" loading="lazy">
+        <span class="tile-cap"><b>Европейское колесо с&nbsp;одним зеро</b><i class="arrow" aria-hidden="true"></i></span>
+      </a>
+      <a class="tile" href="/play" style="grid-area: e">
+        <span class="tile-tag">Шашки</span>
+        <img src="/art/checkers.webp" alt="Шашечная доска с партией в разгаре" width="1600" height="1000" loading="lazy">
+        <span class="tile-cap"><b>Партия один на&nbsp;один на&nbsp;ставку</b><i class="arrow" aria-hidden="true"></i></span>
+      </a>
+
+      <div class="strip" style="grid-area: f">
+        <div class="strip-item">
+          <i aria-hidden="true">♠&#xFE0E;</i>
+          <b>100%</b>
+          <span>честная криптотасовка<br>на&nbsp;сервере</span>
         </div>
-      </article>
-
-      <article class="feat flip">
-        <h2 class="feat-title"><span>Турниры</span> по&nbsp;своим правилам</h2>
-        <div class="feat-media"><img src="/art/tournament.webp" alt="Золотой кубок турнира и фишки" width="1600" height="1000" loading="lazy"></div>
-        <div class="glass">
-          <span class="chip-label">02 · Турниры</span>
-          <p class="glass-lead">Sit &amp; Go стартуют, как только стол заполнен.</p>
-          <hr>
-          <ul class="glass-list">
-            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 3M17 6h3a3 3 0 0 1-3 3"/></svg></i><div><b>Свой формат</b><span>Бай-ин, гарантия, блайнды и&nbsp;выплаты</span></div></li>
-            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i><div><b>По&nbsp;расписанию</b><span>Старт в&nbsp;нужное время, каждый день</span></div></li>
-          </ul>
-          <a class="glass-link" href="/play">К&nbsp;турнирам <span aria-hidden="true">→</span></a>
-        </div>
-      </article>
-
-      <article class="feat">
-        <h2 class="feat-title"><span>Дурак</span> на&nbsp;фишки</h2>
-        <div class="feat-media"><img src="/art/durak.webp" alt="Колода с козырем, отбитые карты и веер в руке" width="1600" height="1000" loading="lazy"></div>
-        <div class="glass">
-          <span class="chip-label">03 · Дурак</span>
-          <p class="glass-lead">От&nbsp;двух до&nbsp;шести игроков, ставка в&nbsp;общий банк.</p>
-          <hr>
-          <ul class="glass-list">
-            <li><i aria-hidden="true">♣&#xFE0E;</i><div><b>Подкидной и&nbsp;переводной</b><span>Подкидывайте вдогонку и&nbsp;переводите</span></div></li>
-            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></i><div><b>Честное «бито»</b><span>Ход переходит, когда все подтвердили</span></div></li>
-          </ul>
-          <a class="glass-link" href="/play">Сыграть в&nbsp;дурака <span aria-hidden="true">→</span></a>
-        </div>
-      </article>
-
-      <article class="feat flip">
-        <h2 class="feat-title"><span>Блэкджек</span> против дилера</h2>
-        <div class="feat-media"><img src="/art/blackjack.webp" alt="Туз и король на столе для блэкджека" width="1600" height="1000" loading="lazy"></div>
-        <div class="glass">
-          <span class="chip-label">04 · Блэкджек</span>
-          <p class="glass-lead">Общий стол на&nbsp;пять боксов, шесть колод.</p>
-          <hr>
-          <ul class="glass-list">
-            <li><i aria-hidden="true">21</i><div><b>Платит 3:2</b><span>Дилер стоит на&nbsp;всех 17</span></div></li>
-            <li><i aria-hidden="true">A</i><div><b>Сплит и&nbsp;дабл</b><span>До&nbsp;четырёх рук, страховка</span></div></li>
-          </ul>
-          <a class="glass-link" href="/play">Взять карту <span aria-hidden="true">→</span></a>
-        </div>
-      </article>
-
-      <article class="feat">
-        <h2 class="feat-title"><span>Рулетка</span> с&nbsp;одним зеро</h2>
-        <div class="feat-media"><img src="/art/roulette.webp" alt="Колесо рулетки и фишки на поле для ставок" width="1600" height="1000" loading="lazy"></div>
-        <div class="glass">
-          <span class="chip-label">05 · Рулетка</span>
-          <p class="glass-lead">Европейское колесо, общий стол на&nbsp;восемь игроков.</p>
-          <hr>
-          <ul class="glass-list">
-            <li><i aria-hidden="true">35</i><div><b>Число платит 35:1</b><span>Дюжины и&nbsp;колонны 2:1, цвета и&nbsp;чёт 1:1</span></div></li>
-            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9M3 4v5h5"/></svg></i><div><b>Повторить и&nbsp;удвоить</b><span>Ставки прошлого спина в&nbsp;один клик</span></div></li>
-          </ul>
-          <a class="glass-link" href="/play">К&nbsp;колесу <span aria-hidden="true">→</span></a>
-        </div>
-      </article>
-
-      <article class="feat flip">
-        <h2 class="feat-title"><span>Шашки</span> на&nbsp;ставку</h2>
-        <div class="feat-media"><img src="/art/checkers.webp" alt="Шашечная доска с партией в разгаре" width="1600" height="1000" loading="lazy"></div>
-        <div class="glass">
-          <span class="chip-label">06 · Шашки</span>
-          <p class="glass-lead">Русские шашки один на&nbsp;один: победитель забирает банк.</p>
-          <hr>
-          <ul class="glass-list">
-            <li><i aria-hidden="true">♛&#xFE0E;</i><div><b>Летающие дамки</b><span>Бить обязательно, турецкий удар</span></div></li>
-            <li><i aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></i><div><b>Шахматные часы</b><span>3, 5 или 10 минут на&nbsp;партию</span></div></li>
-          </ul>
-          <a class="glass-link" href="/play">Сесть за&nbsp;доску <span aria-hidden="true">→</span></a>
-        </div>
-      </article>
-    </section>
-
-    <!-- FAIR -->
-    <section class="believe" id="fair">
-      <div class="wrap">
-        <h2 class="big"><span class="cap">М</span>ы&nbsp;верим в&nbsp;честную игру</h2>
-        <div class="quad">
-          <div><b>01</b><h3>Честная раздача</h3><p>Колоду тасует сервер криптостойким генератором. Карты соперников до&nbsp;вскрытия не&nbsp;видит никто.</p></div>
-          <div><b>02</b><h3>Шансы на&nbsp;виду</h3><p>Пара или лучше выпадает в&nbsp;83% раздач Холдема&nbsp;— панель шансов покажет это сама.</p></div>
-          <div><b>03</b><h3>Только свои</h3><p>Приватные столы, друзья и&nbsp;приглашения по&nbsp;ссылке.</p></div>
-          <div><b>04</b><h3>Без денег</h3><p>Играем на&nbsp;фишки. Их&nbsp;нельзя купить или вывести&nbsp;— только выиграть.</p></div>
+        <span class="strip-line" aria-hidden="true"></span>
+        <span class="strip-line" aria-hidden="true"></span>
+        <div class="strip-item">
+          <i aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="3.5"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 15.5h5"/></svg></i>
+          <span>Игра с&nbsp;компьютером<br>тренировка без фишек</span>
         </div>
       </div>
     </section>
 
-    <!-- FAQ -->
-    <section class="faq-sec" id="faq">
-      <div class="wrap faq-grid">
-        <h2 class="faq-h">Вопросы</h2>
+    <!-- ================= GAMES ================= -->
+    <section class="sec" id="games" aria-labelledby="games-h">
+      <div class="sec-head">
+        <p class="kicker"><i aria-hidden="true">♣&#xFE0E;</i>Игры клуба</p>
+        <h2 class="h2" id="games-h">Шесть способов<br><em>провести вечер.</em></h2>
+        <p class="script sec-script" aria-hidden="true">выбирайте стол</p>
+      </div>
+
+      <div class="show" data-show>
+        <div class="show-tabs" role="tablist" aria-label="Игры">
+          <button type="button" role="tab" class="show-tab is-active" aria-selected="true" data-tab="0"><b>01</b><span>Покер<small>Холдем, Омаха, шорт-дек</small></span></button>
+          <button type="button" role="tab" class="show-tab" aria-selected="false" data-tab="1"><b>02</b><span>Турниры<small>Sit &amp; Go и&nbsp;расписание</small></span></button>
+          <button type="button" role="tab" class="show-tab" aria-selected="false" data-tab="2"><b>03</b><span>Дурак<small>Подкидной и&nbsp;переводной</small></span></button>
+          <button type="button" role="tab" class="show-tab" aria-selected="false" data-tab="3"><b>04</b><span>Блэкджек<small>Против дилера</small></span></button>
+          <button type="button" role="tab" class="show-tab" aria-selected="false" data-tab="4"><b>05</b><span>Рулетка<small>Одно зеро</small></span></button>
+          <button type="button" role="tab" class="show-tab" aria-selected="false" data-tab="5"><b>06</b><span>Шашки<small>Один на&nbsp;один</small></span></button>
+        </div>
+
+        <div class="show-stage">
+          <article class="show-card is-active" role="tabpanel" data-panel="0">
+            <img src="/art/poker.webp" alt="Пара тузов, борд и фишки на зелёном сукне" width="1600" height="1000" loading="lazy">
+            <div class="glass">
+              <h3>Больше, чем просто покер</h3>
+              <p>Садитесь за&nbsp;стол в&nbsp;любой момент: блайнды от&nbsp;1/2 до&nbsp;500/1000.</p>
+              <ul><li><b>5</b>вариантов: холдем NL и&nbsp;Limit, шорт-дек, Омаха и&nbsp;Омаха-5</li><li><b>%</b>шансы на&nbsp;столе: эквити и&nbsp;вероятность каждой комбинации</li></ul>
+              <a class="cta cta-sm" href="/play"><span>Сесть за&nbsp;стол</span><i aria-hidden="true"></i></a>
+            </div>
+          </article>
+          <article class="show-card" role="tabpanel" data-panel="1" hidden>
+            <img src="/art/tournament.webp" alt="Золотой кубок турнира и фишки" width="1600" height="1000" loading="lazy">
+            <div class="glass">
+              <h3>Турниры по&nbsp;своим правилам</h3>
+              <p>Sit &amp; Go стартуют, как только стол заполнен. Свой турнир за&nbsp;фишки может создать любой игрок.</p>
+              <ul><li><b>★</b>бай-ин, гарантия, блайнды и&nbsp;выплаты&nbsp;— на&nbsp;ваш выбор</li><li><b>⏱</b>старт по&nbsp;расписанию, каждый день</li></ul>
+              <a class="cta cta-sm" href="/play"><span>К&nbsp;турнирам</span><i aria-hidden="true"></i></a>
+            </div>
+          </article>
+          <article class="show-card" role="tabpanel" data-panel="2" hidden>
+            <img src="/art/durak.webp" alt="Колода с козырем, отбитые карты и веер в руке" width="1600" height="1000" loading="lazy">
+            <div class="glass">
+              <h3>Дурак на&nbsp;фишки</h3>
+              <p>От&nbsp;двух до&nbsp;шести игроков, ставка в&nbsp;общий банк&nbsp;— дурак платит всем.</p>
+              <ul><li><b>♣&#xFE0E;</b>подкидной и&nbsp;переводной</li><li><b>✓</b>честное «бито»: ход переходит, когда все подтвердили</li></ul>
+              <a class="cta cta-sm" href="/play"><span>Сыграть в&nbsp;дурака</span><i aria-hidden="true"></i></a>
+            </div>
+          </article>
+          <article class="show-card" role="tabpanel" data-panel="3" hidden>
+            <img src="/art/blackjack.webp" alt="Туз и король на столе для блэкджека" width="1600" height="1000" loading="lazy">
+            <div class="glass">
+              <h3>Блэкджек против дилера</h3>
+              <p>Общий стол на&nbsp;пять боксов, шесть колод в&nbsp;шузе.</p>
+              <ul><li><b>3:2</b>платит блэкджек, дилер стоит на&nbsp;всех 17</li><li><b>A</b>сплит и&nbsp;дабл, до&nbsp;четырёх рук, страховка</li></ul>
+              <a class="cta cta-sm" href="/play"><span>Взять карту</span><i aria-hidden="true"></i></a>
+            </div>
+          </article>
+          <article class="show-card" role="tabpanel" data-panel="4" hidden>
+            <img src="/art/roulette.webp" alt="Колесо рулетки и фишки на поле для ставок" width="1600" height="1000" loading="lazy">
+            <div class="glass">
+              <h3>Рулетка с&nbsp;одним зеро</h3>
+              <p>Европейское колесо и&nbsp;общий стол на&nbsp;восемь игроков.</p>
+              <ul><li><b>35</b>к&nbsp;одному платит число; дюжины и&nbsp;колонны&nbsp;— 2:1</li><li><b>×2</b>повторить и&nbsp;удвоить ставки в&nbsp;один клик</li></ul>
+              <a class="cta cta-sm" href="/play"><span>К&nbsp;колесу</span><i aria-hidden="true"></i></a>
+            </div>
+          </article>
+          <article class="show-card" role="tabpanel" data-panel="5" hidden>
+            <img src="/art/checkers.webp" alt="Шашечная доска с партией в разгаре" width="1600" height="1000" loading="lazy">
+            <div class="glass">
+              <h3>Шашки на&nbsp;ставку</h3>
+              <p>Русские шашки один на&nbsp;один: победитель забирает банк.</p>
+              <ul><li><b>♛&#xFE0E;</b>летающие дамки, бить обязательно</li><li><b>3–10</b>минут на&nbsp;партию, шахматные часы</li></ul>
+              <a class="cta cta-sm" href="/play"><span>Сесть за&nbsp;доску</span><i aria-hidden="true"></i></a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= NEW ================= -->
+    <section class="sec" id="new" aria-labelledby="new-h">
+      <div class="sec-head">
+        <p class="kicker"><i aria-hidden="true">♦&#xFE0E;</i>Новое в&nbsp;клубе</p>
+        <h2 class="h2" id="new-h">Больше, чем<br><em>просто игра.</em></h2>
+      </div>
+      <div class="bento">
+        <article class="bcard b-wheel">
+          <div class="b-txt">
+            <span class="b-tag">Каждый день</span>
+            <h3>Колесо фортуны</h3>
+            <p>Один бесплатный спин в&nbsp;сутки&nbsp;— до&nbsp;25&nbsp;000 фишек. Первый спин&nbsp;— сразу после регистрации.</p>
+          </div>
+          <svg class="mini-wheel" viewBox="-100 -100 200 200" aria-hidden="true">
+            <circle r="96" fill="#1B1410" stroke="#C9A24E" stroke-width="3"/>
+            <g class="mw-rot">
+              <path d="M0 0L0-88A88 88 0 0 1 62.2-62.2Z" fill="#0F3D2E"/><path d="M0 0L62.2-62.2A88 88 0 0 1 88 0Z" fill="#17241F"/>
+              <path d="M0 0L88 0A88 88 0 0 1 62.2 62.2Z" fill="#6E1A22"/><path d="M0 0L62.2 62.2A88 88 0 0 1 0 88Z" fill="#0F3D2E"/>
+              <path d="M0 0L0 88A88 88 0 0 1-62.2 62.2Z" fill="#C9A24E"/><path d="M0 0L-62.2 62.2A88 88 0 0 1-88 0Z" fill="#17241F"/>
+              <path d="M0 0L-88 0A88 88 0 0 1-62.2-62.2Z" fill="#0F3D2E"/><path d="M0 0L-62.2-62.2A88 88 0 0 1 0-88Z" fill="#6E1A22"/>
+            </g>
+            <circle r="22" fill="#C9A24E" stroke="#1B1410" stroke-width="3"/><circle r="15" fill="#0F3D2E"/>
+            <path d="M-9-104h18L0-84Z" fill="#F0D48A" stroke="#1B1410" stroke-width="2.5" stroke-linejoin="round"/>
+          </svg>
+        </article>
+        <article class="bcard b-season">
+          <span class="b-tag">Каждую неделю</span>
+          <h3>Сезон и&nbsp;призы</h3>
+          <p>Лучшие трое недели в&nbsp;плюсе получают фишки.</p>
+          <div class="podium" aria-label="Призы: 5000, 3000 и 1500 фишек">
+            <span class="p2"><b>3 000</b></span><span class="p1"><b>5 000</b></span><span class="p3"><b>1 500</b></span>
+          </div>
+        </article>
+        <article class="bcard b-bots">
+          <span class="b-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="3.5"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 15.5h5M2 12v3M22 12v3"/></svg></span>
+          <h3>Игра с&nbsp;компьютером</h3>
+          <p>Покер, дурак и&nbsp;шашки против ботов трёх уровней&nbsp;— тренировка без фишек.</p>
+          <div class="levels"><span>Новичок</span><span>Любитель</span><span class="on">Мастер</span></div>
+        </article>
+        <article class="bcard b-emoji">
+          <span class="b-icon" aria-hidden="true">😎</span>
+          <h3>Эмоции за&nbsp;столом</h3>
+          <p>Реакции всплывают над вашим местом&nbsp;— у&nbsp;всех за&nbsp;столом.</p>
+          <div class="emoji-row" aria-hidden="true"><span>👍</span><span>😂</span><span>😮</span><span>🔥</span><span>🙏</span><span>🎉</span></div>
+        </article>
+        <article class="bcard b-elo">
+          <span class="b-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21V11M16 21V7M12 21V3M4 21h16"/></svg></span>
+          <h3>Рейтинг Эло</h3>
+          <p>В&nbsp;шашках и&nbsp;дураке: победа над сильным даёт больше очков.</p>
+          <p class="elo"><b>1 200</b><span>→</span><b class="g">1 400</b></p>
+        </article>
+        <article class="bcard b-app">
+          <div class="b-txt">
+          <span class="b-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></span>
+          <h3>Приложение и&nbsp;уведомления</h3>
+          <p>Установите клуб на&nbsp;рабочий стол&nbsp;— и&nbsp;не&nbsp;пропустите свой ход или приглашение.</p>
+          </div>
+          <div class="notif" aria-hidden="true">
+            <div><img src="/brand/mark.svg" alt="" width="34" height="34"><span><b>Ваш ход</b>Изумруд · холдем 5/10</span></div>
+            <div><img src="/brand/mark.svg" alt="" width="34" height="34"><span><b>Вас зовут играть</b>Дурак на двоих · ставка 250</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ================= FAIR ================= -->
+    <section class="fair" id="fair" aria-labelledby="fair-h">
+      <img class="fair-bg" src="/art/center.webp" alt="" width="1400" height="800" loading="lazy">
+      <div class="fair-in">
+        <div class="fair-head">
+          <p class="kicker"><i aria-hidden="true">♥&#xFE0E;</i>Честная игра</p>
+          <h2 class="h2" id="fair-h">Мы верим<br><em>в&nbsp;честную игру.</em></h2>
+          <p class="script fair-script" aria-hidden="true">без подкрутки</p>
+        </div>
+        <ol class="fair-list">
+          <li><b>01</b><h3>Честная раздача</h3><p>Колоду тасует сервер криптостойким генератором. Карты соперников до&nbsp;вскрытия не&nbsp;видит никто.</p></li>
+          <li><b>02</b><h3>Шансы на&nbsp;виду</h3><p>Пара или лучше выпадает в&nbsp;83% раздач холдема&nbsp;— панель шансов покажет это сама.</p></li>
+          <li><b>03</b><h3>Только свои</h3><p>Приватные столы, друзья, личные сообщения и&nbsp;приглашения по&nbsp;ссылке.</p></li>
+          <li><b>04</b><h3>Без денег</h3><p>Играем на&nbsp;фишки. Их&nbsp;нельзя купить или вывести&nbsp;— только выиграть.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ================= FAQ ================= -->
+    <section class="sec faq-sec" id="faq" aria-labelledby="faq-h">
+      <div class="faq-card">
+        <div class="faq-head">
+          <p class="kicker"><i aria-hidden="true">♠&#xFE0E;</i>Вопросы</p>
+          <h2 class="h2" id="faq-h">Коротко<br><em>о&nbsp;главном.</em></h2>
+          <p class="sub">Не&nbsp;нашли ответ&nbsp;— спросите администратора клуба прямо в&nbsp;игре.</p>
+        </div>
         <div class="faq">
-          <details><summary>Это игра на&nbsp;деньги?<span aria-hidden="true">+</span></summary><p>Нет. Все ставки&nbsp;— игровые фишки, на&nbsp;старте их&nbsp;10&nbsp;000.</p></details>
-          <details><summary>Почему комбинации выпадают так часто?<span aria-hidden="true">+</span></summary><p>Из&nbsp;семи карт Холдема пара или лучше собирается в&nbsp;83% раздач, две пары&nbsp;— почти в&nbsp;каждой четвёртой. Это обычная математика, и&nbsp;панель шансов за&nbsp;столом её&nbsp;показывает.</p></details>
-          <details><summary>Как сыграть только с&nbsp;друзьями?<span aria-hidden="true">+</span></summary><p>Создайте стол с&nbsp;галочкой «Приватный» и&nbsp;отправьте друзьям ссылку-приглашение.</p></details>
-          <details><summary>Что делать, если фишки закончились?<span aria-hidden="true">+</span></summary><p>Раз в сутки крутите колесо фортуныЗаберите ежедневный бонус или напишите администратору&nbsp;— он&nbsp;может начислить фишки.nbsp;— до 25Заберите ежедневный бонус или напишите администратору&nbsp;— он&nbsp;может начислить фишки.nbsp;000 фишек, выполняйте задания дня или напишите администратору. А потренироваться можно и без фишекЗаберите ежедневный бонус или напишите администратору&nbsp;— он&nbsp;может начислить фишки.nbsp;— с компьютером в покере, дураке и шашках.</p></details>
+          <details open><summary>Это игра на&nbsp;деньги?<span aria-hidden="true"></span></summary><p>Нет. Все ставки&nbsp;— игровые фишки, на&nbsp;старте их&nbsp;10&nbsp;000. Купить или вывести фишки нельзя.</p></details>
+          <details><summary>Почему комбинации выпадают так часто?<span aria-hidden="true"></span></summary><p>Из&nbsp;семи карт холдема пара или лучше собирается в&nbsp;83% раздач, две пары&nbsp;— почти в&nbsp;каждой четвёртой. Это обычная математика, и&nbsp;панель шансов за&nbsp;столом её&nbsp;показывает.</p></details>
+          <details><summary>Как сыграть только с&nbsp;друзьями?<span aria-hidden="true"></span></summary><p>Создайте стол с&nbsp;галочкой «Приватный» и&nbsp;позовите друзей кнопкой «Пригласить» или отправьте им&nbsp;ссылку.</p></details>
+          <details><summary>Что делать, если фишки закончились?<span aria-hidden="true"></span></summary><p>Раз в&nbsp;сутки крутите колесо фортуны&nbsp;— до&nbsp;25&nbsp;000 фишек, выполняйте задания дня или напишите администратору. Потренироваться можно и&nbsp;без фишек&nbsp;— с&nbsp;компьютером в&nbsp;покере, дураке и&nbsp;шашках.</p></details>
+          <details><summary>Нужно что-то скачивать?<span aria-hidden="true"></span></summary><p>Нет, всё работает в&nbsp;браузере на&nbsp;компьютере, планшете и&nbsp;телефоне. При желании клуб можно установить как приложение&nbsp;— кнопка есть в&nbsp;лобби.</p></details>
         </div>
       </div>
     </section>
 
-    <!-- FINAL -->
-    <section class="final">
-      <div class="wrap final-in">
-        <h2 class="final-h"><span>Карты розданы.</span> Ваш ход.</h2>
-        <a class="orb orb-sm" href="/play"><span class="orb-in">Играть</span></a>
+    <!-- ================= FINAL ================= -->
+    <section class="final" aria-labelledby="final-h">
+      <img class="final-bg" src="/art/hero.webp" alt="" width="1920" height="1080" loading="lazy">
+      <div class="final-in">
+        <p class="script final-script" aria-hidden="true">Карты розданы</p>
+        <h2 class="mega final-mega" id="final-h"><span class="mega-a">ВАШ</span> <span class="mega-b">ХОД</span></h2>
+        <a class="cta" href="/play" data-auth-cta><span>Начать играть</span><i aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></i></a>
       </div>
     </section>
   </main>
 
   <footer class="foot">
-    <div class="wrap foot-in">
-      <a class="logo" href="#top"><img src="/brand/mark.svg" alt="" width="28" height="28"><span>NOIR <em>RIVER</em></span></a>
-      <p><span class="age">18+</span> Игра на&nbsp;игровые фишки без денежных выигрышей.</p>
-    </div>
+    <a class="logo" href="#top"><img src="/brand/mark.svg" alt="" width="28" height="28"><span class="logo-txt"><b>NOIR <em>RIVER</em></b></span></a>
+    <nav class="foot-nav" aria-label="Разделы">
+      <a href="#games">Игры</a><a href="#new">Новое</a><a href="#fair">Честная игра</a><a href="#faq">Вопросы</a><a href="/play">Войти</a>
+    </nav>
+    <p><span class="age">18+</span> Игра на&nbsp;игровые фишки без денежных выигрышей.</p>
   </footer>
 </div>
 </body>

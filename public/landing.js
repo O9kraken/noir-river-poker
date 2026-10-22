@@ -1,6 +1,58 @@
-/* Landing: show the signed-in account in the header instead of "Войти в клуб". */
+/* Landing: menu, games showcase, scroll reveal, and the signed-in account in the header. */
 (() => {
   'use strict';
+  document.documentElement.classList.add('js');
+
+  // ---------- menu ----------
+  const btn = document.getElementById('menu-btn');
+  const panel = document.getElementById('menu-panel');
+  const setMenu = (open) => { panel.hidden = !open; btn.setAttribute('aria-expanded', String(open)); btn.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню'); };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); setMenu(panel.hidden); });
+  panel.addEventListener('click', (e) => { if (e.target.closest('a')) setMenu(false); });
+  document.addEventListener('click', (e) => { if (!panel.hidden && !e.target.closest('.menu')) setMenu(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) { setMenu(false); btn.focus(); } });
+
+  // ---------- games showcase ----------
+  const tabs = [...document.querySelectorAll('.show-tab')];
+  const cards = [...document.querySelectorAll('.show-card')];
+  let auto = null;
+  function pick(i, focus) {
+    tabs.forEach((t, k) => { const on = k === i; t.classList.toggle('is-active', on); t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
+    cards.forEach((c, k) => { const on = k === i; c.hidden = !on; c.classList.toggle('is-active', on); });
+    if (focus) tabs[i].focus();
+  }
+  tabs.forEach((t, i) => {
+    t.id = `show-tab-${i}`;
+    cards[i].setAttribute('aria-labelledby', t.id);
+    t.addEventListener('click', () => { clearInterval(auto); pick(i); });
+    t.addEventListener('keydown', (e) => {
+      const d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (!d) return;
+      e.preventDefault(); clearInterval(auto);
+      pick((i + d + tabs.length) % tabs.length, true);
+    });
+  });
+  if (tabs.length) {
+    pick(0);
+    // rotate the games until the visitor picks one
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      auto = setInterval(() => {
+        const stage = document.querySelector('.show');
+        const r = stage.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > innerHeight || document.hidden) return;
+        pick((tabs.findIndex((t) => t.classList.contains('is-active')) + 1) % tabs.length);
+      }, 6000);
+    }
+  }
+
+  // ---------- reveal on scroll ----------
+  const els = document.querySelectorAll('.club .tile, .club-center, .sec-head, .show, .bcard, .fair-in, .faq-card, .final-in');
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((list) => list.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }), { rootMargin: '0px 0px -8% 0px' });
+    els.forEach((el, i) => { el.classList.add('reveal'); el.style.transitionDelay = `${(i % 3) * 70}ms`; io.observe(el); });
+  }
+
+  // ---------- account ----------
   let token = null;
   try { token = localStorage.getItem('nr_token'); } catch (e) { /* storage blocked */ }
   if (!token) return;
@@ -48,8 +100,6 @@
       link.replaceChildren(text, avatar(me.name, me.avatar));
       link.href = '/play';
       document.querySelectorAll('[data-auth-cta] span').forEach((s) => { s.textContent = 'Продолжить игру'; });
-      const t = document.querySelector('.trio-title');
-      if (t) t.textContent = `С возвращением, ${me.name}`;
     })
     .catch(() => { /* offline: keep the guest header */ });
 })();

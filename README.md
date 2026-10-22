@@ -252,7 +252,7 @@ server/
   bots/durak-ai.js    дурак: эвристики
   bots/poker-ai.js    покер: шансы Монте-Карло и решения по пот-оддсам
 public/
-  index.html, landing.css, landing.js  лендинг (показывает аккаунт, если вход выполнен — GET /api/me)
+  index.html, landing.css, landing.js  лендинг: меню, витрина игр, анимации; показывает аккаунт, если вход выполнен (GET /api/me)
   art/                3D-рендеры игр (WebP) и текстура сукна
   odds.js, odds-worker.js  панель шансов
   play.html/.css/.js  лобби и игровой стол
@@ -261,7 +261,7 @@ public/
   roulette.js         экран рулетки (колесо SVG, поле ставок)
   checkers.js         экран шашек
   brand/, favicon.*   логотип и иконки
-  fonts/              Manrope для всего сайта; Cormorant Garamond и Unbounded — заголовки лендинга (все OFL)
+  fonts/              Manrope для всего сайта; Unbounded (крупные заголовки) и рукописный Great Vibes — лендинг (все OFL)
   social.js           профиль, друзья, приглашения
   dm.js               личные сообщения
   fx.js               реакции и всплывающие выигрыши
