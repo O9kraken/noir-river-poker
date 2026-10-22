@@ -1,6 +1,7 @@
 (() => {
   'use strict';
-  const { $, $$, h, fmt, anim, cardEl, toast, call, Sound, S, hueOf, initials } = window.NR;
+  const { $, $$, h, fmt, anim, cardEl, toast, call, Sound, S } = window.NR;
+  const NR = window.NR;
 
   const B = { id: null, st: null, prev: null, at: 0 };
   const CHIPS = [5, 25, 100, 500, 1000, 5000];
@@ -112,7 +113,7 @@
       layer.append(h('div', { class: 'bj-spot' + (isMe ? ' me' : '') + (myTurn ? ' turn' : ''), style, 'data-seat': i },
         hands,
         h('div', { class: 'bj-player seat' + (myTurn ? ' turn' : '') },
-          h('div', { class: 'avatar', style: `--hue:${hueOf(s.name)}`, 'aria-hidden': 'true' }, initials(s.name)),
+          NR.avatarEl(s.name, s.avatar),
           h('div', { class: 'seat-info' },
             h('div', { class: 'seat-name', title: s.name }, s.name),
             s.net != null ? h('div', { class: 'bj-net ' + (s.net > 0 ? 'plus' : s.net < 0 ? 'minus' : '') }, s.net > 0 ? `+${fmt(s.net)}` : s.net < 0 ? fmt(s.net) : '±0')

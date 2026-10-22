@@ -408,3 +408,91 @@ test('счётчик рейзов: опен — 2-бет, ререйз — 3-б�
   assert.equal(t.hand.street, 'flop');
   assert.equal(t.publicState('a').raises, 0, 'на новой улице счёт заново');
 });
+
+// ---------- variants ----------
+const { bestHand } = require('../server/engine/evaluator');
+const { newDeck } = require('../server/engine/cards');
+
+test('шорт-дек: колода 36, флеш старше фулл-хауса, сет старше стрита, A-6-7-8-9', () => {
+  assert.equal(newDeck(true).length, 36);
+  assert.ok(!newDeck(true).some((c) => '2345'.includes(c[0])));
+  const flush = bestHand('SD', ['Ah', '9h'], ['7h', '6h', 'Jh', 'Kc', 'Kd']);
+  const boat = bestHand('SD', ['Kh', 'Ks'], ['Kc', '6h', '6d', '7c', '8d']);
+  assert.equal(flush.name, 'Флеш');
+  assert.equal(boat.name, 'Фулл-хаус');
+  assert.ok(flush.score > boat.score, 'флеш > фулл-хаус');
+  const trips = bestHand('SD', ['9h', '9s'], ['9c', 'Kh', '6d', '7c', 'Jd']);
+  const straight = bestHand('SD', ['Th', 'Js'], ['Qc', 'Kh', 'Ad', '7c', '6d']);
+  assert.ok(trips.score > straight.score, 'сет > стрит');
+  const wheel = bestHand('SD', ['Ah', '6s'], ['7c', '8h', '9d', 'Jc', 'Qd']);
+  assert.equal(wheel.name, 'Стрит');
+  assert.equal(bestHand('NLH', ['Ah', '2s'], ['3c', '4h', '5d', 'Jc', 'Qd']).name, 'Стрит', 'в обычном холдеме A-2-3-4-5');
+  // the same cards in normal Hold'em: full house beats flush
+  assert.ok(bestHand('NLH', ['Kh', 'Ks'], ['Kc', '6h', '6d', '7c', '8d']).score > bestHand('NLH', ['Ah', '9h'], ['7h', '6h', 'Jh', 'Kc', 'Kd']).score);
+});
+
+test('Омаха-5: 5 карт, не больше 6 мест; шорт-дек раздаёт из 36', () => {
+  const { t, timers } = makeTable({ game: 'PLO5', maxSeats: 9 });
+  assert.equal(t.maxSeats, 6);
+  t.sit('a', 'A', 0, 2000); t.sit('b', 'B', 1, 2000);
+  timers.runOne();
+  assert.equal(t.seats[0].hole.length, 5);
+  const sd = makeTable({ game: 'SD' });
+  sd.t.sit('a', 'A', 0, 2000); sd.t.sit('b', 'B', 1, 2000);
+  sd.timers.runOne();
+  assert.equal(sd.t.hand.deck.length, 36 - 4);
+  assert.ok(!sd.t.seats[0].hole.some((c) => '2345'.includes(c[0])));
+});
+
+test('лимит: фиксированный шаг ставки и не больше 4 ставок на улице', () => {
+  const { t, timers } = makeTable({ game: 'LHE', sb: 10, bb: 20 });
+  t.sit('a', 'A', 0, 5000); t.sit('b', 'B', 1, 5000); t.sit('c', 'C', 2, 5000);
+  timers.runOne();
+  const st = t.publicState('a').you.turn;
+  assert.equal(st.minTo, 40); assert.equal(st.maxTo, 40, 'префлоп: рейз ровно на BB');
+  assert.throws(() => t.act('a', 'raise', 60));
+  t.act('a', 'raise', 40);
+  t.act('b', 'raise', 60);
+  t.act('c', 'raise', 80);
+  assert.equal(t.publicState('a').you.turn.canRaise, false, 'кэп: 4 ставки');
+  t.act('a', 'call'); t.act('b', 'call');
+  assert.equal(t.hand.street, 'flop');
+  const who = t.seats[t.hand.toAct].userId;
+  assert.equal(t.publicState(who).you.turn.minTo, 20, 'флоп: бет = BB');
+  t.act(who, 'check');
+  while (t.hand.street === 'flop') t.act(t.seats[t.hand.toAct].userId, 'check');
+  const w2 = t.seats[t.hand.toAct].userId;
+  assert.equal(t.publicState(w2).you.turn.minTo, 40, 'тёрн: бет = 2 BB');
+});
+
+test('симуляция вариантов: фишки сохраняются', () => {
+  for (const game of ['SD', 'PLO5', 'LHE']) {
+    let seed = 11;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const { t, timers } = makeTable({ game, maxSeats: 6, sb: 5, bb: 10, minBuyIn: 50, maxBuyIn: 100000 });
+    for (let i = 0; i < 6; i++) t.sit('u' + i, 'U' + i, i, 100000);
+    let bank = 600000;
+    let hands = 0;
+    for (let steps = 0; steps < 60000 && hands < 300; steps++) {
+      if (t.hand && !t.hand.ended && t.hand.toAct !== -1) {
+        const uid = t.seats[t.hand.toAct].userId;
+        const turn = t.publicState(uid).you.turn;
+        const x = rnd();
+        if (x < 0.2) t.act(uid, 'fold');
+        else if (x < 0.7 || !turn.canRaise) t.act(uid, turn.canCheck ? 'check' : 'call');
+        else t.act(uid, 'raise', turn.minTo + Math.floor(rnd() * (turn.maxTo - turn.minTo + 1)));
+        assert.equal(t.chipsOnTable(), bank, game);
+      } else {
+        if (t.hand && t.hand.ended) hands++;
+        if (!t.hand) {
+          t.seats.forEach((s) => {
+            if (s && s.stack === 0) { t.addChips(s.userId, 100000); bank += 100000; }
+            if (s && s.sittingOut && s.stack > 0) t.setSittingOut(s.userId, false);
+          });
+        }
+        if (!timers.runOne()) break;
+      }
+    }
+    assert.ok(hands >= 50, `${game}: ${hands}`);
+  }
+});

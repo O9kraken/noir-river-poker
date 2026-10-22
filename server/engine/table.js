@@ -1,6 +1,7 @@
 'use strict';
 const { newDeck, shuffle: secureShuffle } = require('./cards');
 const { bestHand } = require('./evaluator');
+const { GAMES, gameOf } = require('./games');
 
 const STREETS = ['preflop', 'flop', 'turn', 'river'];
 
@@ -29,10 +30,11 @@ class Table {
   constructor(cfg, opts = {}) {
     this.id = cfg.id;
     this.name = cfg.name;
-    this.game = cfg.game === 'PLO' ? 'PLO' : 'NLH';
+    this.game = gameOf(cfg.game);
+    this.rules = GAMES[this.game];
     this.sb = cfg.sb;
     this.bb = cfg.bb;
-    this.maxSeats = cfg.maxSeats;
+    this.maxSeats = Math.min(cfg.maxSeats, GAMES[gameOf(cfg.game)].maxSeats);
     this.minBuyIn = cfg.minBuyIn ?? cfg.bb * 40;
     this.maxBuyIn = cfg.maxBuyIn ?? cfg.bb * 200;
     this.permanent = !!cfg.permanent;
@@ -290,7 +292,7 @@ class Table {
     }
 
     this.hand = {
-      no: this.handNo, deck: this.shuffle(newDeck()), board: [], street: 'preflop',
+      no: this.handNo, deck: this.shuffle(newDeck(this.rules.deck === 'short')), board: [], street: 'preflop',
       currentBet: 0, minRaise: this.bb, toAct: -1, turnStarted: 0, ended: false,
       sbIdx: -1, bbIdx: -1, turnLimit: this.actionTime,
       participants: eligible, events: [],
@@ -311,7 +313,7 @@ class Table {
     h.minRaise = this.bb;
     h.raises = 1; // the big blind counts as the first bet: an open is a 2-bet, a re-raise a 3-bet
 
-    const holeCount = this.game === 'PLO' ? 4 : 2;
+    const holeCount = this.rules.hole;
     for (let r = 0; r < holeCount; r++) {
       let i = this.dealer;
       for (let k = 0; k < eligible.length; k++) {
@@ -397,8 +399,15 @@ class Table {
     if (s.stack <= toCall || !this._othersCanAct(i)) return null;
     // A player who already acted may only re-raise if facing a full raise (acted reset).
     if (s.acted) return null;
+    if (this.rules.limit === 'fixed') {
+      // Limit: one fixed step, small bet on preflop/flop, big bet on turn/river, cap of 4 bets
+      if ((h.raises || 0) >= 4) return null;
+      const unit = h.street === 'preflop' || h.street === 'flop' ? this.bb : this.bb * 2;
+      const to = Math.min(h.currentBet + unit, maxTotal);
+      return { minTo: to, maxTo: to };
+    }
     let maxTo = maxTotal;
-    if (this.game === 'PLO') {
+    if (this.rules.limit === 'pot') {
       const pot = this.seats.reduce((sum, p) => sum + (p ? p.total : 0), 0);
       maxTo = Math.min(maxTotal, h.currentBet + pot + toCall);
     }
@@ -595,7 +604,7 @@ class Table {
       showdown: true,
       pots: potResults,
       players: contenders.map((s) => ({
-        seat: this.seats.indexOf(s), name: s.name, hand: hands.get(s).name,
+        seat: this.seats.indexOf(s), name: s.name, hand: hands.get(s).name, category: hands.get(s).category,
         best: hands.get(s).cards, won: winnings.get(s) || 0,
       })),
     };
@@ -792,7 +801,7 @@ class Table {
     return {
       id: this.id, name: this.name, game: this.game, sb: this.sb, bb: this.bb,
       maxSeats: this.maxSeats, players: this.playerCount(),
-      minBuyIn: this.minBuyIn, maxBuyIn: this.maxBuyIn, permanent: this.permanent,
+      minBuyIn: this.minBuyIn, maxBuyIn: this.maxBuyIn, permanent: this.permanent, private: !!this.private, owner: this.ownerName || null,
       tournament: this.tournament,
       blindsEvery: this.schedule ? this.schedule.every : 0,
     };
@@ -822,6 +831,7 @@ class Table {
       raises: h && !h.ended ? h.raises || 0 : 0,
       mySeat: me,
       seats: this.seats.map((s, i) => s && {
+        avatar: this.avatarOf ? this.avatarOf(s.userId) : null,
         name: s.name,
         stack: s.stack,
         bet: s.bet,

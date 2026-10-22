@@ -42,7 +42,10 @@
 
   const SUITS = { s: '♠︎', h: '♥︎', d: '♦︎', c: '♣︎' };
   const SUIT_NAMES = { s: 'пики', h: 'черви', d: 'бубны', c: 'трефы' };
-  const GAME_NAMES = { NLH: 'Холдем NL', PLO: 'Омаха PL' };
+  // filled from the server (hello.games); defaults keep things readable before it arrives
+  const GAMES = { NLH: { name: 'Холдем NL', short: 'NLH', hole: 2, limit: 'no' }, PLO: { name: 'Омаха PL', short: 'PLO', hole: 4, limit: 'pot' } };
+  const GAME_NAMES = new Proxy({}, { get: (_, k) => (GAMES[k] ? GAMES[k].name : String(k)) });
+  const gameInfo = (k) => GAMES[k] || GAMES.NLH;
   const STREET_NAMES = { preflop: 'Префлоп', flop: 'Флоп', turn: 'Тёрн', river: 'Ривер' };
 
   function cardEl(code, extra = '') {
@@ -78,6 +81,44 @@
     for (const ch of name) x = (x * 31 + ch.codePointAt(0)) % 360;
     return x;
   }
+  // avatar: colour + an optional symbol chosen in the profile, initials otherwise
+  const AV_PATHS = {
+    crown: 'M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5L3 7z',
+    star: 'M12 2l3 6.9 7.5.7-5.7 5 1.7 7.4L12 18l-6.5 4 1.7-7.4-5.7-5 7.5-.7z',
+    bolt: 'M13 2L4 14h7l-1 8 9-12h-7l1-8z',
+    moon: 'M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z',
+    flame: 'M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 2-5 3-7 0 3 2 4 3 4-1-4 0-7 0-9z',
+  };
+  const AV_SUITS = { s: '♠\uFE0E', h: '♥\uFE0E', d: '♦\uFE0E', c: '♣\uFE0E' };
+  function avatarContent(name, av) {
+    const sym = av && av.sym;
+    if (sym && AV_SUITS[sym]) return h('span', { class: 'av-sym' }, AV_SUITS[sym]);
+    if (sym && AV_PATHS[sym]) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('class', 'av-svg');
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', AV_PATHS[sym]);
+      path.setAttribute('fill', 'currentColor');
+      svg.append(path);
+      return svg;
+    }
+    return initials(name);
+  }
+  /** Fill an existing .avatar element (keeps its identity for animations). */
+  function fillAvatar(el, name, av) {
+    const hue = av && av.hue != null ? av.hue : hueOf(name);
+    const key = `${name}|${hue}|${av && av.sym}`;
+    if (el._avKey === key) return el;
+    el._avKey = key;
+    el.style.setProperty('--hue', hue);
+    el.replaceChildren(avatarContent(name, av));
+    return el;
+  }
+  function avatarEl(name, av, cls = '') {
+    return fillAvatar(h('span', { class: 'avatar ' + cls, 'aria-hidden': 'true' }), name, av);
+  }
+
   function initials(name) {
     const parts = name.trim().split(/[\s_-]+/).filter(Boolean);
     return ((parts[0] || '?')[0] + (parts[1] ? parts[1][0] : (parts[0] || '')[1] || '')).toUpperCase();
@@ -224,6 +265,8 @@
     myDurak: new Set(),
     bj: [],
     myBj: new Set(),
+    private: [],
+    bjLimits: [],
     durakStakes: [],
     announcement: null,
     filter: 'all',
@@ -330,12 +373,18 @@
       S.sngs = res.sngs || [];
       S.stakes = res.stakes;
       S.seatOptions = res.seatOptions;
+      if (res.games) { for (const k of Object.keys(GAMES)) delete GAMES[k]; Object.assign(GAMES, res.games); }
+      S.games = GAMES;
+      renderGameChoices();
       S.blindEveryOptions = res.blindEveryOptions || [0, 5];
       S.myTables = new Set(res.myTables);
       S.leaderboard = res.leaderboard;
       S.durak = res.durak || [];
       S.myDurak = new Set(res.myDurak || []);
       S.bj = res.bj || [];
+      S.private = res.private || [];
+      S.bjLimits = res.bjLimits || [];
+      fillBjForm();
       S.myBj = new Set(res.myBj || []);
       S.durakStakes = res.durakStakes || [];
       setAnnouncement(res.announcement);
@@ -371,6 +420,8 @@
     socket.on('sng:result', (e) => showSngResult(e));
     socket.on('lobby:durak', (list) => { S.durak = list; renderLobby(); });
     socket.on('lobby:bj', (list) => { S.bj = list; renderLobby(); });
+    socket.on('lobby:private', (list) => { S.private = list; renderLobby(); });
+    if (window.SocialUI) window.SocialUI.bind(socket);
     socket.on('bj:state', (st) => { if (window.BjUI) window.BjUI.onState(st); });
     socket.on('durak:state', (st) => { if (window.DurakUI) window.DurakUI.onState(st); });
     socket.on('announce', (a) => setAnnouncement(a));
@@ -385,6 +436,19 @@
 
   async function route() {
     if (!S.socket) return;
+    const pm = location.hash.match(/^#\/profile(?:\/(.+))?$/);
+    if (pm) {
+      if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
+      S.tableId = null;
+      S.ts = null;
+      if (window.DurakUI) window.DurakUI.close();
+      if (window.BjUI) window.BjUI.close();
+      for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view']) $(v).hidden = true;
+      $('#profile-view').hidden = false;
+      if (window.SocialUI) window.SocialUI.openProfile(pm[1] ? decodeURIComponent(pm[1]) : null);
+      return;
+    }
+    $('#profile-view').hidden = true;
     const bm = location.hash.match(/^#\/bj\/([\w-]+)/);
     if (bm) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
@@ -447,9 +511,10 @@
     if (!S.me) return;
     $('#me-balance').textContent = fmt(S.me.balance);
     $('#me-inplay').textContent = S.me.inPlay ? `+ ${fmt(S.me.inPlay)} в игре` : 'на балансе';
-    $('#me-name').replaceChildren(
-      h('span', { class: 'avatar sm', style: `--hue:${hueOf(S.me.name)}`, 'aria-hidden': 'true' }, initials(S.me.name)),
-      h('span', { class: 'me-name-text' }, S.me.name));
+    $('#me-name').replaceChildren(...[
+      avatarEl(S.me.name, S.me.avatar, 'sm'),
+      h('span', { class: 'me-name-text' }, S.me.name),
+      S.me.friendRequests ? h('span', { class: 'badge', title: 'Заявки в друзья' }, S.me.friendRequests) : null].filter(Boolean));
     $('#bonus-btn').hidden = !S.me.bonusAvailable;
     $('#admin-link').hidden = S.me.role !== 'admin';
     $('#bonus-amount').textContent = fmt(S.me.bonusAmount);
@@ -461,11 +526,27 @@
   });
 
   // ================= lobby =================
-  $$('[data-filter]').forEach((b) => b.addEventListener('click', () => {
-    S.filter = b.dataset.filter;
-    $$('[data-filter]').forEach((x) => x.classList.toggle('is-active', x === b));
-    renderLobby();
-  }));
+  function bindFilters() {
+    $$('[data-filter]').forEach((b) => {
+      if (b._bound) return;
+      b._bound = true;
+      b.addEventListener('click', () => {
+        S.filter = b.dataset.filter;
+        $$('[data-filter]').forEach((x) => x.classList.toggle('is-active', x === b));
+        renderLobby();
+      });
+    });
+  }
+  bindFilters();
+
+  /** Filters, create-table options and the rules panel follow the server's list of variants. */
+  function renderGameChoices() {
+    $('#game-filters').replaceChildren(...Object.entries(GAMES).map(([k, g]) => h('button', { type: 'button', class: 'pill' + (S.filter === k ? ' is-active' : ''), 'data-filter': k }, g.name)));
+    bindFilters();
+    $('#game-seg').replaceChildren(...Object.entries(GAMES).map(([k, g], i) => h('label', null,
+      h('input', { type: 'radio', name: 'game', value: k, checked: i === 0 }), h('span', null, g.name))));
+    $('#rules-list').replaceChildren(...Object.values(GAMES).flatMap((g) => [h('dt', null, g.name), h('dd', null, g.rules || '')]));
+  }
   $('#filter-free').addEventListener('change', (e) => { S.freeOnly = e.target.checked; renderLobby(); });
   $$('[data-lobby-tab]').forEach((tab) => tab.addEventListener('click', () => {
     S.lobbyTab = tab.dataset.lobbyTab;
@@ -485,7 +566,7 @@
     $('#sng-list').hidden = tab !== 'sng';
     $('#durak-list').hidden = tab !== 'durak';
     $('#bj-list').hidden = tab !== 'bj';
-    $('#create-btn').hidden = tab === 'sng' || tab === 'bj';
+    $('#create-btn').hidden = tab === 'sng';
     $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек' }[tab];
     if (tab === 'cash') renderCashList();
     else if (tab === 'sng') renderSngList();
@@ -513,11 +594,12 @@
     const list = $('#durak-list');
     list.replaceChildren();
     if (!S.durak.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
-    const rows = S.durak.slice().sort((a, b) => a.stake - b.stake || b.players - a.players);
+    const rows = S.durak.concat(S.private.filter((t) => t.kind === 'durak')).sort((a, b) => (b.private - a.private) || a.stake - b.stake || b.players - a.players);
     for (const t of rows) {
       const mine = S.myDurak.has(t.id);
       list.append(tcard({
         mine,
+        priv: t.private ? t.owner : null,
         badge: 'Д',
         badgeCls: 'dk-badge',
         kind: `${DURAK_VARIANTS[t.variant]} · колода 36`,
@@ -535,10 +617,11 @@
     const list = $('#bj-list');
     list.replaceChildren();
     if (!S.bj.length) { list.append(h('div', { class: 'empty' }, 'Столов нет.')); return; }
-    for (const t of S.bj.slice().sort((a, b) => a.minBet - b.minBet)) {
+    for (const t of S.bj.concat(S.private.filter((x) => x.kind === 'bj')).sort((a, b) => (b.private - a.private) || a.minBet - b.minBet)) {
       const mine = S.myBj.has(t.id);
       list.append(tcard({
         mine,
+        priv: t.private ? t.owner : null,
         badge: '21',
         badgeCls: 'dk-badge',
         kind: 'Блэкджек · 6 колод',
@@ -551,6 +634,21 @@
     }
   }
 
+  function fillBjForm() {
+    const sel = $('#bj-limits');
+    sel.replaceChildren(...S.bjLimits.map(([a, b], i) => h('option', { value: i }, `${fmt(a)} – ${fmt(b)}`)));
+    sel.value = S.bjLimits.length > 1 ? '1' : '0';
+  }
+  $('#bj-create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const res = await call('bj:create', { name: f.name.value, limits: Number(f.limits.value), private: f.private.checked });
+    if (!res) return;
+    $('#modal-bj-create').close();
+    f.name.value = '';
+    location.hash = `#/bj/${res.tableId}`;
+  });
+
   function fillDurakForm() {
     const sel = $('#durak-stake');
     sel.replaceChildren(...S.durakStakes.map((x) => h('option', { value: x }, `${fmt(x)} фишек`)));
@@ -559,7 +657,7 @@
   $('#durak-create-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
-    const res = await call('durak:create', { name: f.name.value, variant: f.variant.value, stake: Number(f.stake.value), maxPlayers: Number(f.maxPlayers.value) });
+    const res = await call('durak:create', { name: f.name.value, variant: f.variant.value, stake: Number(f.stake.value), maxPlayers: Number(f.maxPlayers.value), private: f.private.checked });
     if (!res) return;
     $('#modal-durak-create').close();
     f.name.value = '';
@@ -579,10 +677,27 @@
     $('#announce').hidden = true;
   });
 
+  function lockIcon() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '14');
+    svg.setAttribute('height', '14');
+    svg.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4');
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'currentColor');
+    p.setAttribute('stroke-width', '2.2');
+    p.setAttribute('stroke-linecap', 'round');
+    svg.append(p);
+    return svg;
+  }
+
   /** One table/tournament as a card in the lobby grid. */
   function tcard(o) {
     const dotsEl = o.fill ? dots(o.fill.max, o.fill.n) : null;
-    return h('article', { class: 'tcard' + (o.mine ? ' mine' : '') },
+    return h('article', { class: 'tcard' + (o.mine ? ' mine' : '') + (o.priv ? ' priv' : '') },
+      o.priv ? h('div', { class: 'tcard-priv' }, lockIcon(), `Приватный · ${o.priv || 'стол'}`) : null,
       h('div', { class: 'tcard-top' },
         h('span', { class: 'tcard-badge' + (o.badgeCls ? ' ' + o.badgeCls : '') }, o.badge),
         h('span', { class: 'tcard-kind' }, o.kind),
@@ -597,17 +712,18 @@
 
   function renderCashList() {
     const list = $('#table-list');
-    const rows = S.tables
+    const rows = S.tables.concat(S.private.filter((t) => t.kind === 'poker' && !t.tournament))
       .filter((t) => S.filter === 'all' || t.game === S.filter)
       .filter((t) => !S.freeOnly || t.players < t.maxSeats)
-      .sort((a, b) => a.bb - b.bb || b.players - a.players);
+      .sort((a, b) => (b.private - a.private) || a.bb - b.bb || b.players - a.players);
     list.replaceChildren();
     if (!rows.length) list.append(h('div', { class: 'empty' }, 'Подходящих столов нет — создайте свой.'));
     for (const t of rows) {
       const mine = S.myTables.has(t.id);
       list.append(tcard({
         mine,
-        badge: t.game === 'PLO' ? 'PLO' : 'NLH',
+        priv: t.private ? t.owner : null,
+        badge: gameInfo(t.game).short,
         kind: `${GAME_NAMES[t.game]} · ${t.maxSeats}-max`,
         status: t.blindsEvery ? { cls: 'registering', text: `↑ каждые ${t.blindsEvery}` } : null,
         title: t.name,
@@ -632,22 +748,25 @@
       if (x.status === 'registering') {
         action = registered
           ? h('button', { type: 'button', class: 'btn btn-block btn-ghost', onclick: () => sngAction('sng:unregister', x) }, 'Отменить регистрацию')
-          : h('button', { type: 'button', class: 'btn btn-block btn-gold', onclick: () => sngAction('sng:register', x) }, `Играть · ${fmt(x.buyIn)}`);
+          : h('button', { type: 'button', class: 'btn btn-block btn-gold', onclick: () => sngAction('sng:register', x) }, x.buyIn ? `Играть · ${fmt(x.buyIn)}` : 'Играть бесплатно');
       } else if (x.status === 'running') {
         const mine = registered || S.myTables.has(x.tableId);
         action = h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/table/${x.tableId}` }, mine ? 'К столу' : 'Смотреть');
       } else {
-        action = h('span', { class: 'tcard-done' }, x.winner ? `Победитель: ${x.winner}` : 'Завершён');
+        action = h('span', { class: 'tcard-done' }, x.status === 'cancelled' ? 'Отменён' : x.winner ? `Победитель: ${x.winner}` : 'Завершён');
       }
+      const startTxt = x.startAt && x.status === 'registering'
+        ? `Старт ${new Date(x.startAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · от ${x.minPlayers} игроков`
+        : null;
       const prizes = x.payouts.map((pz, i) => `${i + 1} — ${fmt(pz)}`).join(' · ');
       list.append(tcard({
         mine: registered,
-        badge: x.game === 'PLO' ? 'PLO' : 'NLH',
+        badge: gameInfo(x.game).short,
         kind: `Sit & Go · ${x.seats}-max`,
-        status: { cls: x.status, text: x.status === 'running' ? `Уровень ${x.level}` : STATUS_NAMES[x.status] },
+        status: { cls: x.status === 'cancelled' ? 'finished' : x.status, text: x.status === 'running' ? `Уровень ${x.level}` : x.status === 'cancelled' ? 'Отменён' : STATUS_NAMES[x.status] },
         title: x.name,
-        sub: `Стек ${fmt(x.startStack)} · блайнды растут каждые ${x.levelHands} раздач`,
-        stats: [['Бай-ин', fmt(x.buyIn)], ['Призовые', fmt(x.prizePool), prizes]],
+        sub: [startTxt, `Стек ${fmt(x.startStack)} · блайнды ${x.startBlinds ? x.startBlinds.map(fmt).join('/') : ''} растут каждые ${x.levelHands} раздач`].filter(Boolean).join(' · '),
+        stats: [['Бай-ин', x.buyIn ? fmt(x.buyIn) : 'Free'], [x.guarantee ? 'Гарантия' : 'Призовые', fmt(x.prizePool), prizes]],
         fill: { n: count, max: x.seats, label: x.status === 'running' ? `в игре ${count} из ${x.seats}` : `${count} из ${x.seats}` },
         names: x.players.length ? x.players.join(', ') : null,
         action,
@@ -683,7 +802,9 @@
     const ol = $('#leaderboard');
     ol.replaceChildren();
     if (!S.leaderboard.length) ol.append(h('li', null, h('span', { class: 'muted' }, 'Пока пусто')));
-    for (const p of S.leaderboard) ol.append(h('li', null, h('span', null, p.name), h('b', null, fmt(p.chips))));
+    for (const p of S.leaderboard) {
+      ol.append(h('li', null, h('a', { class: 'lb-link', href: `#/profile/${encodeURIComponent(p.name)}` }, avatarEl(p.name, p.avatar, 'xs'), h('span', null, p.name)), h('b', null, fmt(p.chips))));
+    }
   }
   setInterval(() => {
     if (!S.token || $('#lobby').hidden) return;
@@ -706,6 +827,7 @@
 
   $('#create-btn').addEventListener('click', () => {
     if (S.lobbyTab === 'durak') { $('#modal-durak-create').showModal(); return; }
+    if (S.lobbyTab === 'bj') { $('#modal-bj-create').showModal(); return; }
     $('#create-error').textContent = '';
     $('#modal-create').showModal();
   });
@@ -715,6 +837,7 @@
     const res = await call('table:create', {
       name: f.name.value, game: f.game.value, stakes: Number(f.stakes.value), seats: Number(f.seats.value),
       blindsEvery: Number(f.blindsEvery.value),
+      private: f.private.checked,
     });
     if (!res) return;
     $('#modal-create').close();
@@ -798,7 +921,8 @@
       const r = {};
       r.g = g;
       r.root = h('div', { class: 'seat', style: `left:${g.seat.x}%;top:${g.seat.y}%` });
-      r.cards = h('div', { class: 'seat-cards' + (t.game === 'PLO' ? ' plo' : '') });
+      const hole = gameInfo(t.game).hole;
+      r.cards = h('div', { class: 'seat-cards' + (hole >= 4 ? ' plo' : '') + (hole >= 5 ? ' plo5' : '') });
       r.avatar = h('div', { class: 'avatar', 'aria-hidden': 'true' });
       r.name = h('div', { class: 'seat-name' });
       r.stack = h('div', { class: 'seat-stack' });
@@ -1000,8 +1124,7 @@
       setText(r.name, s.name);
       r.name.title = s.name;
       setText(r.stack, fmt(s.stack));
-      setText(r.avatar, initials(s.name));
-      r.avatar.style.setProperty('--hue', hueOf(s.name));
+      fillAvatar(r.avatar, s.name, s.avatar);
       const sh = shown.get(i);
       setText(r.hand, sh && sh.hand && result.showdown ? sh.hand : '');
       show(r.hand, !!(sh && sh.hand && result.showdown));
@@ -1084,6 +1207,7 @@
 
     renderControls();
     renderSide();
+    if (window.OddsUI) window.OddsUI.update(t);
 
     // my turn
     const turnKey = t.you && t.you.turn ? `${t.handNo}-${t.street}-${t.currentBet}` : '';
@@ -1244,6 +1368,16 @@
     if (S.raiseKey !== key) { S.raiseKey = key; S.raiseVal = turn.minTo; }
     S.raiseVal = clamp(S.raiseVal, turn.minTo, turn.maxTo);
 
+    // fixed-limit (or a single possible size): one button, no slider
+    if (turn.minTo === turn.maxTo) {
+      const allIn = turn.maxTo >= you.stack + turn.myBet;
+      const b = h('button', { type: 'button', class: 'btn btn-gold', 'data-key': 'raise', onclick: () => act(allIn ? 'allin' : 'raise', turn.minTo) },
+        allIn ? `Олл-ин ${fmt(turn.minTo)}` : `${turn.isBet ? 'Бет' : 'Рейз до'} ${fmt(turn.minTo)} `, kbd('R'));
+      raiseClick = () => b.click();
+      actions.append(b);
+      return h('div', { class: 'ctrl' }, actions);
+    }
+
     const verb = turn.isBet ? 'Бет' : 'Рейз до';
     const label = h('span');
     const raiseBtn = h('button', {
@@ -1295,7 +1429,7 @@
       preset('½ банка', t.currentBet + potAfterCall / 2),
       preset('¾ банка', t.currentBet + potAfterCall * 0.75),
       preset('Банк', t.currentBet + potAfterCall),
-      preset(t.game === 'PLO' ? 'Макс' : 'Олл-ин', turn.maxTo));
+      preset(gameInfo(t.game).limit === 'pot' ? 'Макс' : 'Олл-ин', turn.maxTo));
     const presets = h('div', { class: 'presets-wrap' }, mult.length ? multRow : null, potRow);
 
     return h('div', { class: 'ctrl' },
@@ -1423,7 +1557,7 @@
       const w = winners.get(p.seat);
       return h('li', { class: [p.folded && 'folded', w && 'active'].filter(Boolean).join(' ') },
         h('span', { class: 'rp-name' },
-          h('span', { class: 'avatar', style: `--hue:${hueOf(p.name)};width:28px;height:28px;font-size:11px`, 'aria-hidden': 'true' }, initials(p.name)),
+          avatarEl(p.name, null, 'xs'),
           p.name,
           p.seat === d.dealer ? h('small', null, 'D') : null,
           p.seat === d.mySeat ? h('small', null, 'вы') : null),
@@ -1504,7 +1638,7 @@
   requestAnimationFrame(tick);
 
   // shared helpers for durak.js
-  window.NR = { $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, renderMyTables: () => renderLobby() };
+  window.NR = { $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, renderLobby: () => renderLobby(), route: () => route() };
 
   // ================= boot =================
   if (S.token) startApp(); else showAuth();

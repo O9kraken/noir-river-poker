@@ -2,391 +2,182 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NOIR RIVER — покер онлайн</title>
-<meta name="description" content="Онлайн-покер: Холдем, Омаха, турниры каждый день. Только 18+.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NOIR RIVER — покер, дурак и блэкджек с друзьями</title>
+<meta name="description" content="Покер в пяти вариантах, турниры, дурак и блэкджек на игровые фишки. Садитесь за стол с друзьями прямо в браузере.">
+<meta name="theme-color" content="#0A0D0C">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
+<link rel="preload" href="/art/poker.svg" as="image">
 <link rel="stylesheet" href="/fonts/fonts.css">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="/landing.css">
 </head>
-<body><div style="font-family: 'Inter', system-ui, sans-serif; color: #EFEAE0; background: #0A0D0C; min-height: 100vh; overflow-x: hidden">
+<body>
 
-<!-- HEADER -->
-<header style="position: relative; z-index: 2; border-bottom: 1px solid rgba(217,182,94,0.18)">
-<div style="max-width: 1240px; margin: 0 auto; padding: 20px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
-<a href="#top" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #EFEAE0">
-<img src="/brand/mark.svg" alt="" width="42" height="42" style="display: block">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 0.12em; font-weight: 800">NOIR <span style="color: var(--accent)">RIVER</span></span>
-</a>
-<nav aria-label="Основная навигация" style="display: flex; flex-wrap: wrap; gap: 28px; font-size: 15px; font-weight: 500">
-<a href="#games" style="color: #CFC9BC; text-decoration: none">Игры</a>
-<a href="#tournaments" style="color: #CFC9BC; text-decoration: none">Турниры</a>
-<a href="#start" style="color: #CFC9BC; text-decoration: none">Как начать</a>
-<a href="#app" style="color: #CFC9BC; text-decoration: none">Приложение</a>
-<a href="#faq" style="color: #CFC9BC; text-decoration: none">FAQ</a>
-</nav>
-<div style="display: flex; gap: 12px; flex-wrap: wrap">
-<a href="/play" style="min-height: 44px; padding: 0 22px; display: flex; align-items: center; border: 1px solid rgba(239,234,224,0.3); border-radius: 999px; color: #EFEAE0; text-decoration: none; font-weight: 600; font-size: 15px">Войти</a>
-<a href="/play" style="min-height: 44px; padding: 0 24px; display: flex; align-items: center; background: var(--accent); border-radius: 999px; color: #0A0D0C; text-decoration: none; font-weight: 700; font-size: 15px">Регистрация</a>
-</div>
-</div>
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="logo" href="#top" aria-label="NOIR RIVER — наверх">
+      <img src="/brand/mark.svg" alt="" width="36" height="36">
+      <span>NOIR <em>RIVER</em></span>
+    </a>
+    <nav class="nav-links" aria-label="Разделы">
+      <a href="#games">Игры</a>
+      <a href="#features">Возможности</a>
+      <a href="#faq">Вопросы</a>
+    </nav>
+    <a class="btn btn-gold btn-sm" href="/play">Играть</a>
+  </div>
 </header>
 
-<!-- HERO -->
-<section id="top" style="position: relative; background: radial-gradient(ellipse 70% 80% at 72% 45%, #145040 0%, #0C2C23 45%, #0A0D0C 80%)">
-<div style="max-width: 1240px; margin: 0 auto; padding: 88px 24px 104px; display: flex; flex-wrap: wrap; align-items: center; gap: 56px">
-<div style="flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 28px">
-<div style="display: flex; align-items: center; gap: 12px; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 600">
-<span style="width: 36px; height: 1px; background: var(--accent)"></span>Покер-клуб онлайн
-</div>
-<h1 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(44px, 6vw, 80px); line-height: 1.02; letter-spacing: -0.01em">Ваш стол<br><em style="font-weight: 500; color: var(--accent)">уже накрыт.</em></h1>
-<p style="margin: 0; max-width: 520px; font-size: 19px; line-height: 1.6; color: #BDB7AA">Холдем, Омаха и турниры каждый день. Быстрые столы, честная раздача и выплаты без лишних вопросов — играйте с компьютера или телефона.</p>
-<div style="display: flex; flex-wrap: wrap; gap: 14px; padding-top: 4px">
-<a href="/play" style="min-height: 56px; padding: 0 34px; display: flex; align-items: center; gap: 10px; background: var(--accent); border-radius: 999px; color: #0A0D0C; text-decoration: none; font-weight: 700; font-size: 17px">Играть сейчас
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-<a href="#games" style="min-height: 56px; padding: 0 30px; display: flex; align-items: center; border: 1px solid rgba(239,234,224,0.35); border-radius: 999px; color: #EFEAE0; text-decoration: none; font-weight: 600; font-size: 17px">Смотреть игры</a>
-</div>
-<div style="display: flex; flex-wrap: wrap; gap: 36px; padding-top: 20px; border-top: 1px solid rgba(239,234,224,0.12)">
-<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 30px; color: #EFEAE0; font-weight: 700">[БОНУС]</span><span style="font-size: 14px; color: #9E988B">приветственный бонус</span></div>
-<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 30px; color: #EFEAE0; font-weight: 700">[ЧИСЛО]</span><span style="font-size: 14px; color: #9E988B">турниров в день</span></div>
-<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 30px; color: #EFEAE0; font-weight: 700">24/7</span><span style="font-size: 14px; color: #9E988B">столы и поддержка</span></div>
-</div>
-</div>
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-in">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Онлайн-столы для своей компании</p>
+        <h1>Карточный вечер с друзьями — <span class="gold">в один клик</span></h1>
+        <p class="lead">Покер в пяти вариантах, турниры, дурак и блэкджек. Без скачивания, с телефона или компьютера. Играем на фишки, не на деньги.</p>
+        <div class="cta">
+          <a class="btn btn-gold btn-lg" href="/play">Начать играть</a>
+          <a class="btn btn-ghost btn-lg" href="#games">Посмотреть игры</a>
+        </div>
+        <ul class="facts" aria-label="Коротко">
+          <li><b>10 000</b><span>фишек на старте</span></li>
+          <li><b>4</b><span>игры</span></li>
+          <li><b>18+</b><span>только взрослые</span></li>
+        </ul>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <img class="ha ha-1" src="/art/poker.svg" alt="" width="480" height="300">
+        <img class="ha ha-2" src="/art/blackjack.svg" alt="" width="480" height="300" loading="lazy">
+        <img class="ha ha-3" src="/art/tournament.svg" alt="" width="480" height="300" loading="lazy">
+      </div>
+    </div>
+  </section>
 
-<!-- Cards composition -->
-<div aria-hidden="true" style="flex: 1 1 420px; min-width: 0; height: 460px; position: relative">
-<div style="position: absolute; left: 50%; top: 50%; width: 400px; height: 400px; margin: -200px 0 0 -200px; border-radius: 50%; border: 1px solid rgba(217,182,94,0.25)"></div>
-<div style="position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -150px 0 0 -150px; border-radius: 50%; border: 1px dashed rgba(217,182,94,0.18)"></div>
-<div style="position: absolute; left: 50%; top: 50%; width: 170px; height: 240px; margin: -130px 0 0 -170px; transform: rotate(-14deg); background: #F6F1E6; border-radius: 14px; box-shadow: 0 30px 60px rgba(0,0,0,0.55); padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; color: #141414">
-<div style="font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: 30px; line-height: 1">A<br><span style="font-size: 24px">♠&#xFE0E;</span></div>
-<div style="align-self: center; font-size: 84px; line-height: 1">♠&#xFE0E;</div>
-<div style="align-self: flex-end; transform: rotate(180deg); font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: 30px; line-height: 1">A<br><span style="font-size: 24px">♠&#xFE0E;</span></div>
-</div>
-<div style="position: absolute; left: 50%; top: 50%; width: 170px; height: 240px; margin: -110px 0 0 -10px; transform: rotate(10deg); background: #F6F1E6; border-radius: 14px; box-shadow: 0 30px 60px rgba(0,0,0,0.55); padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; color: #A3202A">
-<div style="font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: 30px; line-height: 1">K<br><span style="font-size: 24px">♥&#xFE0E;</span></div>
-<div style="align-self: center; font-size: 84px; line-height: 1">♥&#xFE0E;</div>
-<div style="align-self: flex-end; transform: rotate(180deg); font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: 30px; line-height: 1">K<br><span style="font-size: 24px">♥&#xFE0E;</span></div>
-</div>
-<div style="position: absolute; left: 14%; bottom: 8%; width: 84px; height: 84px; border-radius: 50%; background: #A3202A; border: 8px dashed #F6F1E6; box-sizing: border-box; box-shadow: 0 14px 30px rgba(0,0,0,0.5)"></div>
-<div style="position: absolute; right: 10%; top: 6%; width: 64px; height: 64px; border-radius: 50%; background: var(--accent); border: 6px dashed #0A0D0C; box-sizing: border-box; box-shadow: 0 14px 30px rgba(0,0,0,0.5)"></div>
-<div style="position: absolute; right: 18%; bottom: 4%; width: 72px; height: 72px; border-radius: 50%; background: #10372B; border: 7px dashed #EFEAE0; box-sizing: border-box; box-shadow: 0 14px 30px rgba(0,0,0,0.5)"></div>
-</div>
-</div>
-</section>
+  <section id="games" class="section">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Игры</p>
+        <h2>Выберите стол</h2>
+      </div>
+      <div class="games">
+        <a class="game" href="/play">
+          <img src="/art/poker.svg" alt="" width="480" height="300" loading="lazy">
+          <div class="game-body">
+            <h3>Покер</h3>
+            <p>Холдем No-Limit и Limit, шорт-дек 6+, Омаха и Омаха-5. Шансы комбинаций видны прямо за столом.</p>
+            <ul class="tags"><li>NLH</li><li>LHE</li><li>6+</li><li>PLO</li><li>PLO5</li></ul>
+          </div>
+        </a>
+        <a class="game" href="/play">
+          <img src="/art/tournament.svg" alt="" width="480" height="300" loading="lazy">
+          <div class="game-body">
+            <h3>Турниры</h3>
+            <p>Sit &amp; Go стартуют, как только стол полон. Турниры по расписанию, фрироллы и гарантированные фонды.</p>
+            <ul class="tags"><li>Sit &amp; Go</li><li>Расписание</li><li>Призы</li></ul>
+          </div>
+        </a>
+        <a class="game" href="/play">
+          <img src="/art/durak.svg" alt="" width="480" height="300" loading="lazy">
+          <div class="game-body">
+            <h3>Дурак</h3>
+            <p>Подкидной и переводной, от 2 до 6 игроков. Ставка в банк, проигравший платит.</p>
+            <ul class="tags"><li>Подкидной</li><li>Переводной</li></ul>
+          </div>
+        </a>
+        <a class="game" href="/play">
+          <img src="/art/blackjack.svg" alt="" width="480" height="300" loading="lazy">
+          <div class="game-body">
+            <h3>Блэкджек</h3>
+            <p>Против дилера за общим столом: сплит, дабл, страховка. Блэкджек платит 3:2.</p>
+            <ul class="tags"><li>6 колод</li><li>3:2</li></ul>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
 
-<!-- GAMES -->
-<section id="games" style="padding: 104px 24px">
-<div style="max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px">
-<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px">
-<div style="display: flex; flex-direction: column; gap: 14px">
-<span style="font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 600">Лобби</span>
-<h2 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(34px, 4vw, 52px); line-height: 1.1">Выберите свою игру</h2>
-</div>
-<p style="margin: 0; max-width: 420px; font-size: 17px; line-height: 1.6; color: #A9A396">Кэш-столы, турниры и быстрый покер — лимиты от микро до хайроллерских.</p>
-</div>
-<div style="display: flex; flex-wrap: wrap; gap: 20px">
+  <section id="features" class="section">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Возможности</p>
+        <h2>Всё, чтобы играть своей компанией</h2>
+      </div>
+      <div class="bento">
+        <article class="tile tile-wide">
+          <h3>Шансы на виду</h3>
+          <p>Панель вероятностей считает ваше эквити против соперников и шанс собрать каждую комбинацию к риверу — только по вашим картам и борду.</p>
+          <div class="odds-demo" aria-hidden="true">
+            <div class="od-row"><span>Пара</span><i style="--w:44%"></i><b>44%</b></div>
+            <div class="od-row"><span>Две пары</span><i style="--w:24%"></i><b>24%</b></div>
+            <div class="od-row"><span>Сет</span><i style="--w:5%"></i><b>5%</b></div>
+            <div class="od-row"><span>Стрит</span><i style="--w:5%"></i><b>5%</b></div>
+            <div class="od-row"><span>Флеш</span><i style="--w:3%"></i><b>3%</b></div>
+          </div>
+        </article>
+        <article class="tile">
+          <h3>Приватные столы</h3>
+          <p>Закрытый стол только для друзей: отправьте ссылку или позовите из списка друзей.</p>
+        </article>
+        <article class="tile">
+          <h3>Честная раздача</h3>
+          <p>Колоду тасует сервер криптостойким генератором. Карты соперников до вскрытия не видит никто.</p>
+        </article>
+        <article class="tile">
+          <h3>Профиль и статистика</h3>
+          <p>График фишек, история игр, достижения и аватар.</p>
+        </article>
+        <article class="tile">
+          <h3>Любой экран</h3>
+          <p>Столы подстраиваются под телефон, планшет и компьютер. Ничего не нужно устанавливать.</p>
+        </article>
+      </div>
+    </div>
+  </section>
 
-<article style="flex: 1 1 260px; min-width: 0; min-height: 300px; padding: 32px 28px; box-sizing: border-box; border-radius: 22px; background: linear-gradient(180deg, #13261F 0%, #0F1513 100%); border: 1px solid rgba(217,182,94,0.16); display: flex; flex-direction: column; gap: 16px">
-<div style="width: 52px; height: 52px; border-radius: 14px; background: rgba(217,182,94,0.12); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px">♠︎</div>
-<span style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #8F897C; font-weight: 600">Кэш-игра</span>
-<h3 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-size: 28px; font-weight: 700">Техасский холдем</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #A9A396; flex-grow: 1">Классика покера: No-Limit и Fixed-Limit столы на 6 и 9 мест в любое время суток.</p>
-<a href="/play" style="font-weight: 600; font-size: 15px; text-decoration: none; display: flex; align-items: center; gap: 8px; min-height: 44px">Играть
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-</article>
+  <section class="section">
+    <div class="wrap">
+      <ol class="steps">
+        <li><b>1</b><div><h3>Регистрация</h3><p>Ник и пароль — без почты и телефона.</p></div></li>
+        <li><b>2</b><div><h3>Фишки</h3><p>Сразу 10 000 игровых фишек на балансе.</p></div></li>
+        <li><b>3</b><div><h3>За стол</h3><p>Выберите игру или создайте свой стол.</p></div></li>
+      </ol>
+    </div>
+  </section>
 
-<article style="flex: 1 1 260px; min-width: 0; min-height: 300px; padding: 32px 28px; box-sizing: border-box; border-radius: 22px; background: linear-gradient(180deg, #13261F 0%, #0F1513 100%); border: 1px solid rgba(217,182,94,0.16); display: flex; flex-direction: column; gap: 16px">
-<div style="width: 52px; height: 52px; border-radius: 14px; background: rgba(217,182,94,0.12); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px">♥︎</div>
-<span style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #8F897C; font-weight: 600">Кэш-игра</span>
-<h3 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-size: 28px; font-weight: 700">Омаха</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #A9A396; flex-grow: 1">Четыре карты на руках и больше экшена. PLO и Hi-Lo для тех, кто любит большие банки.</p>
-<a href="/play" style="font-weight: 600; font-size: 15px; text-decoration: none; display: flex; align-items: center; gap: 8px; min-height: 44px">Играть
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-</article>
+  <section id="faq" class="section">
+    <div class="wrap faq-wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Вопросы</p>
+        <h2>Коротко о главном</h2>
+      </div>
+      <div class="faq">
+        <details><summary>Это игра на деньги?<span aria-hidden="true">+</span></summary><p>Нет. Все ставки — игровые фишки, их нельзя купить или вывести.</p></details>
+        <details><summary>Почему комбинации выпадают так часто?<span aria-hidden="true">+</span></summary><p>В Холдеме из семи карт пара или лучше собирается в 83% раздач, две пары — почти в каждой четвёртой. Включите панель шансов за столом, и вы увидите эти вероятности сами.</p></details>
+        <details><summary>Как сыграть только с друзьями?<span aria-hidden="true">+</span></summary><p>Создайте стол с галочкой «Приватный» и отправьте друзьям ссылку-приглашение.</p></details>
+        <details><summary>Что делать, если фишки закончились?<span aria-hidden="true">+</span></summary><p>Напишите администратору — он может начислить фишки из панели управления.</p></details>
+      </div>
+    </div>
+  </section>
 
-<article style="flex: 1 1 260px; min-width: 0; min-height: 300px; padding: 32px 28px; box-sizing: border-box; border-radius: 22px; background: linear-gradient(180deg, #13261F 0%, #0F1513 100%); border: 1px solid rgba(217,182,94,0.16); display: flex; flex-direction: column; gap: 16px">
-<div style="width: 52px; height: 52px; border-radius: 14px; background: rgba(217,182,94,0.12); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px">♦︎</div>
-<span style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #8F897C; font-weight: 600">Турниры</span>
-<h3 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-size: 28px; font-weight: 700">Sit &amp; Go</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #A9A396; flex-grow: 1">Турниры, которые стартуют, как только соберётся стол. Короткие сессии — быстрый результат.</p>
-<a href="/play" style="font-weight: 600; font-size: 15px; text-decoration: none; display: flex; align-items: center; gap: 8px; min-height: 44px">Играть
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-</article>
+  <section class="section">
+    <div class="wrap">
+      <div class="final">
+        <h2>Карты розданы. <span class="gold">Ваш ход.</span></h2>
+        <a class="btn btn-gold btn-lg" href="/play">Сесть за стол</a>
+      </div>
+    </div>
+  </section>
+</main>
 
-<article style="flex: 1 1 260px; min-width: 0; min-height: 300px; padding: 32px 28px; box-sizing: border-box; border-radius: 22px; background: linear-gradient(180deg, #13261F 0%, #0F1513 100%); border: 1px solid rgba(217,182,94,0.16); display: flex; flex-direction: column; gap: 16px">
-<div style="width: 52px; height: 52px; border-radius: 14px; background: rgba(217,182,94,0.12); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 26px">♣︎</div>
-<span style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #8F897C; font-weight: 600">Быстрый покер</span>
-<h3 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-size: 28px; font-weight: 700">Rush · скоро</h3>
-<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #A9A396; flex-grow: 1">Новый стол и новые карты сразу после фолда. Вдвое больше раздач за час.</p>
-<a href="/play" style="font-weight: 600; font-size: 15px; text-decoration: none; display: flex; align-items: center; gap: 8px; min-height: 44px">Играть
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-</article>
-
-</div>
-</div>
-</section>
-
-<!-- TOURNAMENTS -->
-<section id="tournaments" style="padding: 104px 24px; background: #0F2A21; border-top: 1px solid rgba(217,182,94,0.14); border-bottom: 1px solid rgba(217,182,94,0.14)">
-<div style="max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 56px">
-<div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
-<span style="font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 600">Расписание</span>
-<h2 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(34px, 4vw, 52px); line-height: 1.1">Турниры Sit &amp; Go</h2>
-<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #B3AD9F">Старт — как только соберётся стол. Блайнды растут по уровням, призы получают лучшие места.</p>
-<a href="/play" style="align-self: flex-start; min-height: 52px; padding: 0 28px; display: flex; align-items: center; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); text-decoration: none; font-weight: 600; font-size: 16px">Все турниры</a>
-</div>
-<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
-
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 22px 26px; border-radius: 18px; background: rgba(10,13,12,0.55); border: 1px solid rgba(239,234,224,0.08)">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 26px; color: var(--accent); min-width: 80px; font-weight: 700">6 мест</span>
-<div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
-<span style="font-weight: 700; font-size: 17px">Турбо 6-max</span>
-<span style="font-size: 14px; color: #9E988B">Холдем NL · уровни 3 мин</span>
-</div>
-<div style="display: flex; flex-direction: column; gap: 4px; min-width: 120px">
-<span style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #8F897C">Призовые</span>
-<span style="font-weight: 700; font-size: 17px">3 000</span>
-</div>
-<a href="/play" style="min-height: 44px; padding: 0 20px; display: flex; align-items: center; background: rgba(217,182,94,0.14); border-radius: 999px; color: #F0D48A; text-decoration: none; font-weight: 600; font-size: 14px">Играть</a>
-</div>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 22px 26px; border-radius: 18px; background: rgba(10,13,12,0.55); border: 1px solid rgba(239,234,224,0.08)">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 26px; color: var(--accent); min-width: 80px; font-weight: 700">1 на 1</span>
-<div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
-<span style="font-weight: 700; font-size: 17px">Дуэль</span>
-<span style="font-size: 14px; color: #9E988B">Холдем NL · уровни 3 мин</span>
-</div>
-<div style="display: flex; flex-direction: column; gap: 4px; min-width: 120px">
-<span style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #8F897C">Призовые</span>
-<span style="font-weight: 700; font-size: 17px">2 000</span>
-</div>
-<a href="/play" style="min-height: 44px; padding: 0 20px; display: flex; align-items: center; background: rgba(217,182,94,0.14); border-radius: 999px; color: #F0D48A; text-decoration: none; font-weight: 600; font-size: 14px">Играть</a>
-</div>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 22px 26px; border-radius: 18px; background: rgba(10,13,12,0.55); border: 1px solid rgba(239,234,224,0.08)">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 26px; color: var(--accent); min-width: 80px; font-weight: 700">6 мест</span>
-<div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
-<span style="font-weight: 700; font-size: 17px">Омаха Sit &amp; Go</span>
-<span style="font-size: 14px; color: #9E988B">Омаха PL · уровни 4 мин</span>
-</div>
-<div style="display: flex; flex-direction: column; gap: 4px; min-width: 120px">
-<span style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #8F897C">Призовые</span>
-<span style="font-weight: 700; font-size: 17px">3 000</span>
-</div>
-<a href="/play" style="min-height: 44px; padding: 0 20px; display: flex; align-items: center; background: rgba(217,182,94,0.14); border-radius: 999px; color: #F0D48A; text-decoration: none; font-weight: 600; font-size: 14px">Играть</a>
-</div>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 22px 26px; border-radius: 18px; background: rgba(10,13,12,0.55); border: 1px solid rgba(239,234,224,0.08)">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 26px; color: var(--accent); min-width: 80px; font-weight: 700">9 мест</span>
-<div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
-<span style="font-weight: 700; font-size: 17px">Большой стол</span>
-<span style="font-size: 14px; color: #9E988B">Холдем NL · уровни 5 мин</span>
-</div>
-<div style="display: flex; flex-direction: column; gap: 4px; min-width: 120px">
-<span style="font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #8F897C">Призовые</span>
-<span style="font-weight: 700; font-size: 17px">18 000</span>
-</div>
-<a href="/play" style="min-height: 44px; padding: 0 20px; display: flex; align-items: center; background: rgba(217,182,94,0.14); border-radius: 999px; color: #F0D48A; text-decoration: none; font-weight: 600; font-size: 14px">Играть</a>
-</div>
-
-</div>
-</div>
-</section>
-
-<!-- HOW TO START -->
-<section id="start" style="padding: 104px 24px">
-<div style="max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px">
-<div style="display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center">
-<span style="font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 600">Три шага</span>
-<h2 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(34px, 4vw, 52px); line-height: 1.1">От регистрации до первой раздачи</h2>
-</div>
-<div style="display: flex; flex-wrap: wrap; gap: 24px">
-
-<div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding-top: 28px; border-top: 2px solid rgba(217,182,94,0.35)">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-style: italic; font-size: 56px; line-height: 1; color: var(--accent); font-weight: 700">01</span>
-<h3 style="margin: 0; font-size: 22px; font-weight: 700">Создайте аккаунт</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #A9A396">Email или телефон — и вы в клубе. Подтверждение личности занимает несколько минут.</p>
-</div>
-
-<div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding-top: 28px; border-top: 2px solid rgba(217,182,94,0.35)">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-style: italic; font-size: 56px; line-height: 1; color: var(--accent); font-weight: 700">02</span>
-<h3 style="margin: 0; font-size: 22px; font-weight: 700">Пополните баланс</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #A9A396">Удобные способы оплаты и мгновенное зачисление. Приветственный бонус — автоматически.</p>
-</div>
-
-<div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding-top: 28px; border-top: 2px solid rgba(217,182,94,0.35)">
-<span style="font-family: 'Montserrat', system-ui, sans-serif; font-style: italic; font-size: 56px; line-height: 1; color: var(--accent); font-weight: 700">03</span>
-<h3 style="margin: 0; font-size: 22px; font-weight: 700">Садитесь за стол</h3>
-<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #A9A396">Выберите игру и лимит. Новичкам — фрироллы и столы с маленькими ставками.</p>
-</div>
-
-</div>
-</div>
-</section>
-
-<!-- WHY US -->
-<section style="padding: 0 24px 104px">
-<div style="max-width: 1240px; margin: 0 auto; border-radius: 28px; background: #F2ECDF; color: #121614; padding: 64px 48px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 48px">
-<div style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
-<h2 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(32px, 3.6vw, 46px); line-height: 1.1">Играйте спокойно</h2>
-<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #4A4F4B">Мы отвечаем за технику, безопасность и выплаты. Вам остаётся только читать соперников.</p>
-</div>
-<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-wrap: wrap; gap: 32px 40px">
-
-<div style="flex: 1 1 240px; min-width: 0; display: flex; gap: 16px">
-<div style="flex: 0 0 44px; height: 44px; border-radius: 12px; background: #0F2A21; color: #D9B65E; display: flex; align-items: center; justify-content: center">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-</div>
-<div style="display: flex; flex-direction: column; gap: 6px">
-<span style="font-weight: 700; font-size: 18px">Честная раздача</span>
-<span style="font-size: 15px; line-height: 1.55; color: #4A4F4B">Генератор случайных чисел [ПРОШЁЛ АУДИТ / НАЗВАНИЕ ЛАБОРАТОРИИ].</span>
-</div>
-</div>
-
-<div style="flex: 1 1 240px; min-width: 0; display: flex; gap: 16px">
-<div style="flex: 0 0 44px; height: 44px; border-radius: 12px; background: #0F2A21; color: #D9B65E; display: flex; align-items: center; justify-content: center">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-</div>
-<div style="display: flex; flex-direction: column; gap: 6px">
-<span style="font-weight: 700; font-size: 18px">Быстрые выплаты</span>
-<span style="font-size: 15px; line-height: 1.55; color: #4A4F4B">Вывод выигрыша в срок [СРОК ВЫПЛАТ] без скрытых комиссий.</span>
-</div>
-</div>
-
-<div style="flex: 1 1 240px; min-width: 0; display: flex; gap: 16px">
-<div style="flex: 0 0 44px; height: 44px; border-radius: 12px; background: #0F2A21; color: #D9B65E; display: flex; align-items: center; justify-content: center">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-</div>
-<div style="display: flex; flex-direction: column; gap: 6px">
-<span style="font-weight: 700; font-size: 18px">Защита данных</span>
-<span style="font-size: 15px; line-height: 1.55; color: #4A4F4B">Шифрование соединения и двухфакторная авторизация для аккаунта.</span>
-</div>
-</div>
-
-<div style="flex: 1 1 240px; min-width: 0; display: flex; gap: 16px">
-<div style="flex: 0 0 44px; height: 44px; border-radius: 12px; background: #0F2A21; color: #D9B65E; display: flex; align-items: center; justify-content: center">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-</div>
-<div style="display: flex; flex-direction: column; gap: 6px">
-<span style="font-weight: 700; font-size: 18px">Ответственная игра</span>
-<span style="font-size: 15px; line-height: 1.55; color: #4A4F4B">Лимиты на депозит и время, самоисключение — в пару кликов в профиле.</span>
-</div>
-</div>
-
-</div>
-</div>
-</section>
-
-<!-- APP -->
-<section id="app" style="padding: 0 24px 104px">
-<div style="max-width: 1240px; margin: 0 auto; border-radius: 28px; background: radial-gradient(ellipse 60% 90% at 85% 50%, #145040 0%, #0F2A21 60%); border: 1px solid rgba(217,182,94,0.2); padding: 64px 48px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 48px">
-<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
-<span style="font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); font-weight: 600">Мобильное приложение</span>
-<h2 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(32px, 3.6vw, 46px); line-height: 1.1">Стол в кармане</h2>
-<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #B3AD9F">Мультистолинг, игра одной рукой и уведомления о старте ваших турниров.</p>
-<div style="display: flex; flex-wrap: wrap; gap: 12px">
-<a href="#ios" style="min-height: 52px; padding: 0 24px; display: flex; align-items: center; gap: 10px; background: #EFEAE0; border-radius: 14px; color: #0A0D0C; text-decoration: none; font-weight: 700; font-size: 15px">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Скачать для iOS</a>
-<a href="#android" style="min-height: 52px; padding: 0 24px; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(239,234,224,0.35); border-radius: 14px; color: #EFEAE0; text-decoration: none; font-weight: 700; font-size: 15px">
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Скачать для Android</a>
-</div>
-</div>
-<div aria-hidden="true" style="flex: 1 1 300px; min-width: 0; display: flex; justify-content: center">
-<div style="width: 240px; height: 440px; border-radius: 40px; background: #0A0D0C; border: 2px solid rgba(217,182,94,0.4); padding: 14px; box-sizing: border-box; box-shadow: 0 40px 80px rgba(0,0,0,0.5)">
-<div style="width: 100%; height: 100%; border-radius: 28px; background: radial-gradient(ellipse at 50% 45%, #1B6A52 0%, #0F3D2E 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px">
-<div style="display: flex; gap: 6px">
-<span style="width: 34px; height: 48px; border-radius: 6px; background: #F6F1E6; color: #141414; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">Q♠&#xFE0E;</span>
-<span style="width: 34px; height: 48px; border-radius: 6px; background: #F6F1E6; color: #A3202A; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">J♥&#xFE0E;</span>
-<span style="width: 34px; height: 48px; border-radius: 6px; background: #F6F1E6; color: #141414; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">10♣&#xFE0E;</span>
-</div>
-<span style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #CFE3D9">Банк: [СУММА]</span>
-<span style="padding: 10px 24px; border-radius: 999px; background: var(--accent); color: #0A0D0C; font-weight: 700; font-size: 13px">Колл</span>
-</div>
-</div>
-</div>
-</div>
-</section>
-
-<!-- FAQ -->
-<section id="faq" style="padding: 0 24px 104px">
-<div style="max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px">
-<h2 style="margin: 0; text-align: center; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(34px, 4vw, 52px); line-height: 1.1">Частые вопросы</h2>
-<div style="display: flex; flex-direction: column">
-
-<details style="border-bottom: 1px solid rgba(239,234,224,0.12)">
-<summary style="min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 18px; font-weight: 600">Можно ли играть бесплатно?<span class="faq-plus" style="font-size: 26px; color: var(--accent); transition: transform .2s">+</span></summary>
-<p style="margin: 0 0 22px; font-size: 16px; line-height: 1.65; color: #A9A396">Да: есть фрироллы и столы на игровые фишки, чтобы освоиться без риска.</p>
-</details>
-
-<details style="border-bottom: 1px solid rgba(239,234,224,0.12)">
-<summary style="min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 18px; font-weight: 600">Как вывести выигрыш?<span class="faq-plus" style="font-size: 26px; color: var(--accent); transition: transform .2s">+</span></summary>
-<p style="margin: 0 0 22px; font-size: 16px; line-height: 1.65; color: #A9A396">В разделе «Касса» выберите способ вывода и сумму. Сроки и лимиты: [УСЛОВИЯ ВЫВОДА].</p>
-</details>
-
-<details style="border-bottom: 1px solid rgba(239,234,224,0.12)">
-<summary style="min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 18px; font-weight: 600">Нужна ли верификация?<span class="faq-plus" style="font-size: 26px; color: var(--accent); transition: transform .2s">+</span></summary>
-<p style="margin: 0 0 22px; font-size: 16px; line-height: 1.65; color: #A9A396">Да, для вывода средств нужно подтвердить личность — это требование лицензии и защита вашего аккаунта.</p>
-</details>
-
-<details style="border-bottom: 1px solid rgba(239,234,224,0.12)">
-<summary style="min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 18px; font-weight: 600">Есть ли приложение?<span class="faq-plus" style="font-size: 26px; color: var(--accent); transition: transform .2s">+</span></summary>
-<p style="margin: 0 0 22px; font-size: 16px; line-height: 1.65; color: #A9A396">Да, для iOS и Android. Аккаунт и баланс общие с десктоп-версией.</p>
-</details>
-
-<details style="border-bottom: 1px solid rgba(239,234,224,0.12)">
-<summary style="min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 18px; font-weight: 600">Как установить лимиты?<span class="faq-plus" style="font-size: 26px; color: var(--accent); transition: transform .2s">+</span></summary>
-<p style="margin: 0 0 22px; font-size: 16px; line-height: 1.65; color: #A9A396">В профиле откройте «Ответственная игра» и задайте лимиты на депозиты, проигрыш и время сессии.</p>
-</details>
-
-</div>
-</div>
-</section>
-
-<!-- CTA -->
-<section id="register" style="padding: 0 24px 104px">
-<div style="max-width: 1240px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 72px 24px; border-radius: 28px; border: 1px solid rgba(217,182,94,0.3); background: linear-gradient(180deg, rgba(217,182,94,0.08), rgba(217,182,94,0))">
-<h2 style="margin: 0; font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: clamp(36px, 5vw, 64px); line-height: 1.05">Карты розданы.<br><em style="font-weight: 500; color: var(--accent)">Ваш ход.</em></h2>
-<p style="margin: 0; max-width: 520px; font-size: 18px; line-height: 1.6; color: #B3AD9F">Регистрация занимает минуту. Приветственный бонус — [УСЛОВИЯ БОНУСА].</p>
-<a href="/play" style="min-height: 58px; padding: 0 40px; display: flex; align-items: center; background: var(--accent); border-radius: 999px; color: #0A0D0C; text-decoration: none; font-weight: 700; font-size: 18px">Создать аккаунт</a>
-</div>
-</section>
-
-<!-- FOOTER -->
-<footer style="border-top: 1px solid rgba(239,234,224,0.1); padding: 56px 24px 40px">
-<div style="max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px">
-<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 40px">
-<div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
-<span style="display: flex; align-items: center; gap: 12px"><img src="/brand/mark.svg" alt="" width="36" height="36"><span style="font-family: 'Montserrat', system-ui, sans-serif; font-size: 22px; font-weight: 800; letter-spacing: 0.12em">NOIR <span style="color: var(--accent)">RIVER</span></span></span>
-<span style="font-size: 14px; line-height: 1.6; color: #8F897C; max-width: 320px">[ЮРИДИЧЕСКОЕ НАЗВАНИЕ КОМПАНИИ], лицензия [НОМЕР ЛИЦЕНЗИИ], выдана [РЕГУЛЯТОР].</span>
-</div>
-<div style="display: flex; flex-wrap: wrap; gap: 56px">
-<div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px">
-<span style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #8F897C">Игра</span>
-<a href="#games" style="color: #CFC9BC; text-decoration: none">Кэш-игры</a>
-<a href="#tournaments" style="color: #CFC9BC; text-decoration: none">Турниры</a>
-<a href="#app" style="color: #CFC9BC; text-decoration: none">Приложение</a>
-</div>
-<div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px">
-<span style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #8F897C">Помощь</span>
-<a href="#faq" style="color: #CFC9BC; text-decoration: none">FAQ</a>
-<a href="#support" style="color: #CFC9BC; text-decoration: none">Поддержка</a>
-<a href="#rules" style="color: #CFC9BC; text-decoration: none">Правила</a>
-</div>
-<div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px">
-<span style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #8F897C">Документы</span>
-<a href="#terms" style="color: #CFC9BC; text-decoration: none">Условия</a>
-<a href="#privacy" style="color: #CFC9BC; text-decoration: none">Конфиденциальность</a>
-<a href="#responsible" style="color: #CFC9BC; text-decoration: none">Ответственная игра</a>
-</div>
-</div>
-</div>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding-top: 28px; border-top: 1px solid rgba(239,234,224,0.08); font-size: 13px; line-height: 1.6; color: #8F897C">
-<span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid #A3202A; color: #E06A72; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px">18+</span>
-<span style="flex: 1 1 400px; min-width: 0">Только для лиц старше 18 лет. Азартные игры могут вызывать зависимость — играйте ответственно и устанавливайте лимиты. © [ГОД] NOIR RIVER.</span>
-</div>
-</div>
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span class="logo"><img src="/brand/mark.svg" alt="" width="28" height="28"><span>NOIR <em>RIVER</em></span></span>
+    <p><span class="age">18+</span> Игра на игровые фишки без денежных выигрышей. Играйте в удовольствие.</p>
+  </div>
 </footer>
 
-</div>
 </body>
 </html>

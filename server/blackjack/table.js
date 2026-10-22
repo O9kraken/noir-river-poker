@@ -269,15 +269,18 @@ class BlackjackTable {
     const r = this.round;
     const d = handValue(r.dealer.cards).total;
     this._log(r.dealerBlackjack ? 'Дилер: блэкджек' : d > 21 ? `Дилер: перебор (${d})` : `Дилер: ${d}`);
+    const results = [];
     for (const p of r.players) {
       const userId = this._userBySeat.get(p.seat);
       const pay = r.totalPayout(p.seat);
       const bet = r.totalBet(p.seat);
       if (pay) this.deps.pay && this.deps.pay(userId, pay);
       const net = pay - bet;
+      results.push({ userId, net, blackjacks: p.hands.filter((hd) => hd.result === 'blackjack').length });
       this._log(`${this._name(p.seat)}: ${net > 0 ? `выигрыш +${net}` : net < 0 ? `проигрыш ${net}` : 'ничья'}`);
     }
     for (const s of this.seats) if (s) this.deps.onInPlay && this.deps.onInPlay(s.userId, s.bet);
+    this.deps.onRoundEnd && this.deps.onRoundEnd(this, results);
     this.status = 'result';
     this.deadline = 0;
     this._update();
@@ -329,7 +332,7 @@ class BlackjackTable {
   summary() {
     return {
       id: this.id, kind: 'bj', name: this.name, minBet: this.minBet, maxBet: this.maxBet,
-      maxSeats: this.maxSeats, players: this.playerCount(), status: this.status, permanent: this.permanent,
+      maxSeats: this.maxSeats, players: this.playerCount(), status: this.status, permanent: this.permanent, private: !!this.private, owner: this.ownerName || null,
     };
   }
 
@@ -358,6 +361,7 @@ class BlackjackTable {
       roundNo: this.roundNo,
       bettingIn: this.status === 'betting' && this._bet ? Math.max(0, this.bettingEnds - this.now()) : 0,
       seats: this.seats.map((s, i) => s && {
+        avatar: this.avatarOf ? this.avatarOf(s.userId) : null,
         name: s.name, connected: s.connected, leaving: s.leaving, bet: s.bet, lastBet: s.lastBet,
         hands: handsOf(i),
         net: r && this.status === 'result' && r.players.some((p) => p.seat === i) ? r.totalPayout(i) - r.totalBet(i) : null,

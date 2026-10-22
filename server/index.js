@@ -5,8 +5,9 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const { Table, GameError } = require('./engine/table');
+const { GAMES, gameOf } = require('./engine/games');
 const { Store, StoreError } = require('./store');
-const { SitAndGo, TEMPLATES } = require('./tournament');
+const { SitAndGo, TEMPLATES, validateTemplate, DAY } = require('./tournament');
 const { DurakTable } = require('./durak/table');
 const { BlackjackTable } = require('./blackjack/table');
 
@@ -26,9 +27,9 @@ const STARTED_AT = Date.now();
 function createServer({
   dataFile = DATA_FILE, actionTime = ACTION_TIME, tableOpts = {},
   sngTemplates = TEMPLATES, levelHands = Number(process.env.SNG_LEVEL_HANDS) || 0, sngLinger = 120000,
-  durakOpts = {}, bjOpts = {}, adminNames = ADMIN_NAMES,
+  durakOpts = {}, bjOpts = {}, adminNames = ADMIN_NAMES, store: givenStore = null,
 } = {}) {
-  const store = new Store(dataFile, { adminNames });
+  const store = givenStore || new Store(dataFile, { adminNames });
   const app = express();
   const server = http.createServer(app);
   const io = new Server(server, { maxHttpBufferSize: 1e5 });
@@ -79,8 +80,19 @@ function createServer({
   const tables = new Map();
   const disconnectTimers = new Map(); // userId -> timer
 
+  const newId = (prefix, priv) => prefix + crypto.randomBytes(priv ? 9 : 4).toString('hex');
+
+  /** Things every table of any game needs from the server. */
+  function decorate(t, cfg) {
+    t.avatarOf = (uid) => { const u = store.get(uid); return u ? u.avatar : null; };
+    t.private = !!cfg.private;
+    t.createdBy = cfg.createdBy || t.createdBy || null;
+    t.ownerName = t.createdBy && store.get(t.createdBy) ? store.get(t.createdBy).name : null;
+    return t;
+  }
+
   function makeTable(cfg, extra = {}) {
-    const id = cfg.id || crypto.randomBytes(4).toString('hex');
+    const id = cfg.id || newId('', cfg.private);
     const tourney = !!extra.tournament;
     const table = new Table({ ...cfg, id }, {
       actionTime,
@@ -96,14 +108,22 @@ function createServer({
       },
       onHandEnd: (t) => {
         if (!tourney) for (const s of t.seats) if (s) store.setInPlay(s.userId, id, s.stack);
-        if (t.lastResult) {
-          for (const p of t.lastResult.players) {
-            const s = t.seats[p.seat];
-            if (s && p.won > 0) store.recordWin(s.userId, p.won);
+        const hh = t.histories[t.histories.length - 1];
+        if (hh) {
+          for (const pl of hh.players) {
+            const rp = t.lastResult && t.lastResult.players.find((x) => x.seat === pl.seat);
+            store.recordGame(pl.userId, 'poker', {
+              tournament: tourney, table: t.name, bb: hh.bb,
+              net: pl.endStack - pl.startStack, won: rp ? rp.won : 0,
+              showdown: !!(t.lastResult && t.lastResult.showdown && rp),
+              category: rp && t.lastResult.showdown ? rp.category : null,
+              handName: rp && t.lastResult.showdown ? rp.hand : null,
+            });
           }
         }
       },
     });
+    decorate(table, cfg);
     tables.set(id, table);
     broadcastLobby();
     return table;
@@ -116,6 +136,9 @@ function createServer({
     { id: 'omaha-mid', name: 'Омаха Ривер', game: 'PLO', sb: 10, bb: 20, maxSeats: 6 },
     { id: 'holdem-high', name: 'Золотой зал', game: 'NLH', sb: 100, bb: 200, maxSeats: 6 },
     { id: 'holdem-turbo', name: 'Разгон', game: 'NLH', sb: 5, bb: 10, maxSeats: 6, blindsEvery: 5 },
+    { id: 'shortdeck', name: 'Шорт-дек', game: 'SD', sb: 10, bb: 20, maxSeats: 6 },
+    { id: 'plo5', name: 'Пять карт', game: 'PLO5', sb: 10, bb: 20, maxSeats: 6 },
+    { id: 'limit', name: 'Лимит', game: 'LHE', sb: 10, bb: 20, maxSeats: 6 },
   ];
 
   const pendingBroadcast = new Set();
@@ -133,12 +156,13 @@ function createServer({
         }
       }
       broadcastLobby();
+      if (table.private) schedulePrivate(table);
     });
   }
 
   let lobbyPending = false;
   function lobbyList() {
-    return [...tables.values()].filter((t) => !t.tournament).map((t) => t.summary());
+    return [...tables.values()].filter((t) => !t.tournament && !t.private).map((t) => t.summary());
   }
   function broadcastLobby() {
     if (lobbyPending) return;
@@ -166,9 +190,17 @@ function createServer({
     store,
     levelHands,
     makeTable,
-    notify: (userId, event, payload) => { io.to('user:' + userId).emit(event, payload); pushProfile(userId); },
+    notify: (userId, event, payload) => {
+      if (event === 'sng:result') store.recordGame(userId, 'sng', { table: payload.name, place: payload.place, total: payload.total, prize: payload.prize, buyIn: payload.buyIn });
+      io.to('user:' + userId).emit(event, payload);
+      pushProfile(userId);
+    },
     onChange: () => broadcastSngs(),
-    onStarted: (sng) => spawnSng(sngTemplates.find((t) => t.id === sng.templateId)), // keep registration open
+    onStarted: (sng) => next(sng), // keep registration open
+    onCancelled: (sng) => {
+      next(sng);
+      setTimeout(() => { sngs.delete(sng.id); broadcastSngs(); }, sngLinger).unref();
+    },
     onFinished: (sng) => {
       setTimeout(() => {
         sngs.delete(sng.id);
@@ -178,6 +210,8 @@ function createServer({
       }, sngLinger).unref();
     },
   };
+  const allTemplates = () => sngTemplates.concat(store.data.sngTemplates);
+  const tplById = (id) => allTemplates().find((t) => t.id === id);
   function spawnSng(tpl) {
     if (!tpl) return;
     const sng = new SitAndGo(tpl, sngDeps);
@@ -185,9 +219,29 @@ function createServer({
     broadcastSngs();
     return sng;
   }
+  /** After a tournament starts (or a scheduled one is cancelled) open the next one of the same kind. */
+  function next(sng) {
+    const tpl = tplById(sng.templateId);
+    if (!tpl) return;
+    if (tpl.custom && !tpl.recurring) { tpl.spent = true; store.save(); return; }
+    if (tpl.startAt) {
+      while (tpl.startAt <= Date.now() + 30000) tpl.startAt += DAY;
+      store.save();
+    }
+    if (![...sngs.values()].some((x) => x.templateId === tpl.id && x.status === 'registering')) spawnSng(tpl);
+  }
   sngTemplates.forEach(spawnSng);
+  // custom (admin-made) tournaments survive restarts; a missed daily start moves to the next day
+  for (const tpl of store.data.sngTemplates) {
+    if (tpl.spent) continue;
+    if (tpl.startAt && tpl.startAt <= Date.now() + 30000) {
+      if (!tpl.recurring) { tpl.spent = true; continue; }
+      while (tpl.startAt <= Date.now() + 30000) tpl.startAt += DAY;
+    }
+    spawnSng(tpl);
+  }
   function sngList() {
-    const order = { running: 0, registering: 1, finished: 2 };
+    const order = { running: 0, registering: 1, finished: 2, cancelled: 3 };
     return [...sngs.values()].map((x) => x.summary())
       .sort((a, b) => order[a.status] - order[b.status] || a.buyIn - b.buyIn);
   }
@@ -213,7 +267,7 @@ function createServer({
   ];
 
   function makeDurak(cfg) {
-    const id = cfg.id || 'd' + crypto.randomBytes(4).toString('hex');
+    const id = cfg.id || newId('d', cfg.private);
     const key = 'durak:' + id;
     const t = new DurakTable({ ...cfg, id }, {
       canAfford: (u, a) => ((store.get(u) || {}).balance || 0) >= a,
@@ -227,8 +281,16 @@ function createServer({
       onUpdate: (tt) => scheduleDurakBroadcast(tt),
       onGameEnd: (tt) => {
         for (const i of tt.players) { const u = tt._userOf(i); if (u) { store.setInPlay(u, key, 0); pushProfile(u); } }
+        const r = tt.result;
+        if (r) {
+          for (const pay of r.payouts) {
+            const u = tt._userOf(pay.seat);
+            if (u) store.recordGame(u, 'durak', { table: tt.name, net: pay.net, draw: r.draw, durak: !!(r.durak && r.durak.seat === pay.seat) });
+          }
+        }
       },
     }, durakOpts);
+    decorate(t, cfg);
     durakTables.set(id, t);
     broadcastDurakLobby();
     return t;
@@ -240,7 +302,7 @@ function createServer({
     if (!t) throw new GameError('Стол не найден');
     return t;
   }
-  function durakList() { return [...durakTables.values()].map((t) => t.summary()); }
+  function durakList() { return [...durakTables.values()].filter((t) => !t.private).map((t) => t.summary()); }
   const pendingDurak = new Set();
   function scheduleDurakBroadcast(t) {
     if (pendingDurak.has(t.id)) return;
@@ -256,6 +318,7 @@ function createServer({
         }
       }
       broadcastDurakLobby();
+      if (t.private) schedulePrivate(t);
     });
   }
   function broadcastDurakLobby() {
@@ -274,14 +337,18 @@ function createServer({
     { id: 'bj-vip', name: 'VIP-зал', minBet: 100, maxBet: 10000 },
   ];
   function makeBj(cfg) {
-    const id = cfg.id || 'bj' + crypto.randomBytes(4).toString('hex');
+    const id = cfg.id || newId('bj', cfg.private);
     const key = 'bj:' + id;
     const t = new BlackjackTable({ ...cfg, id }, {
       charge: (u, a) => { try { store.withdraw(u, a); } catch (e) { return false; } pushProfile(u); return true; },
       pay: (u, a) => { if (!u || !a) return; store.deposit(u, a); pushProfile(u); },
       onInPlay: (u, a) => { store.setInPlay(u, key, a); },
       onUpdate: (tt) => scheduleBjBroadcast(tt),
+      onRoundEnd: (tt, results) => {
+        for (const r of results) if (r.userId) store.recordGame(r.userId, 'bj', { table: tt.name, net: r.net, blackjacks: r.blackjacks });
+      },
     }, bjOpts);
+    decorate(t, cfg);
     bjTables.set(id, t);
     broadcastBjLobby();
     return t;
@@ -291,7 +358,7 @@ function createServer({
     if (!t) throw new GameError('Стол не найден');
     return t;
   }
-  function bjList() { return [...bjTables.values()].map((t) => t.summary()); }
+  function bjList() { return [...bjTables.values()].filter((t) => !t.private).map((t) => t.summary()); }
   const pendingBj = new Set();
   function scheduleBjBroadcast(t) {
     if (pendingBj.has(t.id)) return;
@@ -307,6 +374,7 @@ function createServer({
         }
       }
       broadcastBjLobby();
+      if (t.private) schedulePrivate(t);
     });
   }
   function broadcastBjLobby() {
@@ -341,6 +409,60 @@ function createServer({
       }
     }
   }, 60000);
+
+  // --- private tables & friends ---
+  const KIND_OF = (t) => (t.kind === 'durak' ? 'durak' : t.kind === 'bj' ? 'bj' : 'poker');
+  const HREF_OF = (t) => (t.kind === 'durak' ? `#/durak/${t.id}` : t.kind === 'bj' ? `#/bj/${t.id}` : `#/table/${t.id}`);
+  const allTables = () => [...tables.values(), ...durakTables.values(), ...bjTables.values()];
+
+  /** Private tables a player may see in the lobby: own, friends', or where they sit. */
+  function privateList(uid) {
+    return allTables()
+      .filter((t) => t.private && (t.createdBy === uid || store.areFriends(t.createdBy, uid) || t.seatOf(uid) !== -1))
+      .map((t) => ({ ...t.summary(), kind: KIND_OF(t), href: HREF_OF(t) }));
+  }
+  function pushPrivate(uid) { io.to('user:' + uid).emit('lobby:private', privateList(uid)); }
+  const privPending = new Set();
+  function schedulePrivate(t) {
+    if (privPending.has(t.id)) return;
+    privPending.add(t.id);
+    setTimeout(() => {
+      privPending.delete(t.id);
+      const audience = new Set([t.createdBy, ...store.friendsOf(t.createdBy)]);
+      t.seats.forEach((x) => { if (x) audience.add(x.userId); });
+      for (const uid of audience) if (uid) pushPrivate(uid);
+    }, 250);
+  }
+
+  const isOnline = (uid) => { const r = io.sockets.adapter.rooms.get('user:' + uid); return !!(r && r.size); };
+  /** Where a player sits right now (any game). */
+  function whereIs(uid) {
+    return allTables().filter((t) => t.seatOf(uid) !== -1)
+      .map((t) => ({ kind: KIND_OF(t), id: t.id, name: t.name, href: HREF_OF(t), private: !!t.private }));
+  }
+  function friendsPayload(uid) {
+    const u = store.get(uid);
+    if (!u) return { friends: [], incoming: [], outgoing: [] };
+    const friends = u.friends.map((fid) => {
+      const b = store.brief(fid);
+      return b && { ...b, online: isOnline(fid), where: whereIs(fid) };
+    }).filter(Boolean).sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name, 'ru'));
+    return {
+      friends,
+      incoming: u.friendReq.in.map((x) => store.brief(x)).filter(Boolean),
+      outgoing: u.friendReq.out.map((x) => store.brief(x)).filter(Boolean),
+    };
+  }
+  /** Tell a player's friends that something about them changed (online, seat). */
+  const presencePending = new Set();
+  function presenceChanged(uid) {
+    if (presencePending.has(uid)) return;
+    presencePending.add(uid);
+    setTimeout(() => {
+      presencePending.delete(uid);
+      for (const f of store.friendsOf(uid)) io.to('user:' + f).emit('friends:dirty');
+    }, 400);
+  }
 
   /** Take a player off every table and out of pending registrations (ban / admin kick). */
   function removeEverywhere(target) {
@@ -378,6 +500,7 @@ function createServer({
     for (const t of tables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
     for (const t of durakTables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
     for (const t of bjTables.values()) if (t.seatOf(userId) !== -1) t.setConnected(userId, true);
+    presenceChanged(userId);
 
     let lastChat = 0;
     const on = (event, handler) => {
@@ -399,6 +522,7 @@ function createServer({
       myTables: [...tables.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
       stakes: STAKES,
       seatOptions: SEAT_OPTIONS,
+      games: Object.fromEntries(Object.entries(GAMES).map(([k, g]) => [k, { name: g.name, short: g.short, hole: g.hole, maxSeats: g.maxSeats, limit: g.limit, rules: g.rules }])),
       blindEveryOptions: BLIND_EVERY_OPTIONS,
       sngs: sngList(),
       durak: durakList(),
@@ -408,7 +532,79 @@ function createServer({
       myBj: [...bjTables.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
       announcement: store.data.announcement,
       leaderboard: store.leaderboard(),
+      private: privateList(userId),
+      bjLimits: BJ_LIMITS,
     }));
+
+    // ----- profile -----
+    on('profile:get', ({ name }) => {
+      const p = store.publicProfile(name || userId);
+      const me = store.get(userId);
+      p.me = p.id === userId;
+      p.friend = me.friends.includes(p.id);
+      p.requested = me.friendReq.out.includes(p.id);
+      p.incoming = me.friendReq.in.includes(p.id);
+      p.online = isOnline(p.id);
+      p.where = p.me || p.friend ? whereIs(p.id) : [];
+      return { profile: p };
+    });
+    on('profile:avatar', ({ hue, sym }) => {
+      const avatar = store.setAvatar(userId, hue, sym);
+      pushProfile(userId);
+      // seats show avatars: refresh the tables this player sits at
+      for (const t of allTables()) {
+        if (t.seatOf(userId) === -1) continue;
+        if (t.kind === 'durak' || t.kind === 'bj') t._update(); else t.onUpdate(t);
+      }
+      presenceChanged(userId);
+      return { avatar };
+    });
+
+    // ----- friends -----
+    on('friends:list', () => friendsPayload(userId));
+    on('friends:add', ({ name }) => {
+      const res = store.friendRequest(userId, name);
+      const other = res.other.id;
+      if (res.status === 'sent') io.to('user:' + other).emit('friends:request', { from: store.brief(userId) });
+      else { io.to('user:' + other).emit('notice', { text: `${socket.data.name} теперь ваш друг` }); pushPrivate(other); pushPrivate(userId); }
+      io.to('user:' + other).emit('friends:dirty');
+      pushProfile(other);
+      pushProfile(userId);
+      return { status: res.status, ...friendsPayload(userId) };
+    });
+    on('friends:accept', ({ id }) => {
+      const res = store.friendAccept(userId, String(id));
+      io.to('user:' + res.other.id).emit('notice', { text: `${socket.data.name} принял(а) заявку в друзья` });
+      io.to('user:' + res.other.id).emit('friends:dirty');
+      pushPrivate(res.other.id); pushPrivate(userId); pushProfile(userId);
+      return friendsPayload(userId);
+    });
+    on('friends:decline', ({ id }) => {
+      store.friendDecline(userId, String(id));
+      io.to('user:' + String(id)).emit('friends:dirty');
+      pushProfile(userId); pushProfile(String(id));
+      return friendsPayload(userId);
+    });
+    on('friends:remove', ({ id }) => {
+      store.friendRemove(userId, String(id));
+      io.to('user:' + String(id)).emit('friends:dirty');
+      pushPrivate(String(id)); pushPrivate(userId);
+      return friendsPayload(userId);
+    });
+    let lastInvite = 0;
+    on('friends:invite', ({ id, href }) => {
+      const fid = String(id);
+      if (!store.areFriends(userId, fid)) throw new GameError('Приглашать можно только друзей');
+      const m = /^#\/(table|durak|bj)\/([\w-]+)$/.exec(String(href || ''));
+      if (!m) throw new GameError('Неверная ссылка');
+      const t = m[1] === 'table' ? tables.get(m[2]) : m[1] === 'durak' ? durakTables.get(m[2]) : bjTables.get(m[2]);
+      if (!t) throw new GameError('Стол не найден');
+      if (Date.now() - lastInvite < 1500) throw new GameError('Не так быстро');
+      lastInvite = Date.now();
+      if (!isOnline(fid)) throw new GameError('Друг сейчас не в сети');
+      const game = { poker: t.tournament ? 'Sit & Go' : 'Покер', durak: 'Дурак', bj: 'Блэкджек' }[KIND_OF(t)];
+      io.to('user:' + fid).emit('invite', { from: store.brief(userId), href, title: t.name, game });
+    });
 
     on('bonus:claim', () => {
       const amount = store.claimBonus(userId);
@@ -416,7 +612,7 @@ function createServer({
       return { amount };
     });
 
-    on('table:create', ({ name, game, stakes, seats, blindsEvery }) => {
+    on('table:create', ({ name, game, stakes, seats, blindsEvery, private: priv }) => {
       if (tables.size >= MAX_TABLES) throw new GameError('Слишком много столов, попробуйте позже');
       const st = STAKES[Number(stakes)];
       const maxSeats = Number(seats);
@@ -425,7 +621,9 @@ function createServer({
       if (own >= 3) throw new GameError('Можно создать не больше 3 столов');
       const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Стол ${socket.data.name}`;
       const every = BLIND_EVERY_OPTIONS.includes(Number(blindsEvery)) ? Number(blindsEvery) : 0;
-      const t = makeTable({ name: clean, game: game === 'PLO' ? 'PLO' : 'NLH', sb: st[0], bb: st[1], maxSeats, createdBy: userId, blindsEvery: every });
+      if (maxSeats > GAMES[gameOf(game)].maxSeats) throw new GameError(`В ${GAMES[gameOf(game)].name} играют до ${GAMES[gameOf(game)].maxSeats} человек`);
+      const t = makeTable({ name: clean, game: gameOf(game), sb: st[0], bb: st[1], maxSeats, createdBy: userId, blindsEvery: every, private: !!priv });
+      if (t.private) schedulePrivate(t);
       return { tableId: t.id };
     });
 
@@ -458,6 +656,7 @@ function createServer({
     });
 
     on('table:sit', ({ tableId, seat, buyIn }) => {
+      presenceChanged(userId);
       const t = getTable(tableId);
       buyIn = Math.floor(Number(buyIn));
       seat = Math.floor(Number(seat));
@@ -474,6 +673,7 @@ function createServer({
     });
 
     on('table:stand', ({ tableId }) => {
+      presenceChanged(userId);
       getTable(tableId).standUp(userId);
     });
 
@@ -511,7 +711,7 @@ function createServer({
     };
 
     // ----- durak -----
-    on('durak:create', ({ name, variant, stake, maxPlayers }) => {
+    on('durak:create', ({ name, variant, stake, maxPlayers, private: priv }) => {
       if (durakTables.size >= MAX_TABLES) throw new GameError('Слишком много столов');
       const st = Number(stake);
       const mp = Number(maxPlayers);
@@ -519,7 +719,8 @@ function createServer({
       const own = [...durakTables.values()].filter((t) => t.createdBy === userId).length;
       if (own >= 3) throw new GameError('Можно создать не больше 3 столов');
       const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Дурак у ${socket.data.name}`;
-      const t = makeDurak({ name: clean, variant, stake: st, maxPlayers: mp, createdBy: userId });
+      const t = makeDurak({ name: clean, variant, stake: st, maxPlayers: mp, createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
       return { tableId: t.id };
     });
     on('durak:watch', ({ tableId }) => {
@@ -529,11 +730,13 @@ function createServer({
     });
     on('durak:unwatch', ({ tableId }) => { socket.leave('durak:' + String(tableId)); });
     on('durak:sit', ({ tableId, seat }) => {
+      presenceChanged(userId);
       const t = getDurak(tableId);
       t.sit(userId, socket.data.name, Math.floor(Number(seat)));
       socket.join('durak:' + t.id);
     });
-    on('durak:leave', ({ tableId }) => { getDurak(tableId).leave(userId); });
+    on('durak:leave', ({ tableId }) => {
+      presenceChanged(userId); getDurak(tableId).leave(userId); });
     on('durak:ready', ({ tableId, value }) => { getDurak(tableId).setReady(userId, !!value); });
     on('durak:act', ({ tableId, type, card, index }) => {
       if (!['attack', 'defend', 'transfer', 'take', 'pass'].includes(type)) throw new GameError('Неизвестное действие');
@@ -546,6 +749,17 @@ function createServer({
     });
 
     // ----- blackjack -----
+    on('bj:create', ({ name, limits, private: priv }) => {
+      if (bjTables.size >= MAX_TABLES) throw new GameError('Слишком много столов');
+      const lim = BJ_LIMITS[Number(limits)];
+      if (!lim) throw new GameError('Неверные лимиты');
+      const own = [...bjTables.values()].filter((t) => t.createdBy === userId).length;
+      if (own >= 3) throw new GameError('Можно создать не больше 3 столов');
+      const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Блэкджек у ${socket.data.name}`;
+      const t = makeBj({ name: clean, minBet: lim[0], maxBet: lim[1], createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
+      return { tableId: t.id };
+    });
     on('bj:watch', ({ tableId }) => {
       const t = getBj(tableId);
       socket.join('bj:' + t.id);
@@ -553,11 +767,13 @@ function createServer({
     });
     on('bj:unwatch', ({ tableId }) => { socket.leave('bj:' + String(tableId)); });
     on('bj:sit', ({ tableId, seat }) => {
+      presenceChanged(userId);
       const t = getBj(tableId);
       t.sit(userId, socket.data.name, Math.floor(Number(seat)));
       socket.join('bj:' + t.id);
     });
-    on('bj:leave', ({ tableId }) => { getBj(tableId).leave(userId); });
+    on('bj:leave', ({ tableId }) => {
+      presenceChanged(userId); getBj(tableId).leave(userId); });
     on('bj:bet', ({ tableId, amount }) => { getBj(tableId).bet(userId, amount); });
     on('bj:clear', ({ tableId }) => { getBj(tableId).clearBet(userId); });
     on('bj:rebet', ({ tableId }) => { getBj(tableId).rebet(userId); });
@@ -619,7 +835,7 @@ function createServer({
           seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, stack: x.stack, sittingOut: x.sittingOut, connected: x.connected }),
         })),
         sngs: [...sngs.values()].map((x) => x.summary()),
-        templates: sngTemplates.map((x) => ({ id: x.id, name: x.name })),
+        templates: allTemplates().map((x) => ({ ...x })),
         durak: [...durakTables.values()].map((t) => ({
           ...t.summary(), gameNo: t.gameNo, pot: t.pot, chat: t.chat.length,
           seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, ready: x.ready, connected: x.connected }),
@@ -630,7 +846,11 @@ function createServer({
         })),
         announcement: store.data.announcement,
         log: store.data.adminLog.slice(-100).reverse(),
-        options: { stakes: STAKES, seats: SEAT_OPTIONS, blindEvery: BLIND_EVERY_OPTIONS, durakStakes: DURAK_STAKES, bjLimits: BJ_LIMITS },
+        options: {
+          stakes: STAKES, seats: SEAT_OPTIONS, blindEvery: BLIND_EVERY_OPTIONS, durakStakes: DURAK_STAKES, bjLimits: BJ_LIMITS,
+          games: Object.fromEntries(Object.entries(GAMES).map(([k, g]) => [k, g.name])),
+          gameSeats: Object.fromEntries(Object.entries(GAMES).map(([k, g]) => [k, g.maxSeats])),
+        },
       };
     });
 
@@ -713,7 +933,7 @@ function createServer({
       if (!st || !SEAT_OPTIONS.includes(maxSeats)) throw new GameError('Неверные параметры стола');
       const clean = String(name || '').trim().slice(0, 24) || 'Новый стол';
       const t = makeTable({
-        name: clean, game: game === 'PLO' ? 'PLO' : 'NLH', sb: st[0], bb: st[1], maxSeats,
+        name: clean, game: gameOf(game), sb: st[0], bb: st[1], maxSeats: Math.min(maxSeats, GAMES[gameOf(game)].maxSeats),
         blindsEvery: BLIND_EVERY_OPTIONS.includes(Number(blindsEvery)) ? Number(blindsEvery) : 0, permanent: !!permanent,
       });
       audit(`Создал стол «${clean}» (${st[0]}/${st[1]}${permanent ? ', постоянный' : ''})`);
@@ -722,8 +942,13 @@ function createServer({
 
     admin('admin:sng', ({ sngId, action }) => {
       const x = getSng(sngId);
+      if (action === 'start') {
+        x.forceStart();
+        audit(`Запустил турнир «${x.name}» (${x.entrants} игроков)`);
+        return;
+      }
       if (action !== 'cancel') throw new GameError('Неизвестное действие');
-      if (x.status === 'finished') throw new GameError('Турнир уже завершён');
+      if (x.status === 'finished' || x.status === 'cancelled') throw new GameError('Турнир уже завершён');
       const wasRegistering = x.status === 'registering';
       const players = x.players.map((p) => p.userId);
       x.shutdown();
@@ -734,16 +959,48 @@ function createServer({
       }
       sngs.delete(x.id);
       for (const u of players) { pushProfile(u); notice(u, wasRegistering ? `Турнир «${x.name}» отменён, бай-ин возвращён` : `Турнир «${x.name}» отменён, призовой фонд разделён по фишкам`); }
-      if (wasRegistering) spawnSng(sngTemplates.find((t) => t.id === x.templateId));
+      if (wasRegistering && !(x.tpl.custom && !x.tpl.recurring) && !x.tpl.startAt) spawnSng(tplById(x.templateId));
+      else if (wasRegistering) next(x);
       broadcastSngs();
       audit(`Отменил турнир «${x.name}»`);
     });
 
     admin('admin:sngSpawn', ({ templateId }) => {
-      const tpl = sngTemplates.find((t) => t.id === templateId);
+      const tpl = tplById(templateId);
       if (!tpl) throw new GameError('Нет такого формата');
+      if (tpl.startAt && tpl.startAt <= Date.now() + 30000) throw new GameError('Время старта этого турнира прошло — создайте новый');
+      tpl.spent = false;
       spawnSng(tpl);
       audit(`Открыл регистрацию: «${tpl.name}»`);
+    });
+
+    admin('admin:sngCreate', (raw) => {
+      const v = validateTemplate(raw || {});
+      if (store.data.sngTemplates.length >= 50) throw new GameError('Слишком много своих турниров — удалите старые');
+      const tpl = { id: 'c' + crypto.randomBytes(4).toString('hex'), custom: true, createdAt: Date.now(), ...v };
+      store.data.sngTemplates.push(tpl);
+      store.save();
+      const sng = spawnSng(tpl);
+      audit(`Создал турнир «${tpl.name}»: ${GAMES[tpl.game].name}, ${tpl.seats} мест, бай-ин ${tpl.buyIn}${tpl.guarantee ? `, гарантия ${tpl.guarantee}` : ''}${tpl.startAt ? `, старт ${new Date(tpl.startAt).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК` : ''}`);
+      return { sngId: sng.id, templateId: tpl.id };
+    });
+
+    admin('admin:sngTemplateDelete', ({ templateId }) => {
+      const idx = store.data.sngTemplates.findIndex((t) => t.id === templateId);
+      if (idx === -1) throw new GameError('Можно удалять только свои турниры');
+      const [tpl] = store.data.sngTemplates.splice(idx, 1);
+      store.save();
+      // registration still open: refund and close it
+      for (const x of [...sngs.values()]) {
+        if (x.templateId === tpl.id && x.status === 'registering') {
+          const players = x.players.map((p) => p.userId);
+          x.cancel(`Турнир «${x.name}» отменён администратором, бай-ин возвращён`);
+          players.forEach(pushProfile);
+          sngs.delete(x.id);
+        }
+      }
+      broadcastSngs();
+      audit(`Удалил турнир «${tpl.name}»`);
     });
 
     admin('admin:durak', ({ tableId, action, target }) => {
@@ -818,6 +1075,7 @@ function createServer({
     socket.on('disconnect', () => {
       const room = io.sockets.adapter.rooms.get('user:' + userId);
       if (room && room.size > 0) return; // another tab is still open
+      presenceChanged(userId);
       const seated = [...tables.values(), ...durakTables.values(), ...bjTables.values()].filter((t) => t.seatOf(userId) !== -1);
       if (!seated.length) return;
       seated.forEach((t) => t.setConnected(userId, false));
@@ -840,20 +1098,48 @@ function createServer({
     for (const t of durakTables.values()) t.destroy();
     for (const t of bjTables.values()) t.destroy();
     for (const timer of disconnectTimers.values()) clearTimeout(timer);
-    store.saveNow();
+    const done = store.flush();
     io.close();
     server.close();
+    return done;
   }
 
   return { app, server, io, store, tables, sngs, durakTables, bjTables, shutdown };
 }
 
-if (require.main === module) {
-  const { server, shutdown } = createServer();
+/** Production start: PostgreSQL when DATABASE_URL is set, otherwise the JSON file. */
+async function start() {
+  let store = null;
+  let backend = null;
+  const url = process.env.DATABASE_URL;
+  if (url) {
+    const { PgBackend } = require('./persist');
+    backend = PgBackend.fromUrl(url);
+    const data = await backend.load();
+    store = new Store(null, { adminNames: ADMIN_NAMES, backend, initialData: data });
+    await store.flush();
+    console.log(`База данных: PostgreSQL, игроков — ${Object.keys(store.data.users).length}`);
+  } else {
+    console.log(`База данных: файл ${DATA_FILE}`);
+  }
+  const { server, shutdown } = createServer({ store });
   server.listen(PORT, () => console.log(`NOIR RIVER Poker: http://localhost:${PORT}`));
-  const stop = () => { console.log('\nОстанавливаю сервер, возвращаю фишки на балансы…'); shutdown(); process.exit(0); };
+  let stopping = false;
+  const stop = async () => {
+    if (stopping) return;
+    stopping = true;
+    console.log('\nОстанавливаю сервер, возвращаю фишки на балансы…');
+    const force = setTimeout(() => process.exit(1), 8000);
+    try { await shutdown(); if (backend) await backend.close(); } catch (e) { console.error(e); }
+    clearTimeout(force);
+    process.exit(0);
+  };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
+}
+
+if (require.main === module) {
+  start().catch((e) => { console.error('Не удалось запустить сервер:', e.message); process.exit(1); });
 }
 
 module.exports = { createServer };

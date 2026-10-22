@@ -1,16 +1,21 @@
 'use strict';
 const { rankValue } = require('./cards');
+const { GAMES } = require('./games');
 
 const CATEGORY_NAMES = [
   'Старшая карта', 'Пара', 'Две пары', 'Сет', 'Стрит',
   'Флеш', 'Фулл-хаус', 'Каре', 'Стрит-флеш', 'Роял-флеш',
 ];
 
+// Short deck order: high, pair, two pair, STRAIGHT, TRIPS, FULL HOUSE, FLUSH, quads, straight flush
+const SHORT_RANK = [0, 1, 2, 4, 3, 6, 5, 7, 8, 8];
+
 /**
  * Scores exactly five cards. Higher score = stronger hand.
  * Score = category * 15^5 + tie-breakers packed in base 15.
+ * shortDeck: 36-card rules (A-6-7-8-9 is the lowest straight, flush > full house, trips > straight).
  */
-function score5(cards) {
+function score5(cards, shortDeck = false) {
   const ranks = cards.map(rankValue).sort((a, b) => b - a);
   const flush = cards.every((c) => c[1] === cards[0][1]);
 
@@ -18,7 +23,8 @@ function score5(cards) {
   let straightHigh = 0;
   if (unique.length === 5) {
     if (ranks[0] - ranks[4] === 4) straightHigh = ranks[0];
-    else if (ranks[0] === 14 && ranks[1] === 5) straightHigh = 5; // wheel A-2-3-4-5
+    else if (!shortDeck && ranks[0] === 14 && ranks[1] === 5) straightHigh = 5; // wheel A-2-3-4-5
+    else if (shortDeck && ranks[0] === 14 && ranks[1] === 9 && ranks[4] === 6) straightHigh = 9; // A-6-7-8-9
   }
 
   const counts = new Map();
@@ -41,7 +47,7 @@ function score5(cards) {
   else { category = 0; kickers = ranks; }
 
   // Royal flush is a straight flush; give it the same comparison base.
-  const cmpCategory = category === 9 ? 8 : category;
+  const cmpCategory = shortDeck ? SHORT_RANK[category] : category === 9 ? 8 : category;
   let score = cmpCategory;
   for (let i = 0; i < 5; i++) score = score * 15 + (kickers[i] || 0);
   return { score, category, cards };
@@ -60,9 +66,9 @@ function combinations(arr, k, start = 0, acc = [], out = []) {
 function better(a, b) { return !b || a.score > b.score ? a : b; }
 
 /** Texas Hold'em: best 5 of hole + board (any combination). */
-function bestHoldem(hole, board) {
+function bestHoldem(hole, board, shortDeck = false) {
   let best = null;
-  for (const combo of combinations([...hole, ...board], 5)) best = better(score5(combo), best);
+  for (const combo of combinations([...hole, ...board], 5)) best = better(score5(combo, shortDeck), best);
   return describe(best);
 }
 
@@ -80,7 +86,8 @@ function describe(result) {
 }
 
 function bestHand(game, hole, board) {
-  return game === 'PLO' ? bestOmaha(hole, board) : bestHoldem(hole, board);
+  const g = GAMES[game] || GAMES.NLH;
+  return g.omaha ? bestOmaha(hole, board) : bestHoldem(hole, board, g.deck === 'short');
 }
 
 module.exports = { score5, bestHoldem, bestOmaha, bestHand, combinations, CATEGORY_NAMES };

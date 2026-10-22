@@ -1,6 +1,7 @@
 (() => {
   'use strict';
-  const { $, $$, h, fmt, anim, cardEl, toast, call, Sound, S, hueOf, initials } = window.NR;
+  const { $, $$, h, fmt, anim, cardEl, toast, call, Sound, S } = window.NR;
+  const NR = window.NR;
 
   const VARIANTS = { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' };
   const SUIT_SIGNS = { s: '♠︎', h: '♥︎', d: '♦︎', c: '♣︎' };
@@ -111,7 +112,7 @@
         h('div', { class: 'seat-cards dk-backs' }, backs),
         h('div', { class: 'seat-box' },
           tag ? h('span', { class: tagCls }, tag) : null,
-          h('div', { class: 'avatar', style: `--hue:${hueOf(s.name)}`, 'aria-hidden': 'true' }, initials(s.name)),
+          NR.avatarEl(s.name, s.avatar),
           h('div', { class: 'seat-info' },
             h('div', { class: 'seat-name', title: s.name }, s.name),
             h('div', { class: 'seat-stack' }, s.inGame && st.status !== 'waiting' ? `${s.cards} карт` : s.ready ? 'готов' : 'ждёт'),

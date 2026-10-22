@@ -343,7 +343,7 @@ class DurakTable {
   summary() {
     return {
       id: this.id, kind: 'durak', name: this.name, variant: this.variant, stake: this.stake,
-      maxPlayers: this.maxPlayers, players: this.playerCount(), status: this.status, permanent: this.permanent,
+      maxPlayers: this.maxPlayers, players: this.playerCount(), status: this.status, permanent: this.permanent, private: !!this.private, owner: this.ownerName || null,
     };
   }
 
@@ -358,6 +358,7 @@ class DurakTable {
       pot: this.pot,
       countdownIn: this.status === 'countdown' ? Math.max(0, this.countdownEnds - this.now()) : 0,
       seats: this.seats.map((s, i) => s && {
+        avatar: this.avatarOf ? this.avatarOf(s.userId) : null,
         name: s.name,
         ready: s.ready,
         connected: s.connected,

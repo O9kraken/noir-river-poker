@@ -15,3 +15,6 @@ services:
       # your nickname(s) for the admin panel, comma-separated; Render asks for it on deploy
       - key: ADMIN_NAMES
         sync: false
+      # PostgreSQL connection string (Neon / Supabase); without it data lives in a file and is lost on restart
+      - key: DATABASE_URL
+        sync: false

@@ -32,7 +32,7 @@
   }
   $$('[data-close]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
 
-  const GAME = { NLH: 'Холдем NL', PLO: 'Омаха PL' };
+  let GAME = { NLH: 'Холдем NL', PLO: 'Омаха PL' };
   const VARIANT = { podkidnoy: 'Подкидной', perevodnoy: 'Переводной' };
   const STATUS = { registering: 'Регистрация', running: 'Идёт', finished: 'Завершён', waiting: 'Ждут', countdown: 'Старт', playing: 'Партия', result: 'Итоги' };
 
@@ -66,6 +66,7 @@
     const res = await call('admin:overview');
     if (!res) { if (!A.data) deny('У этого аккаунта нет прав администратора.'); return; }
     A.data = res;
+    if (res.options && res.options.games) GAME = res.options.games;
     $('#adm-denied').hidden = true;
     $('#adm-body').hidden = false;
     $('#adm-updated').textContent = `Обновлено в ${new Date().toLocaleTimeString('ru-RU')}`;
@@ -94,7 +95,7 @@
     const d = A.data;
     if (!d) return;
     const view = { overview, users, tables, sng, durak, bj, announce }[A.tab];
-    main.replaceChildren(...[view(d)].flat());
+    main.replaceChildren(...[view(d)].flat().filter(Boolean));
   }
 
   // ---------- sections ----------
@@ -190,7 +191,7 @@
     const o = d.options;
     const form = h('form', { class: 'adm-form' },
       h('input', { class: 'adm-input', name: 'name', placeholder: 'Название', maxlength: 24, 'aria-label': 'Название' }),
-      select('game', [['NLH', 'Холдем NL'], ['PLO', 'Омаха PL']], 'NLH', 'Игра'),
+      select('game', Object.entries(GAME), 'NLH', 'Игра'),
       select('stakes', o.stakes.map(([a, b], i) => [i, `${fmt(a)}/${fmt(b)}`]), 2, 'Блайнды'),
       select('seats', o.seats.map((n) => [n, `${n} мест`]), 6, 'Мест'),
       select('blindsEvery', o.blindEvery.map((n) => [n, n ? `Рост каждые ${n}` : 'Без роста']), 5, 'Рост блайндов'),
@@ -225,20 +226,132 @@
     }))];
   }
 
+  const STATUS_SNG = { registering: 'Регистрация', running: 'Идёт', finished: 'Завершён', cancelled: 'Отменён' };
+  const pad = (n) => String(n).padStart(2, '0');
+  const localInput = (ms) => { const t = new Date(ms); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`; };
+  const when = (ms) => new Date(ms).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  A.draft = null;
+
+  function field(label, input, hint) {
+    return h('label', { class: 'adm-field' }, h('span', null, label), input, hint ? h('small', { class: 'muted' }, hint) : null);
+  }
+
+  function sngBuilder(d) {
+    const seatsMax = (d.options.gameSeats || {});
+    const v = A.draft || {
+      name: '', game: 'NLH', seats: 6, buyIn: 500, guarantee: 0, startStack: 3000, startSb: 10, startBb: 20,
+      levelHands: 5, actionTime: 25, payouts: '', scheduled: false, startAt: localInput(Date.now() + 3600e3), minPlayers: 3, recurring: false,
+    };
+    const num = (name, min, max, step = 1) => h('input', { class: 'adm-input', type: 'number', name, min, max, step, value: v[name], inputmode: 'numeric' });
+    const form = h('form', { class: 'adm-builder', novalidate: true });
+    const game = select('game', Object.entries(GAME), v.game, 'Игра');
+    const seats = num('seats', 2, seatsMax[v.game] || 9);
+    const sched = h('input', { type: 'checkbox', name: 'scheduled' }); sched.checked = !!v.scheduled;
+    const startAt = h('input', { class: 'adm-input', type: 'datetime-local', name: 'startAt', value: v.startAt });
+    const minPlayers = num('minPlayers', 2, 9);
+    const recurring = h('input', { type: 'checkbox', name: 'recurring' }); recurring.checked = !!v.recurring;
+    const schedBox = h('div', { class: 'adm-grid adm-sched' }, field('Дата и время старта', startAt), field('Минимум игроков', minPlayers, 'если к старту меньше — турнир отменяется с возвратом'));
+    const preview = h('p', { class: 'adm-preview' });
+    const snapshot = () => {
+      const f = form.elements;
+      A.draft = {
+        name: f.name.value, game: f.game.value, seats: f.seats.value, buyIn: f.buyIn.value, guarantee: f.guarantee.value,
+        startStack: f.startStack.value, startSb: f.startSb.value, startBb: f.startBb.value, levelHands: f.levelHands.value,
+        actionTime: f.actionTime.value, payouts: f.payouts.value, scheduled: sched.checked, startAt: startAt.value,
+        minPlayers: f.minPlayers.value, recurring: recurring.checked,
+      };
+      return A.draft;
+    };
+    const refresh = () => {
+      const x = snapshot();
+      const max = seatsMax[x.game] || 9;
+      seats.max = max;
+      if (Number(seats.value) > max) seats.value = max;
+      schedBox.hidden = !x.scheduled;
+      const pool = Math.max(Number(x.guarantee) || 0, (Number(x.buyIn) || 0) * (Number(seats.value) || 0));
+      const bbs = Number(x.startBb) ? Math.floor(Number(x.startStack) / Number(x.startBb)) : 0;
+      preview.textContent = `Фонд при полном столе: ${fmt(pool)} · стек = ${bbs} больших блайндов · ` +
+        (x.scheduled ? `старт ${x.startAt ? when(new Date(x.startAt).getTime()) : '—'}${x.recurring ? ', каждый день' : ''}` : `старт, когда соберутся все ${seats.value}${x.recurring ? ' · после старта откроется новый' : ''}`);
+    };
+    form.addEventListener('input', refresh);
+    form.addEventListener('change', refresh);
+    form.append(
+      h('div', { class: 'adm-grid' },
+        field('Название', h('input', { class: 'adm-input', name: 'name', maxlength: 32, placeholder: 'Пятничный турнир', value: v.name, required: true })),
+        field('Игра', game),
+        field('Мест за столом', seats),
+        field('Бай-ин', num('buyIn', 0, 1000000, 50), '0 — бесплатный (фриролл)'),
+        field('Гарантия фонда', num('guarantee', 0, 10000000, 100), 'фонд не меньше этой суммы'),
+        field('Стартовый стек', num('startStack', 100, 1000000, 100)),
+        field('Малый блайнд', num('startSb', 1, 100000)),
+        field('Большой блайнд', num('startBb', 2, 200000)),
+        field('Раздач на уровень', num('levelHands', 1, 100), 'потом блайнды растут'),
+        field('Время на ход, сек', num('actionTime', 10, 120)),
+        field('Выплаты, %', h('input', { class: 'adm-input', name: 'payouts', value: v.payouts, placeholder: 'авто, напр. 50, 30, 20' }), 'по местам, по убыванию')),
+      h('div', { class: 'adm-form-row' },
+        h('label', { class: 'check' }, sched, 'Старт по расписанию'),
+        h('label', { class: 'check' }, recurring, 'Повторять (каждый день / после старта)')),
+      schedBox, preview,
+      h('div', { class: 'adm-form-row' },
+        h('button', { type: 'submit', class: 'btn btn-gold' }, 'Создать турнир'),
+        h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => { A.draft = null; render(); } }, 'Сбросить')));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const x = snapshot();
+      const payload = {
+        name: x.name, game: x.game, seats: Number(x.seats), buyIn: Number(x.buyIn), guarantee: Number(x.guarantee),
+        startStack: Number(x.startStack), startSb: Number(x.startSb), startBb: Number(x.startBb), levelHands: Number(x.levelHands),
+        actionTime: Number(x.actionTime), payouts: x.payouts, recurring: x.recurring,
+      };
+      if (x.scheduled) {
+        const t = new Date(x.startAt).getTime();
+        if (!Number.isFinite(t)) { toast('Укажите дату и время старта', true); return; }
+        payload.startAt = t; payload.minPlayers = Number(x.minPlayers);
+      }
+      const res = await run('admin:sngCreate', payload, 'Турнир создан, регистрация открыта');
+      if (res) { A.draft = null; render(); }
+    });
+    refresh();
+    return form;
+  }
+
   function sng(d) {
-    const tpl = select('tpl', d.templates.map((t) => [t.id, t.name]), null, 'Формат');
+    const tpl = select('tpl', d.templates.map((t) => [t.id, t.name + (t.custom ? ' ★' : '')]), null, 'Формат');
+    const custom = d.templates.filter((t) => t.custom);
     return [
+      h('h2', { class: 'h3 adm-h' }, 'Конструктор турнира'),
+      sngBuilder(d),
+      custom.length ? h('h2', { class: 'h3 adm-h' }, 'Ваши форматы') : null,
+      custom.length ? h('div', { class: 'adm-list' }, custom.map((t) => h('div', { class: 'adm-row' },
+        h('div', { class: 'adm-row-main' },
+          h('b', null, t.name),
+          t.recurring ? h('span', { class: 'status registering' }, 'повторяется') : h('span', { class: 'status finished' }, t.spent ? 'сыгран' : 'разовый'),
+          h('span', { class: 'muted small' }, `${GAME[t.game]} · ${t.seats} мест · бай-ин ${fmt(t.buyIn)}${t.guarantee ? ` · гарантия ${fmt(t.guarantee)}` : ''} · стек ${fmt(t.startStack)} · блайнды ${fmt(t.startSb)}/${fmt(t.startBb)}, +уровень каждые ${t.levelHands} · ход ${t.actionTime} с${t.payouts ? ` · выплаты ${t.payouts.join('/')}%` : ''}${t.startAt ? ` · старт ${when(t.startAt)}` : ''}`)),
+        h('div', { class: 'adm-actions' },
+          h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => run('admin:sngSpawn', { templateId: t.id }, 'Регистрация открыта') }, 'Открыть регистрацию'),
+          h('button', {
+            type: 'button', class: 'btn btn-dark btn-sm',
+            onclick: () => { A.draft = { ...t, payouts: (t.payouts || []).join(', '), scheduled: !!t.startAt, startAt: localInput(Math.max(t.startAt || 0, Date.now() + 3600e3)), name: t.name + ' 2' }; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+          }, 'Копировать'),
+          h('button', { type: 'button', class: 'btn btn-red btn-sm', onclick: () => { if (confirm(`Удалить формат «${t.name}»? Открытая регистрация отменится, бай-ины вернутся.`)) run('admin:sngTemplateDelete', { templateId: t.id }, 'Формат удалён'); } }, 'Удалить'))))) : null,
+      h('h2', { class: 'h3 adm-h' }, 'Турниры сейчас'),
       h('div', { class: 'adm-form' }, tpl,
         h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => run('admin:sngSpawn', { templateId: tpl.value }, 'Регистрация открыта') }, 'Открыть ещё один турнир')),
       h('div', { class: 'adm-list' }, d.sngs.map((x) => h('div', { class: 'adm-row' },
         h('div', { class: 'adm-row-main' },
           h('b', null, x.name),
-          h('span', { class: 'status ' + x.status }, x.status === 'running' ? `уровень ${x.level}` : STATUS[x.status]),
-          h('span', { class: 'muted small' }, `${GAME[x.game]} · бай-ин ${fmt(x.buyIn)} · фонд ${fmt(x.prizePool)} · ${x.status === 'running' ? `в игре ${x.alive}/${x.seats}` : `игроков ${x.players.length}/${x.seats}`}${x.winner ? ` · победитель ${x.winner}` : ''}`),
+          h('span', { class: 'status ' + (x.status === 'cancelled' ? 'finished' : x.status) }, x.status === 'running' ? `уровень ${x.level}` : STATUS_SNG[x.status] || x.status),
+          x.startAt && x.status === 'registering' ? h('span', { class: 'pill' }, `старт ${when(x.startAt)}`) : null,
+          h('span', { class: 'muted small' }, `${GAME[x.game]} · бай-ин ${fmt(x.buyIn)} · фонд ${fmt(x.prizePool)}${x.guarantee ? ' (гарантия)' : ''} · ${x.status === 'running' ? `в игре ${x.alive}/${x.entrants || x.seats}` : `игроков ${x.players.length}/${x.seats}`}${x.winner ? ` · победитель ${x.winner}` : ''}`),
           x.players.length ? h('span', { class: 'muted small' }, x.players.join(', ')) : null),
         h('div', { class: 'adm-actions' },
           x.tableId ? h('a', { class: 'btn btn-dark btn-sm', href: `/play#/table/${x.tableId}`, target: '_blank', rel: 'noopener' }, 'Смотреть') : null,
-          x.status !== 'finished' ? h('button', {
+          x.status === 'registering' ? h('button', {
+            type: 'button', class: 'btn btn-gold btn-sm', disabled: x.players.length < 2,
+            title: x.players.length < 2 ? 'Нужно минимум 2 игрока' : null,
+            onclick: () => { if (confirm(`Начать «${x.name}» сейчас с ${x.players.length} игроками?`)) run('admin:sng', { sngId: x.id, action: 'start' }, 'Турнир начался'); },
+          }, 'Начать сейчас') : null,
+          x.status === 'registering' || x.status === 'running' ? h('button', {
             type: 'button', class: 'btn btn-red btn-sm',
             onclick: () => { if (confirm(x.status === 'registering' ? 'Отменить турнир? Бай-ины вернутся.' : 'Остановить турнир? Остаток фонда разделится по фишкам.')) run('admin:sng', { sngId: x.id, action: 'cancel' }, 'Турнир отменён'); },
           }, 'Отменить') : null)))),

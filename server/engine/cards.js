@@ -4,9 +4,13 @@ const crypto = require('crypto');
 const RANKS = '23456789TJQKA';
 const SUITS = 'shdc'; // spades, hearts, diamonds, clubs
 
-function newDeck() {
+/** Full 52-card deck, or the 36-card short deck (6 to Ace). */
+function newDeck(short = false) {
   const deck = [];
-  for (const r of RANKS) for (const s of SUITS) deck.push(r + s);
+  for (const r of RANKS) {
+    if (short && '2345'.includes(r)) continue;
+    for (const s of SUITS) deck.push(r + s);
+  }
   return deck;
 }
 

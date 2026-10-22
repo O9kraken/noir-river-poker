@@ -386,3 +386,146 @@ test('блэкджек через сокеты: ставка, ходы, расч
   assert.equal(user().balance, before, 'ставка вернулась');
   assert.ok(!srv.bjTables.has('bj-classic'));
 });
+
+test('друзья, приглашения, приватные столы и профиль через сокеты', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({ dataFile: path.join(dir, 'users.json'), adminNames: [] });
+  await new Promise((r) => srv.server.listen(0, r));
+  t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  const regs = [];
+  for (const n of ['Хозяин', 'Друг', 'Чужой']) regs.push(await post('/api/register', { name: n, password: 'secret1' }));
+  let clients = [];
+  t.after(() => clients.forEach((c) => c.close()));
+  clients = await Promise.all(regs.map(({ token }) => new Promise((resolve) => {
+    const c = connect(base, { auth: { token }, reconnection: false });
+    c.ev = [];
+    for (const e of ['friends:request', 'friends:dirty', 'invite', 'lobby:private', 'notice']) c.on(e, (x) => c.ev.push([e, x]));
+    c.on('connect', () => resolve(c));
+  })));
+  const [host, friend, stranger] = clients;
+  const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // заявка и принятие
+  assert.equal((await call(host, 'friends:add', { name: 'друг' })).status, 'sent');
+  await wait(50);
+  assert.ok(friend.ev.some(([e]) => e === 'friends:request'));
+  const fl = await call(friend, 'friends:list', {});
+  assert.equal(fl.incoming[0].name, 'Хозяин');
+  const acc = await call(friend, 'friends:accept', { id: regs[0].user.id });
+  assert.equal(acc.friends[0].name, 'Хозяин');
+  assert.equal(acc.friends[0].online, true);
+
+  // приватный стол: не виден в общем лобби и чужим, виден другу
+  const cr = await call(host, 'table:create', { name: 'Свои', game: 'NLH', stakes: 1, seats: 6, private: true });
+  assert.ok(cr.ok && cr.tableId.length >= 16, 'длинный неугадываемый id');
+  await wait(350);
+  const helloStranger = await call(stranger, 'hello', {});
+  assert.ok(!helloStranger.tables.some((x) => x.id === cr.tableId), 'в общем лобби нет');
+  assert.equal(helloStranger.private.length, 0, 'чужой не видит');
+  const helloFriend = await call(friend, 'hello', {});
+  assert.equal(helloFriend.private[0].id, cr.tableId, 'друг видит');
+  assert.equal(helloFriend.private[0].owner, 'Хозяин');
+  assert.ok(friend.ev.some(([e, x]) => e === 'lobby:private' && x.length === 1), 'обновление прилетело само');
+  // по ссылке может зайти кто угодно
+  assert.ok((await call(stranger, 'table:watch', { tableId: cr.tableId })).ok);
+
+  // приглашение: только другу и только на существующий стол
+  assert.match((await call(host, 'friends:invite', { id: regs[2].user.id, href: `#/table/${cr.tableId}` })).error, /друзей/);
+  assert.match((await call(host, 'friends:invite', { id: regs[1].user.id, href: 'javascript:alert(1)' })).error, /ссылка/);
+  assert.ok((await call(host, 'friends:invite', { id: regs[1].user.id, href: `#/table/${cr.tableId}` })).ok);
+  await wait(50);
+  const inv = friend.ev.find(([e]) => e === 'invite');
+  assert.equal(inv[1].title, 'Свои');
+  assert.equal(inv[1].from.name, 'Хозяин');
+
+  // друг видит, где сидит хозяин
+  await call(host, 'table:sit', { tableId: cr.tableId, seat: 0, buyIn: 400 });
+  const fl2 = await call(friend, 'friends:list', {});
+  assert.equal(fl2.friends[0].where[0].name, 'Свои');
+
+  // профиль и аватар
+  const av = await call(host, 'profile:avatar', { hue: 200, sym: 'crown' });
+  assert.deepEqual(av.avatar, { hue: 200, sym: 'crown' });
+  const pr = (await call(stranger, 'profile:get', { name: 'Хозяин' })).profile;
+  assert.equal(pr.name, 'Хозяин');
+  assert.equal(pr.friend, false);
+  assert.deepEqual(pr.where, [], 'чужим не показываем, где сидит');
+  assert.ok(Array.isArray(pr.achievements) && pr.achievements.length > 5);
+  const prF = (await call(friend, 'profile:get', { name: 'Хозяин' })).profile;
+  assert.equal(prF.where.length, 1);
+  const st = (await call(host, 'table:watch', { tableId: cr.tableId })).state;
+  assert.deepEqual(st.seats[0].avatar, { hue: 200, sym: 'crown' }, 'аватар виден за столом');
+
+  // удаление из друзей убирает приватный стол из лобби друга
+  await call(friend, 'friends:remove', { id: regs[0].user.id });
+  await call(host, 'table:stand', { tableId: cr.tableId });
+  const helloAfter = await call(friend, 'hello', {});
+  assert.equal(helloAfter.private.length, 0);
+});
+
+test('конструктор турниров: фриролл с гарантией, свои блайнды, ручной старт, удаление', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const dataFile = path.join(dir, 'users.json');
+  const srv = createServer({ dataFile, adminNames: [], tableOpts: { startDelay: 20, pauseAfterHand: 20, runoutDelay: 5 } });
+  await new Promise((r) => srv.server.listen(0, r));
+  t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  const regs = [];
+  for (const n of ['Админ', 'Игрок1', 'Игрок2']) regs.push(await post('/api/register', { name: n, password: 'secret1' }));
+  let clients = [];
+  t.after(() => clients.forEach((c) => c.close()));
+  clients = await Promise.all(regs.map(({ token }) => new Promise((resolve) => {
+    const c = connect(base, { auth: { token }, reconnection: false });
+    c.on('connect', () => resolve(c));
+  })));
+  const [adm, p1, p2] = clients;
+  const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
+
+  // validation
+  assert.match((await call(adm, 'admin:sngCreate', { name: 'X', game: 'NLH', seats: 3, startStack: 1000 })).error, /Название/);
+  assert.match((await call(adm, 'admin:sngCreate', { name: 'Без денег', game: 'NLH', seats: 3, buyIn: 0, startStack: 2000 })).error, /гарантия/);
+  assert.match((await call(adm, 'admin:sngCreate', { name: 'Пятёрка', game: 'PLO5', seats: 9, buyIn: 10, startStack: 2000 })).error, /Мест/);
+  assert.match((await call(adm, 'admin:sngCreate', { name: 'Выплаты', game: 'NLH', seats: 3, buyIn: 10, startStack: 2000, payouts: '30,70' })).error, /убыванию/);
+  assert.match((await call(p1, 'admin:sngCreate', { name: 'Хак', game: 'NLH', seats: 3, buyIn: 10, startStack: 2000 })).error, /прав/);
+
+  const cr = await call(adm, 'admin:sngCreate', {
+    name: 'Фриролл друзей', game: 'SD', seats: 3, buyIn: 0, guarantee: 3000, startStack: 2000,
+    startSb: 50, startBb: 100, levelHands: 3, actionTime: 15, payouts: '70, 30', recurring: false,
+  });
+  assert.ok(cr.ok, JSON.stringify(cr));
+  const sng = srv.sngs.get(cr.sngId);
+  assert.equal(sng.summary().prizePool, 3000);
+  assert.deepEqual(sng.payouts(), [2100, 900], 'до старта — по полному столу');
+  assert.ok((await call(p1, 'sng:register', { sngId: cr.sngId })).ok);
+  assert.equal(srv.store.get(regs[1].user.id).balance, 10000, 'фриролл не списывает фишки');
+  assert.match((await call(adm, 'admin:sng', { sngId: cr.sngId, action: 'start' })).error, /2 игрока/);
+  await call(p2, 'sng:register', { sngId: cr.sngId });
+  assert.ok((await call(adm, 'admin:sng', { sngId: cr.sngId, action: 'start' })).ok, 'старт не дожидаясь третьего');
+  assert.equal(sng.status, 'running');
+  assert.deepEqual(sng.payouts(), [3000], 'двое игроков — платим одно место, но всю гарантию');
+  assert.equal(sng.table.game, 'SD');
+  assert.equal(sng.table.bb, 100);
+  assert.equal(sng.table.actionTime, 15000);
+  // одноразовый турнир не открывается заново
+  assert.ok(![...srv.sngs.values()].some((x) => x.templateId === cr.templateId && x.status === 'registering'));
+  // сохранён в базе и виден в админке
+  const ov = await call(adm, 'admin:overview', {});
+  assert.ok(ov.templates.some((x) => x.id === cr.templateId && x.custom));
+  srv.store.saveNow();
+  assert.ok(JSON.parse(fs.readFileSync(dataFile, 'utf8')).sngTemplates.length === 1);
+
+  // турнир по расписанию с повтором, затем удаление с возвратом бай-ина
+  const at = Date.now() + 3600 * 1000;
+  const sch = await call(adm, 'admin:sngCreate', { name: 'Вечерний', game: 'NLH', seats: 6, buyIn: 300, startStack: 3000, startAt: at, minPlayers: 3, recurring: true });
+  assert.ok(sch.ok);
+  assert.equal(srv.sngs.get(sch.sngId).summary().startAt, at);
+  await call(p1, 'sng:register', { sngId: sch.sngId });
+  assert.equal(srv.store.get(regs[1].user.id).balance, 9700);
+  assert.ok((await call(adm, 'admin:sngTemplateDelete', { templateId: sch.templateId })).ok);
+  assert.equal(srv.store.get(regs[1].user.id).balance, 10000, 'удаление вернуло бай-ин');
+  assert.match((await call(adm, 'admin:sngTemplateDelete', { templateId: 'turbo6' })).error, /свои/);
+});

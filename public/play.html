@@ -47,8 +47,8 @@
         <span class="chip-icon" aria-hidden="true"></span>
         <span><b id="me-balance">0</b><small id="me-inplay"></small></span>
       </div>
-      <a href="/admin" class="btn btn-ghost btn-sm" id="admin-link" hidden>Админка</a>
-      <span class="me-name" id="me-name"></span>
+      <a href="/admin" class="btn btn-ghost btn-sm" id="admin-link" hidden aria-label="Админка"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="btn-label">Админка</span></a>
+      <a href="#/profile" class="me-name" id="me-name" title="Мой профиль"></a>
       <button type="button" class="icon-btn deck-btn" id="deck-btn" aria-pressed="true" title="Четырёхцветная колода">
         <span aria-hidden="true"><i class="ds">♠&#xFE0E;</i><i class="dh">♥&#xFE0E;</i><i class="dd">♦&#xFE0E;</i><i class="dc">♣&#xFE0E;</i></span>
       </button>
@@ -85,32 +85,29 @@
       </div>
       <div class="modes lobby-tabs" role="tablist" aria-label="Режим игры">
         <button type="button" role="tab" class="mode is-active" data-lobby-tab="cash" aria-selected="true">
-          <span class="mode-ico" aria-hidden="true">♠&#xFE0E;</span>
-          <span class="mode-txt"><b>Покер</b><small>Холдем и Омаха, садитесь в любой момент</small></span>
+          <img class="mode-art" src="/art/poker.svg" alt="" width="480" height="300" loading="eager" decoding="async">
+          <span class="mode-txt"><b>Покер</b><small>Холдем, Омаха, шорт-дек — садитесь в любой момент</small></span>
           <span class="mode-cnt" id="cnt-cash"></span>
         </button>
         <button type="button" role="tab" class="mode" data-lobby-tab="sng" aria-selected="false">
-          <span class="mode-ico" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 3M17 6h3a3 3 0 0 1-3 3"/></svg>
-          </span>
-          <span class="mode-txt"><b>Турниры</b><small>Sit &amp; Go: старт, как только стол полон</small></span>
+          <img class="mode-art" src="/art/tournament.svg" alt="" width="480" height="300" loading="eager" decoding="async">
+          <span class="mode-txt"><b>Турниры</b><small>Sit &amp; Go и турниры по расписанию</small></span>
           <span class="mode-cnt" id="cnt-sng"></span>
         </button>
         <button type="button" role="tab" class="mode" data-lobby-tab="durak" aria-selected="false">
-          <span class="mode-ico" aria-hidden="true">Д</span>
+          <img class="mode-art" src="/art/durak.svg" alt="" width="480" height="300" loading="eager" decoding="async">
           <span class="mode-txt"><b>Дурак</b><small>Подкидной и переводной на фишки</small></span>
           <span class="mode-cnt" id="cnt-durak"></span>
         </button>
         <button type="button" role="tab" class="mode" data-lobby-tab="bj" aria-selected="false">
-          <span class="mode-ico" aria-hidden="true">21</span>
+          <img class="mode-art" src="/art/blackjack.svg" alt="" width="480" height="300" loading="eager" decoding="async">
           <span class="mode-txt"><b>Блэкджек</b><small>Против дилера, блэкджек платит 3:2</small></span>
           <span class="mode-cnt" id="cnt-bj"></span>
         </button>
       </div>
       <div class="filters" id="cash-filters" role="group" aria-label="Фильтр игр">
         <button type="button" class="pill is-active" data-filter="all">Все</button>
-        <button type="button" class="pill" data-filter="NLH">Холдем</button>
-        <button type="button" class="pill" data-filter="PLO">Омаха</button>
+        <span id="game-filters" class="game-filters"></span>
         <label class="check"><input type="checkbox" id="filter-free"> Есть места</label>
       </div>
       <div class="table-list" id="table-list"></div>
@@ -119,6 +116,19 @@
       <div class="table-list" id="bj-list" hidden></div>
     </div>
     <aside class="lobby-side">
+      <section class="panel friends-panel" id="friends-panel">
+        <div class="panel-head">
+          <h2 class="h3">Друзья</h2>
+          <span class="muted small" id="friends-online"></span>
+        </div>
+        <form class="friend-add" id="friend-add">
+          <label class="sr-only" for="friend-name">Ник друга</label>
+          <input id="friend-name" maxlength="16" autocomplete="off" placeholder="Ник друга">
+          <button class="btn btn-gold btn-sm" type="submit">Добавить</button>
+        </form>
+        <div id="friend-requests"></div>
+        <ul class="friend-list" id="friend-list"></ul>
+      </section>
       <section class="panel">
         <h2 class="h3">Мои столы</h2>
         <div id="my-tables" class="my-tables"><p class="muted">Вы пока не сидите за столом.</p></div>
@@ -129,10 +139,13 @@
       </section>
       <section class="panel panel-quiet">
         <h2 class="h3">Правила</h2>
-        <p class="muted small"><b>Холдем No-Limit</b>: 2 карты, любая комбинация из 7. <b>Омаха Pot-Limit</b>: 4 карты, ровно 2 с руки и 3 с борда, рейз не больше банка.</p>
+        <dl class="rules-list" id="rules-list"></dl>
       </section>
     </aside>
   </main>
+
+  <!-- PROFILE -->
+  <main id="profile-view" class="profile" hidden></main>
 
   <!-- DURAK -->
   <main id="durak-view" class="table-view durak-view" hidden>
@@ -140,13 +153,17 @@
       <div class="table-top">
         <a href="#/" class="btn btn-ghost btn-sm">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
-          Лобби
+          <span class="btn-label">Лобби</span>
         </a>
         <div class="table-title">
           <b id="dk-name"></b>
           <span id="dk-meta" class="muted"></span>
         </div>
         <span class="hand-no muted" id="dk-game"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
       </div>
       <div class="felt-wrap">
         <div class="felt dk-felt" id="dk-felt">
@@ -202,13 +219,17 @@
       <div class="table-top">
         <a href="#/" class="btn btn-ghost btn-sm">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
-          Лобби
+          <span class="btn-label">Лобби</span>
         </a>
         <div class="table-title">
           <b id="bj-name"></b>
           <span id="bj-meta" class="muted"></span>
         </div>
         <span class="hand-no muted" id="bj-round"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
       </div>
       <div class="felt-wrap bj-wrap">
         <div class="bj-felt" id="bj-felt">
@@ -263,13 +284,21 @@
       <div class="table-top">
         <a href="#/" class="btn btn-ghost btn-sm">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
-          Лобби
+          <span class="btn-label">Лобби</span>
         </a>
         <div class="table-title">
           <b id="t-name"></b>
           <span id="t-meta" class="muted"></span>
         </div>
         <span class="hand-no muted" id="t-hand"></span>
+        <button type="button" class="btn btn-ghost btn-sm odds-toggle" id="odds-toggle" aria-pressed="true" title="Показать или скрыть шансы">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>
+          <span class="btn-label">Шансы</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
       </div>
       <div class="tourney-bar" id="t-tourney" hidden></div>
       <div class="felt-wrap">
@@ -285,6 +314,7 @@
           <div id="fx" class="fx" aria-hidden="true"></div>
         </div>
       </div>
+      <div class="odds" id="odds" hidden></div>
       <div class="controls" id="controls"></div>
     </div>
     <aside class="table-side">
@@ -323,8 +353,7 @@
     <fieldset class="seg-field">
       <legend>Игра</legend>
       <div class="seg">
-        <label><input type="radio" name="game" value="NLH" checked><span>Холдем NL</span></label>
-        <label><input type="radio" name="game" value="PLO"><span>Омаха PL</span></label>
+        <span class="seg-dyn" id="game-seg"></span>
       </div>
     </fieldset>
     <label class="field"><span>Блайнды</span><select name="stakes" id="stakes-select"></select></label>
@@ -333,6 +362,7 @@
       <div class="seg" id="seats-seg"></div>
     </fieldset>
     <label class="field"><span>Рост блайндов</span><select name="blindsEvery" id="blinds-every"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и по ссылке</small></span></label>
     <p class="form-error" id="create-error" role="alert"></p>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" data-close>Отмена</button>
@@ -363,11 +393,40 @@
         <label><input type="radio" name="maxPlayers" value="6"><span>6</span></label>
       </div>
     </fieldset>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и по ссылке</small></span></label>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" data-close>Отмена</button>
       <button type="submit" class="btn btn-gold" value="ok">Создать</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="modal-bj-create" class="modal">
+  <form method="dialog" class="form" id="bj-create-form">
+    <h2 class="h2">Новый стол: блэкджек</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Блэкджек у друзей"></label>
+    <label class="field"><span>Лимиты ставки</span><select name="limits" id="bj-limits"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и по ссылке</small></span></label>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Отмена</button>
+      <button type="submit" class="btn btn-gold" value="ok">Создать</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="modal-invite" class="modal">
+  <div class="form">
+    <h2 class="h2">Пригласить за стол</h2>
+    <p class="muted small" id="invite-sub"></p>
+    <div class="invite-link">
+      <label class="sr-only" for="invite-url">Ссылка на стол</label>
+      <input id="invite-url" readonly>
+      <button type="button" class="btn btn-gold btn-sm" id="invite-copy">Копировать</button>
+    </div>
+    <h3 class="h3">Друзья онлайн</h3>
+    <ul class="friend-list" id="invite-friends"></ul>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Готово</button></div>
+  </div>
 </dialog>
 
 <dialog id="modal-buyin" class="modal">
@@ -432,10 +491,13 @@
 </dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="invites" id="invites" aria-live="polite"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/play.js"></script>
 <script src="/durak.js"></script>
 <script src="/blackjack.js"></script>
+<script src="/social.js"></script>
+<script src="/odds.js"></script>
 </body>
 </html>
