@@ -452,7 +452,7 @@
   }
   function renderSide(st) {
     if (!st.chat.length) $('#dk-chat').replaceChildren(h('li', { class: 'sys' }, 'Здесь пока тихо.'));
-    else fillList($('#dk-chat'), st.chat, (m) => h('li', null, h('b', null, m.name), m.text));
+    else fillList($('#dk-chat'), st.chat, (m) => h('li', null, window.NR.chatNick(m), m.text));
     fillList($('#dk-log'), st.log, (l) => h('li', { class: l.text.startsWith('—') ? 'sep' : '' }, l.text));
   }
   $('#dk-chat-form').addEventListener('submit', async (e) => {

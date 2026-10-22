@@ -768,8 +768,8 @@ class Table {
     if (this.log.length > 60) this.log.shift();
   }
 
-  addChat(name, text) {
-    this.chat.push({ t: this.now(), name, text });
+  addChat(name, text, hue = null) {
+    this.chat.push({ t: this.now(), name, text, hue });
     if (this.chat.length > 50) this.chat.shift();
     this.onUpdate(this);
   }

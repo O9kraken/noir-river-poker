@@ -139,6 +139,7 @@ class Store {
       bonusAmount: DAILY_BONUS, handsWon: u.stats.poker.won, biggestPot: u.stats.poker.biggestPot,
       role: u.role || 'player', muted: !!u.muted, avatar: u.avatar,
       friendRequests: u.friendReq.in.length,
+      rewardsReady: this.rewardsReady(userId),
     };
   }
 
@@ -153,6 +154,8 @@ class Store {
     u.avatar ||= { hue: null, sym: '' };
     u.friends ||= [];
     u.friendReq ||= { in: [], out: [] };
+    u.achClaimed ||= [];
+    u.quests ||= null;
   }
 
   _chips(u) { return u.balance + Object.values(u.inPlay || {}).reduce((a, b) => a + b, 0); }
@@ -177,6 +180,22 @@ class Store {
     if (!u) return;
     const st = u.stats;
     let entry = null;
+    const q = this._quests(u);
+    const bump = (m, n = 1) => { q.prog[m] = (q.prog[m] || 0) + n; };
+    if (kind === 'poker') {
+      bump('hands');
+      if (f.won > 0) bump('pokerWins');
+      if (f.won > 0 && f.category != null && f.category >= 3) bump('pokerStrong');
+    } else if (kind === 'sng') {
+      bump('sngPlayed');
+      if (f.prize > 0) bump('sngItm');
+    } else if (kind === 'durak') {
+      bump('durakGames');
+      if (!f.draw && !f.durak) bump('durakWins');
+    } else if (kind === 'bj') {
+      bump('bjRounds');
+      if (f.net > 0) bump('bjWins');
+    }
     if (kind === 'poker') {
       const p = st.poker;
       p.hands += 1;
@@ -235,9 +254,93 @@ class Store {
     u.avatar = {
       hue: Number.isFinite(h) ? ((Math.round(h) % 360) + 360) % 360 : null,
       sym: AVATAR_SYMBOLS.includes(sym) ? sym : '',
+      ...(u.avatar && u.avatar.img ? { img: u.avatar.img } : {}),
     };
     this.save();
     return u.avatar;
+  }
+
+  /** Own picture as the avatar (PNG / JPEG / WebP / GIF, up to 1 MB). */
+  setAvatarImage(userId, buf, mime) {
+    const u = this.findUser(userId);
+    if (!Buffer.isBuffer(buf) || !buf.length) throw new StoreError('Пустой файл');
+    if (buf.length > AVATAR_MAX_BYTES) throw new StoreError('Картинка больше 1 МБ');
+    const real = sniffImage(buf);
+    if (!real) throw new StoreError('Нужна картинка PNG, JPEG, WebP или GIF');
+    const v = Date.now().toString(36);
+    u.avatarImg = { mime: real, data: buf.toString('base64'), v };
+    u.avatar = { ...(u.avatar || { hue: null, sym: '' }), img: `/avatar/${u.id}?v=${v}` };
+    this.save();
+    return u.avatar;
+  }
+
+  clearAvatarImage(userId) {
+    const u = this.findUser(userId);
+    delete u.avatarImg;
+    if (u.avatar) delete u.avatar.img;
+    this.save();
+    return u.avatar;
+  }
+
+  avatarImage(userId) {
+    const u = this.data.users[userId];
+    if (!u || !u.avatarImg) return null;
+    return { mime: u.avatarImg.mime, buf: Buffer.from(u.avatarImg.data, 'base64'), v: u.avatarImg.v };
+  }
+
+  // ---------- quests & achievement rewards ----------
+
+  _quests(u) {
+    const day = dayKey();
+    if (!u.quests || u.quests.day !== day) u.quests = { day, picks: pickQuests(u.id, day), prog: {}, claimed: [] };
+    return u.quests;
+  }
+
+  progress(userId) {
+    const u = this.findUser(userId);
+    const q = this._quests(u);
+    const quests = q.picks.map((id) => {
+      const d = QUESTS.find((x) => x.id === id);
+      const n = Math.min(q.prog[d.metric] || 0, d.target);
+      return { id, title: d.title, text: d.text, reward: d.reward, progress: [n, d.target], done: n >= d.target, claimed: q.claimed.includes(id) };
+    });
+    const next = new Date(`${q.day}T00:00:00+03:00`).getTime() + 24 * 3600 * 1000;
+    return { quests, resetIn: Math.max(0, next - Date.now()), achievements: achievements(u) };
+  }
+
+  rewardsReady(userId) {
+    const u = this.data.users[userId];
+    if (!u) return 0;
+    const q = this._quests(u);
+    const qr = q.picks.filter((id) => { const d = QUESTS.find((x) => x.id === id); return (q.prog[d.metric] || 0) >= d.target && !q.claimed.includes(id); }).length;
+    return qr + achievements(u).filter((a) => a.done && !a.claimed).length;
+  }
+
+  claimQuest(userId, id) {
+    const u = this.findUser(userId);
+    const q = this._quests(u);
+    const d = QUESTS.find((x) => x.id === id);
+    if (!d || !q.picks.includes(id)) throw new StoreError('Такого задания сегодня нет');
+    if ((q.prog[d.metric] || 0) < d.target) throw new StoreError('Задание ещё не выполнено');
+    if (q.claimed.includes(id)) throw new StoreError('Награда уже получена');
+    q.claimed.push(id);
+    u.balance += d.reward;
+    this.snapshot(userId);
+    this.save();
+    return d.reward;
+  }
+
+  claimAchievement(userId, id) {
+    const u = this.findUser(userId);
+    const a = achievements(u).find((x) => x.id === id);
+    if (!a) throw new StoreError('Нет такого достижения');
+    if (!a.done) throw new StoreError('Достижение ещё не открыто');
+    if (a.claimed) throw new StoreError('Награда уже получена');
+    u.achClaimed.push(id);
+    u.balance += a.reward;
+    this.snapshot(userId);
+    this.save();
+    return a.reward;
   }
 
   /** Public profile, visible to anyone. */
@@ -455,29 +558,59 @@ class Store {
 
 // ---------- achievements ----------
 const ACHIEVEMENTS = [
-  { id: 'first', title: 'Первая кровь', text: 'Выиграть первую раздачу в покере', ok: (s) => s.poker.won >= 1 },
-  { id: 'grinder', title: 'Гриндер', text: 'Сыграть 100 раздач', ok: (s) => s.poker.hands >= 100, progress: (s) => [s.poker.hands, 100] },
-  { id: 'shark', title: 'Акула', text: 'Сыграть 1000 раздач', ok: (s) => s.poker.hands >= 1000, progress: (s) => [s.poker.hands, 1000] },
-  { id: 'boat', title: 'Полный дом', text: 'Выиграть с фулл-хаусом или лучше', ok: (s) => s.poker.bestHand >= 6 },
-  { id: 'quads', title: 'Четвёрка', text: 'Собрать каре', ok: (s) => s.poker.bestHand >= 7 },
-  { id: 'royal', title: 'Королевская удача', text: 'Собрать роял-флеш', ok: (s) => s.poker.bestHand >= 9 },
-  { id: 'bigpot', title: 'Крупный банк', text: 'Забрать банк от 10 000', ok: (s) => s.poker.biggestPot >= 10000, progress: (s) => [s.poker.biggestPot, 10000] },
-  { id: 'sng', title: 'Чемпион', text: 'Выиграть турнир Sit & Go', ok: (s) => s.sng.won >= 1 },
-  { id: 'sng5', title: 'Серийный победитель', text: 'Выиграть 5 турниров', ok: (s) => s.sng.won >= 5, progress: (s) => [s.sng.won, 5] },
-  { id: 'durak10', title: 'Не дурак', text: 'Выйти первым в 10 партиях дурака', ok: (s) => s.durak.wins >= 10, progress: (s) => [s.durak.wins, 10] },
-  { id: 'natural', title: 'Двадцать одно', text: 'Получить блэкджек', ok: (s) => s.bj.blackjacks >= 1 },
-  { id: 'natural10', title: 'Любимец шуза', text: '10 блэкджеков', ok: (s) => s.bj.blackjacks >= 10, progress: (s) => [s.bj.blackjacks, 10] },
-  { id: 'rich', title: 'Состоятельный', text: 'Накопить 50 000 фишек', ok: (s, u, chips) => chips >= 50000, progress: (s, u, chips) => [chips, 50000] },
-  { id: 'social', title: 'Своя компания', text: 'Добавить 3 друзей', ok: (s, u) => u.friends.length >= 3, progress: (s, u) => [u.friends.length, 3] },
+  { id: 'first', title: 'Первая кровь', text: 'Выиграть первую раздачу в покере', reward: 500, ok: (s) => s.poker.won >= 1 },
+  { id: 'grinder', title: 'Гриндер', text: 'Сыграть 100 раздач', reward: 2000, ok: (s) => s.poker.hands >= 100, progress: (s) => [s.poker.hands, 100] },
+  { id: 'shark', title: 'Акула', text: 'Сыграть 1000 раздач', reward: 10000, ok: (s) => s.poker.hands >= 1000, progress: (s) => [s.poker.hands, 1000] },
+  { id: 'boat', title: 'Полный дом', text: 'Выиграть с фулл-хаусом или лучше', reward: 1500, ok: (s) => s.poker.bestHand >= 6 },
+  { id: 'quads', title: 'Четвёрка', text: 'Собрать каре', reward: 3000, ok: (s) => s.poker.bestHand >= 7 },
+  { id: 'royal', title: 'Королевская удача', text: 'Собрать роял-флеш', reward: 25000, ok: (s) => s.poker.bestHand >= 9 },
+  { id: 'bigpot', title: 'Крупный банк', text: 'Забрать банк от 10 000', reward: 2500, ok: (s) => s.poker.biggestPot >= 10000, progress: (s) => [s.poker.biggestPot, 10000] },
+  { id: 'sng', title: 'Чемпион', text: 'Выиграть турнир Sit & Go', reward: 2000, ok: (s) => s.sng.won >= 1 },
+  { id: 'sng5', title: 'Серийный победитель', text: 'Выиграть 5 турниров', reward: 7500, ok: (s) => s.sng.won >= 5, progress: (s) => [s.sng.won, 5] },
+  { id: 'durak10', title: 'Не дурак', text: 'Выйти первым в 10 партиях дурака', reward: 3000, ok: (s) => s.durak.wins >= 10, progress: (s) => [s.durak.wins, 10] },
+  { id: 'natural', title: 'Двадцать одно', text: 'Получить блэкджек', reward: 500, ok: (s) => s.bj.blackjacks >= 1 },
+  { id: 'natural10', title: 'Любимец шуза', text: '10 блэкджеков', reward: 3000, ok: (s) => s.bj.blackjacks >= 10, progress: (s) => [s.bj.blackjacks, 10] },
+  { id: 'rich', title: 'Состоятельный', text: 'Накопить 50 000 фишек', reward: 5000, ok: (s, u, chips) => chips >= 50000, progress: (s, u, chips) => [chips, 50000] },
+  { id: 'social', title: 'Своя компания', text: 'Добавить 3 друзей', reward: 1500, ok: (s, u) => u.friends.length >= 3, progress: (s, u) => [u.friends.length, 3] },
 ];
+
+// ---------- daily quests: 3 a day (Moscow time), one poker, one other game, one any ----------
+const QUESTS = [
+  { id: 'hands25', group: 'poker', title: 'Разогрев', text: 'Сыграть 25 раздач в покере', metric: 'hands', target: 25, reward: 600 },
+  { id: 'pwin5', group: 'poker', title: 'Банк за банком', text: 'Выиграть 5 раздач в покере', metric: 'pokerWins', target: 5, reward: 800 },
+  { id: 'strong', group: 'poker', title: 'Сильная рука', text: 'Выиграть раздачу с сетом или лучше', metric: 'pokerStrong', target: 1, reward: 1000 },
+  { id: 'durak3', group: 'other', title: 'Козырная тройка', text: 'Сыграть 3 партии в дурака', metric: 'durakGames', target: 3, reward: 600 },
+  { id: 'durakwin', group: 'other', title: 'Не остаться дураком', text: 'Выйти из партии в дурака первым', metric: 'durakWins', target: 1, reward: 700 },
+  { id: 'bj10', group: 'other', title: 'За столом дилера', text: 'Сыграть 10 раундов блэкджека', metric: 'bjRounds', target: 10, reward: 600 },
+  { id: 'bjwin3', group: 'other', title: 'Обыграть дилера', text: 'Выиграть 3 раунда в блэкджеке', metric: 'bjWins', target: 3, reward: 700 },
+  { id: 'sng1', group: 'any', title: 'Турнирный день', text: 'Сыграть турнир Sit & Go', metric: 'sngPlayed', target: 1, reward: 900 },
+  { id: 'itm', group: 'any', title: 'В призах', text: 'Занять призовое место в турнире', metric: 'sngItm', target: 1, reward: 1200 },
+];
+function pickQuests(userId, day) {
+  const h = crypto.createHash('sha256').update(userId + '|' + day).digest();
+  const from = (list, k) => list[h[k] % list.length];
+  const a = from(QUESTS.filter((q) => q.group === 'poker'), 0);
+  const b = from(QUESTS.filter((q) => q.group === 'other'), 1);
+  const c = from(QUESTS.filter((q) => q.id !== a.id && q.id !== b.id), 2);
+  return [a.id, b.id, c.id];
+}
+
+const AVATAR_MAX_BYTES = 1024 * 1024;
+function sniffImage(b) {
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  if (b.length > 6 && (b.toString('ascii', 0, 6) === 'GIF87a' || b.toString('ascii', 0, 6) === 'GIF89a')) return 'image/gif';
+  return null;
+}
 
 function achievements(u) {
   const chips = u.balance + Object.values(u.inPlay || {}).reduce((a, b) => a + b, 0);
   return ACHIEVEMENTS.map((a) => {
     const done = !!a.ok(u.stats, u, chips);
     const pr = a.progress ? a.progress(u.stats, u, chips) : null;
-    return { id: a.id, title: a.title, text: a.text, done, progress: pr && !done ? [Math.min(pr[0], pr[1]), pr[1]] : null };
+    return { id: a.id, title: a.title, text: a.text, reward: a.reward, done, claimed: (u.achClaimed || []).includes(a.id), progress: pr && !done ? [Math.min(pr[0], pr[1]), pr[1]] : null };
   });
 }
 
-module.exports = { Store, StoreError, START_BALANCE, DAILY_BONUS, AVATAR_SYMBOLS, dayKey };
+module.exports = { Store, StoreError, START_BALANCE, DAILY_BONUS, AVATAR_SYMBOLS, AVATAR_MAX_BYTES, QUESTS, dayKey };

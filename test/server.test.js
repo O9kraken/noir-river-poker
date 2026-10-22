@@ -544,3 +544,108 @@ test('/api/me: аккаунт для шапки лендинга', async (t) => 
   assert.equal(me.balance, 10000);
   assert.ok(!('password' in me) && !('hash' in me));
 });
+
+test('задания дня, награды за достижения, своя картинка на аватаре', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({ dataFile: path.join(dir, 'u.json'), adminNames: [] });
+  await new Promise((r) => srv.server.listen(0, r));
+  let c;
+  t.after(() => { try { c && c.close(); srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Квестер', password: 'secret1' }) }).then((r) => r.json());
+  const uid = reg.user.id;
+  c = await new Promise((resolve) => { const s = connect(base, { auth: { token: reg.token }, reconnection: false }); s.on('connect', () => resolve(s)); });
+  const call = (ev, p) => new Promise((r) => c.emit(ev, p, r));
+
+  let pr = await call('progress:get', {});
+  assert.equal(pr.quests.length, 3);
+  assert.ok(pr.resetIn > 0 && pr.resetIn <= 24 * 3600 * 1000);
+  assert.equal(new Set(pr.quests.map((q) => q.id)).size, 3);
+  assert.match((await call('quest:claim', { id: pr.quests[0].id })).error, /не выполнено/);
+
+  // play enough to finish every metric
+  for (let i = 0; i < 30; i++) srv.store.recordGame(uid, 'poker', { table: 'x', net: 10, won: 50, category: 3, showdown: true });
+  for (let i = 0; i < 12; i++) srv.store.recordGame(uid, 'bj', { table: 'b', net: 5 });
+  for (let i = 0; i < 3; i++) srv.store.recordGame(uid, 'durak', { table: 'd', net: 10 });
+  srv.store.recordGame(uid, 'sng', { table: 's', place: 1, total: 2, prize: 100, buyIn: 50 });
+  pr = await call('progress:get', {});
+  assert.ok(pr.quests.every((q) => q.done));
+  const before = srv.store.get(uid).balance;
+  const r1 = await call('quest:claim', { id: pr.quests[0].id });
+  assert.equal(srv.store.get(uid).balance, before + r1.reward);
+  assert.match((await call('quest:claim', { id: pr.quests[0].id })).error, /уже получена/);
+  assert.equal(srv.store.profile(uid).rewardsReady >= 2, true);
+
+  // achievement reward
+  const first = pr.achievements.find((a) => a.id === 'first');
+  assert.ok(first.done && !first.claimed && first.reward === 500);
+  const b2 = srv.store.get(uid).balance;
+  await call('ach:claim', { id: 'first' });
+  assert.equal(srv.store.get(uid).balance, b2 + 500);
+  assert.match((await call('ach:claim', { id: 'first' })).error, /уже получена/);
+  assert.match((await call('ach:claim', { id: 'royal' })).error, /не открыто/);
+
+  // avatar picture
+  const png = Buffer.from('89504E470D0A1A0A0000000D49484452000000010000000108060000001F15C4890000000D4944415478DA63F8CFC0F01F0005000201E2E18A3A0000000049454E44AE426082', 'hex');
+  const auth = { Authorization: 'Bearer ' + reg.token };
+  assert.equal((await fetch(base + '/api/avatar', { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: png })).status, 401);
+  assert.equal((await fetch(base + '/api/avatar', { method: 'POST', headers: { ...auth, 'Content-Type': 'image/png' }, body: Buffer.from('<svg onload=alert(1)>') })).status, 400);
+  const big = Buffer.alloc(1024 * 1024 + 10, 1); png.copy(big);
+  assert.equal((await fetch(base + '/api/avatar', { method: 'POST', headers: { ...auth, 'Content-Type': 'image/png' }, body: big })).status, 413);
+  const up = await fetch(base + '/api/avatar', { method: 'POST', headers: { ...auth, 'Content-Type': 'image/png' }, body: png }).then((r) => r.json());
+  assert.match(up.avatar.img, new RegExp(`^/avatar/${uid}\\?v=`));
+  const got = await fetch(base + up.avatar.img);
+  assert.equal(got.headers.get('content-type'), 'image/png');
+  assert.equal(Buffer.from(await got.arrayBuffer()).length, png.length);
+  // colour change keeps the picture; leaderboard carries it
+  await call('profile:avatar', { hue: 120, sym: 's' });
+  assert.ok(srv.store.get(uid).avatar.img);
+  assert.ok((await fetch(base + '/api/leaderboard').then((r) => r.json()))[0].avatar.img);
+  await fetch(base + '/api/avatar', { method: 'DELETE', headers: auth });
+  assert.equal(srv.store.get(uid).avatar.img, undefined);
+  assert.equal((await fetch(base + `/avatar/${uid}`)).status, 404);
+});
+
+test('игрок создаёт турнир за фишки: фонд организатора, отмена с возвратом, старт', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({ dataFile: path.join(dir, 'u.json'), adminNames: ['никто'], tableOpts: { startDelay: 20, pauseAfterHand: 20, runoutDelay: 5 } });
+  await new Promise((r) => srv.server.listen(0, r));
+  let cl = [];
+  t.after(() => { cl.forEach((x) => x.close()); try { srv.shutdown(); } catch (e) { /* closed */ } });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const regs = [];
+  for (const n of ['Организатор', 'Гость1']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1' }) }).then((r) => r.json()));
+  cl = await Promise.all(regs.map(({ token }) => new Promise((resolve) => { const s = connect(base, { auth: { token }, reconnection: false }); s.on('connect', () => resolve(s)); })));
+  const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
+  const [own, guest] = cl;
+  const [oid, gid] = regs.map((r) => r.user.id);
+
+  assert.match((await call(own, 'sng:create', { name: 'Пусто', game: 'NLH', seats: 2, buyIn: 0, startStack: 1500 })).error, /бай-ин или добавьте/);
+  assert.match((await call(own, 'sng:create', { name: 'Гарант', game: 'NLH', seats: 2, buyIn: 0, guarantee: 99999, startStack: 1500 })).error, /бай-ин или добавьте/, 'игрок не может напечатать гарантию');
+  const cr = await call(own, 'sng:create', { name: 'Мой фриролл', game: 'NLH', seats: 3, buyIn: 0, sponsor: 1500, startStack: 1500, register: true });
+  assert.ok(cr.sngId, JSON.stringify(cr));
+  assert.equal(srv.store.get(oid).balance, 8500, 'фонд списан с организатора');
+  const sng = srv.sngs.get(cr.sngId);
+  assert.equal(sng.prizePool, 1500);
+  assert.equal(sng.summary().ownerName, 'Организатор');
+  assert.equal(sng.players.length, 1, 'организатор сразу в списке');
+  assert.match((await call(guest, 'sng:cancelOwn', { sngId: cr.sngId })).error, /организатор/);
+  await call(guest, 'sng:register', { sngId: cr.sngId });
+  assert.ok(!(await call(own, 'sng:cancelOwn', { sngId: cr.sngId })).error);
+  assert.equal(srv.store.get(oid).balance, 10000, 'фонд вернулся');
+  assert.equal(srv.store.data.sngTemplates.length, 0);
+
+  // paid one: starts when full and the template is consumed
+  const cr2 = await call(own, 'sng:create', { name: 'Дуэль за фишки', game: 'NLH', seats: 2, buyIn: 300, sponsor: 200, startStack: 1500, register: true });
+  await call(guest, 'sng:register', { sngId: cr2.sngId });
+  const s2 = srv.sngs.get(cr2.sngId);
+  assert.equal(s2.status, 'running');
+  assert.equal(s2.prizePool, 800);
+  assert.equal(srv.store.get(oid).balance, 10000 - 300 - 200);
+  assert.equal(srv.store.get(gid).balance, 10000 - 300);
+  assert.equal(srv.store.data.sngTemplates.length, 0);
+  // limits
+  await call(own, 'sng:create', { name: 'Первый', game: 'NLH', seats: 6, buyIn: 100, startStack: 1500 });
+  await call(own, 'sng:create', { name: 'Второй', game: 'NLH', seats: 6, buyIn: 100, startStack: 1500 });
+  assert.match((await call(own, 'sng:create', { name: 'Третий', game: 'NLH', seats: 6, buyIn: 100, startStack: 1500 })).error, /2 открытых/);
+});

@@ -232,7 +232,10 @@
         h('span', { class: 'ach-txt' }, h('b', null, a.title), h('small', null, a.text),
           a.progress ? h('span', { class: 'ach-bar', role: 'progressbar', 'aria-valuenow': a.progress[0], 'aria-valuemax': a.progress[1], 'aria-label': a.title },
             h('i', { style: `width:${Math.round((a.progress[0] / a.progress[1]) * 100)}%` })) : null,
-          a.progress ? h('small', { class: 'ach-num' }, `${fmt(a.progress[0])} / ${fmt(a.progress[1])}`) : null)))));
+          a.progress ? h('small', { class: 'ach-num' }, `${fmt(a.progress[0])} / ${fmt(a.progress[1])}`) : null),
+        p.me && a.done && !a.claimed
+          ? h('button', { type: 'button', class: 'btn btn-gold btn-sm ach-claim', onclick: async () => { const r = await call('ach:claim', { id: a.id }); if (!r) return; toast(`«${a.title}»: +${fmt(r.reward)} фишек`); Sound.play('win'); if (window.Progress) window.Progress.refresh(); openProfile(P.name); } }, `+${fmt(a.reward)}`)
+          : h('span', { class: 'ach-reward' + (a.claimed ? ' got' : '') }, a.claimed ? 'получено' : `+${fmt(a.reward)}`)))));
 
     const chart = h('section', { class: 'pcard' },
       h('div', { class: 'panel-head' }, h('h2', { class: 'h3' }, 'Фишки по дням'), h('span', { class: 'muted small' }, p.history.length ? `последние ${p.history.length} дн.` : '')),
@@ -255,9 +258,37 @@
   // ---------- avatar editor ----------
   let editorOpen = false;
   function toggleEditor() { editorOpen = !editorOpen; renderProfile(); }
+
+  /** Crop to a square, shrink to 256 px and upload; the original may be up to 1 MB. */
+  async function uploadAvatar(f) {
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(f.type)) { toast('Нужна картинка PNG, JPEG, WebP или GIF', true); return; }
+    if (f.size > 1024 * 1024) { toast('Картинка больше 1 МБ — выберите файл поменьше', true); return; }
+    let blob = f;
+    try {
+      const bmp = await createImageBitmap(f);
+      const side = Math.min(bmp.width, bmp.height);
+      const size = Math.min(256, side);
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+      const out = await new Promise((r) => c.toBlob(r, 'image/webp', 0.9));
+      if (out && out.type === 'image/webp' && out.size < f.size) blob = out;
+    } catch (e) { /* keep the original file */ }
+    const res = await fetch('/api/avatar', { method: 'POST', headers: { Authorization: 'Bearer ' + S.token, 'Content-Type': blob.type }, body: blob })
+      .then((r) => r.json()).catch(() => ({ error: 'Не удалось загрузить картинку' }));
+    if (!res || res.error) { toast(res && res.error ? res.error : 'Не удалось загрузить картинку', true); return; }
+    editorOpen = false;
+    toast('Аватар обновлён');
+    openProfile(P.name);
+  }
+  async function removeAvatarImage() {
+    const res = await fetch('/api/avatar', { method: 'DELETE', headers: { Authorization: 'Bearer ' + S.token } }).then((r) => r.json()).catch(() => null);
+    if (!res || res.error) { toast('Не получилось', true); return; }
+    toast('Картинка убрана');
+    openProfile(P.name);
+  }
   function avatarEditor(p) {
     if (!editorOpen) return null;
-    const cur = { hue: p.avatar && p.avatar.hue != null ? p.avatar.hue : NR.hueOf(p.name), sym: (p.avatar && p.avatar.sym) || '' };
+    const cur = { hue: p.avatar && p.avatar.hue != null ? p.avatar.hue : NR.hueOf(p.name), sym: (p.avatar && p.avatar.sym) || '', img: (p.avatar && p.avatar.img) || undefined };
     const preview = NR.avatarEl(p.name, cur, 'xl');
     const redraw = () => NR.fillAvatar(preview, p.name, cur);
     const hues = h('div', { class: 'av-hues', role: 'radiogroup', 'aria-label': 'Цвет' }, HUES.map((hu) => h('button', {
@@ -268,10 +299,19 @@
       type: 'button', class: 'av-symbtn', role: 'radio', 'aria-label': sy ? `Значок ${sy}` : 'Инициалы', 'aria-checked': sy === cur.sym ? 'true' : 'false',
       onclick: (e) => { cur.sym = sy; $$('.av-symbtn').forEach((b) => b.setAttribute('aria-checked', b === e.currentTarget ? 'true' : 'false')); redraw(); },
     }, NR.avatarEl(p.name, { hue: 40, sym: sy }, 'sm'))));
+    const file = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif', class: 'sr-only', id: 'av-file' });
+    file.addEventListener('change', () => { const f = file.files && file.files[0]; file.value = ''; if (f) uploadAvatar(f); });
+    const hasImg = !!(p.avatar && p.avatar.img);
     return h('section', { class: 'pcard av-editor' },
       preview,
       h('div', { class: 'av-controls' },
-        h('h2', { class: 'h3' }, 'Цвет'), hues,
+        h('h2', { class: 'h3' }, 'Своя картинка'),
+        h('div', { class: 'av-upload' },
+          file,
+          h('label', { class: 'btn btn-gold btn-sm', for: 'av-file' }, hasImg ? 'Заменить картинку' : 'Загрузить картинку'),
+          hasImg ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: removeAvatarImage }, 'Убрать картинку') : null,
+          h('small', { class: 'muted' }, 'PNG, JPEG, WebP или GIF до 1 МБ. Картинка обрежется в круг.')),
+        h('h2', { class: 'h3' }, hasImg ? 'Цвет ника и фона (без картинки)' : 'Цвет'), hues,
         h('h2', { class: 'h3' }, 'Значок'), syms,
         h('div', { class: 'modal-actions' },
           h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: toggleEditor }, 'Отмена'),

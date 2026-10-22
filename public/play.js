@@ -106,14 +106,23 @@
     return initials(name);
   }
   /** Fill an existing .avatar element (keeps its identity for animations). */
+  const AV_IMG_RE = /^\/avatar\/[\w-]+\?v=[\w]+$/;
   function fillAvatar(el, name, av) {
     const hue = av && av.hue != null ? av.hue : hueOf(name);
-    const key = `${name}|${hue}|${av && av.sym}`;
+    const img = av && typeof av.img === 'string' && AV_IMG_RE.test(av.img) ? av.img : '';
+    const key = `${name}|${hue}|${av && av.sym}|${img}`;
     if (el._avKey === key) return el;
     el._avKey = key;
     el.style.setProperty('--hue', hue);
-    el.replaceChildren(avatarContent(name, av));
+    el.classList.toggle('av-img', !!img);
+    el.style.backgroundImage = img ? `url("${img}")` : '';
+    el.replaceChildren(img ? '' : avatarContent(name, av));
     return el;
+  }
+  /** Chat nickname in the colour of the player's avatar. */
+  function chatNick(m) {
+    const hue = m.hue != null ? m.hue : hueOf(m.name || '');
+    return h('b', { class: 'chat-nick', style: `--nick-hue:${hue}` }, m.name);
   }
   function avatarEl(name, av, cls = '') {
     return fillAvatar(h('span', { class: 'avatar ' + cls, 'aria-hidden': 'true' }), name, av);
@@ -369,6 +378,7 @@
       const res = await call('hello');
       if (!res) return;
       S.me = res.me;
+      if (window.Progress) setTimeout(() => window.Progress.onMe(S.me), 0);
       S.tables = res.tables;
       S.sngs = res.sngs || [];
       S.stakes = res.stakes;
@@ -404,7 +414,7 @@
       } else $('#conn-banner').hidden = false;
     });
     socket.on('disconnect', () => { $('#conn-banner').hidden = false; });
-    socket.on('me', (me) => { S.me = me; renderMe(); });
+    socket.on('me', (me) => { S.me = me; renderMe(); if (window.Progress) window.Progress.onMe(me); });
     socket.on('lobby:tables', (tables) => { S.tables = tables; renderLobby(); });
     socket.on('lobby:sngs', (sngs) => { S.sngs = sngs; renderLobby(); });
     socket.on('table:state', (ts) => {
@@ -544,7 +554,9 @@
     $('#game-filters').replaceChildren(...Object.entries(GAMES).map(([k, g]) => h('button', { type: 'button', class: 'pill' + (S.filter === k ? ' is-active' : ''), 'data-filter': k }, g.name)));
     bindFilters();
     $('#game-seg').replaceChildren(...Object.entries(GAMES).map(([k, g], i) => h('label', null,
-      h('input', { type: 'radio', name: 'game', value: k, checked: i === 0 }), h('span', null, g.name))));
+      h('input', { type: 'radio', name: 'game', value: k, checked: i === 0 }), h('span', null, h('b', null, g.name), h('small', null, g.short)))));
+    const sg = $('#sng-game');
+    if (sg) { const cur = sg.value; sg.replaceChildren(...Object.entries(GAMES).map(([k, g]) => h('option', { value: k }, g.name))); sg.value = GAMES[cur] ? cur : 'NLH'; }
     $('#rules-list').replaceChildren(...Object.values(GAMES).flatMap((g) => [h('dt', null, g.name), h('dd', null, g.rules || '')]));
   }
   $('#filter-free').addEventListener('change', (e) => { S.freeOnly = e.target.checked; renderLobby(); });
@@ -562,11 +574,10 @@
     const tab = S.lobbyTab;
     $('#table-list').hidden = tab !== 'cash';
     $('#cash-filters').hidden = tab !== 'cash';
-    $('#create-btn').hidden = tab === 'sng';
     $('#sng-list').hidden = tab !== 'sng';
     $('#durak-list').hidden = tab !== 'durak';
     $('#bj-list').hidden = tab !== 'bj';
-    $('#create-btn').hidden = tab === 'sng';
+    $('#create-btn-label').textContent = tab === 'sng' ? 'Создать турнир' : 'Создать стол';
     $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек' }[tab];
     if (tab === 'cash') renderCashList();
     else if (tab === 'sng') renderSngList();
@@ -724,7 +735,7 @@
         mine,
         priv: t.private ? t.owner : null,
         badge: gameInfo(t.game).short,
-        kind: `${GAME_NAMES[t.game]} · ${t.maxSeats}-max`,
+        kind: `${GAME_NAMES[t.game]} · ${t.maxSeats}\u2011max`,
         status: t.blindsEvery ? { cls: 'registering', text: `↑ каждые ${t.blindsEvery}` } : null,
         title: t.name,
         stats: [['Блайнды', `${fmt(t.sb)}/${fmt(t.bb)}`], ['Бай-ин', `${fmt(t.minBuyIn)}–${fmt(t.maxBuyIn)}`]],
@@ -745,10 +756,17 @@
       const registered = x.players.includes(myName);
       const count = x.status === 'registering' ? x.players.length : x.alive;
       let action;
+      const own = S.me && x.owner === S.me.id;
       if (x.status === 'registering') {
         action = registered
           ? h('button', { type: 'button', class: 'btn btn-block btn-ghost', onclick: () => sngAction('sng:unregister', x) }, 'Отменить регистрацию')
           : h('button', { type: 'button', class: 'btn btn-block btn-gold', onclick: () => sngAction('sng:register', x) }, x.buyIn ? `Играть · ${fmt(x.buyIn)}` : 'Играть бесплатно');
+        if (own) {
+          action = h('div', { class: 'tcard-act2' }, action, h('button', {
+            type: 'button', class: 'btn btn-block btn-red btn-sm',
+            onclick: async () => { if (!confirm(`Отменить «${x.name}»? Бай-ины и ваш вклад в фонд вернутся.`)) return; if (await call('sng:cancelOwn', { sngId: x.id })) toast('Турнир отменён, фишки возвращены'); },
+          }, 'Отменить турнир'));
+        }
       } else if (x.status === 'running') {
         const mine = registered || S.myTables.has(x.tableId);
         action = h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/table/${x.tableId}` }, mine ? 'К столу' : 'Смотреть');
@@ -762,11 +780,11 @@
       list.append(tcard({
         mine: registered,
         badge: gameInfo(x.game).short,
-        kind: `Sit & Go · ${x.seats}-max`,
+        kind: x.ownerName ? `Организатор: ${x.ownerName}` : `Sit & Go · ${x.seats}\u2011max`,
         status: { cls: x.status === 'cancelled' ? 'finished' : x.status, text: x.status === 'running' ? `Уровень ${x.level}` : x.status === 'cancelled' ? 'Отменён' : STATUS_NAMES[x.status] },
         title: x.name,
         sub: [startTxt, `Стек ${fmt(x.startStack)} · блайнды ${x.startBlinds ? x.startBlinds.map(fmt).join('/') : ''} растут каждые ${x.levelHands} раздач`].filter(Boolean).join(' · '),
-        stats: [['Бай-ин', x.buyIn ? fmt(x.buyIn) : 'Free'], [x.guarantee ? 'Гарантия' : 'Призовые', fmt(x.prizePool), prizes]],
+        stats: [['Бай-ин', x.buyIn ? fmt(x.buyIn) : 'Free'], [x.guarantee ? 'Гарантия' : 'Призовые', fmt(x.prizePool), prizes + (x.sponsor ? ` · ${fmt(x.sponsor)} добавил организатор` : '')]],
         fill: { n: count, max: x.seats, label: x.status === 'running' ? `в игре ${count} из ${x.seats}` : `${count} из ${x.seats}` },
         names: x.players.length ? x.players.join(', ') : null,
         action,
@@ -803,7 +821,7 @@
     ol.replaceChildren();
     if (!S.leaderboard.length) ol.append(h('li', null, h('span', { class: 'muted' }, 'Пока пусто')));
     for (const p of S.leaderboard) {
-      ol.append(h('li', null, h('a', { class: 'lb-link', href: `#/profile/${encodeURIComponent(p.name)}` }, avatarEl(p.name, p.avatar, 'xs'), h('span', null, p.name)), h('b', null, fmt(p.chips))));
+      ol.append(h('li', null, h('a', { class: 'lb-link', href: `#/profile/${encodeURIComponent(p.name)}` }, avatarEl(p.name, p.avatar, 'xs'), h('span', { class: 'lb-name' }, p.name)), h('b', null, fmt(p.chips))));
     }
   }
   setInterval(() => {
@@ -828,9 +846,67 @@
   $('#create-btn').addEventListener('click', () => {
     if (S.lobbyTab === 'durak') { $('#modal-durak-create').showModal(); return; }
     if (S.lobbyTab === 'bj') { $('#modal-bj-create').showModal(); return; }
+    if (S.lobbyTab === 'sng') { openSngCreate(); return; }
     $('#create-error').textContent = '';
     $('#modal-create').showModal();
   });
+
+  // ----- a tournament made by a player -----
+  function sngSeatsFor(game) {
+    const max = (GAMES[game] && GAMES[game].maxSeats) || 9;
+    const sel = $('#sng-seats');
+    const cur = Number(sel.value) || 6;
+    sel.replaceChildren(...Array.from({ length: max - 1 }, (_, i) => i + 2).map((n) => h('option', { value: n }, n === 2 ? '2 — дуэль' : `${n} игроков`)));
+    sel.value = String(Math.min(cur, max));
+  }
+  function openSngCreate() {
+    const f = $('#sng-create-form');
+    $('#sng-create-error').textContent = '';
+    if (!f.name.value) f.name.value = S.me ? `Турнир ${S.me.name}`.slice(0, 32) : '';
+    sngSeatsFor(f.game.value || 'NLH');
+    const d = new Date(Date.now() + 2 * 3600e3); d.setMinutes(0, 0, 0);
+    const pad = (n) => String(n).padStart(2, '0');
+    if (!f.startAt.value) f.startAt.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    syncSngForm();
+    $('#modal-sng-create').showModal();
+  }
+  function syncSngForm() {
+    const f = $('#sng-create-form');
+    const timed = f.when.value === 'time';
+    $('#sng-time-row').hidden = !timed;
+    const seats = Number(f.seats.value) || 2;
+    const buyIn = Math.max(0, Math.floor(Number(f.buyIn.value) || 0));
+    const sponsor = Math.max(0, Math.floor(Number(f.sponsor.value) || 0));
+    [...f.payouts.options].forEach((o) => { o.disabled = !!o.value && o.value.split(',').length >= seats; });
+    if (f.payouts.selectedOptions[0] && f.payouts.selectedOptions[0].disabled) f.payouts.value = '';
+    const pay = (f.register.checked ? buyIn : 0) + sponsor;
+    $('#sng-create-sum').textContent = `Фонд при полном столе: ${fmt(buyIn * seats + sponsor)}${sponsor ? `, из них ваших ${fmt(sponsor)}` : ''}${pay ? ` · спишется сейчас: ${fmt(pay)}` : ''}`;
+  }
+  $('#sng-create-form').addEventListener('input', syncSngForm);
+  $('#sng-create-form').addEventListener('change', (e) => { if (e.target.name === 'game') sngSeatsFor(e.target.value); syncSngForm(); });
+  $('#sng-create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const [sb, bb] = f.blinds.value.split('/').map(Number);
+    const payload = {
+      name: f.name.value, game: f.game.value, seats: Number(f.seats.value), buyIn: Number(f.buyIn.value) || 0, sponsor: Number(f.sponsor.value) || 0,
+      startStack: Number(f.stack.value), startSb: sb, startBb: bb, levelHands: Number(f.levelHands.value), actionTime: Number(f.actionTime.value),
+      payouts: f.payouts.value, register: f.register.checked,
+    };
+    if (f.when.value === 'time') {
+      const t = new Date(f.startAt.value).getTime();
+      if (!Number.isFinite(t)) { $('#sng-create-error').textContent = 'Укажите дату и время старта'; return; }
+      payload.startAt = t; payload.minPlayers = Number(f.minPlayers.value);
+    }
+    const res = await new Promise((resolve) => S.socket.timeout(8000).emit('sng:create', payload, (err, r) => resolve(err ? { error: 'Сервер не ответил' } : r)));
+    if (!res || res.error) { $('#sng-create-error').textContent = (res && res.error) || 'Ошибка'; return; }
+    $('#modal-sng-create').close();
+    toast('Турнир создан — зовите друзей!');
+    S.lobbyTab = 'sng';
+    $$('[data-lobby-tab]').forEach((x) => { const on = x.dataset.lobbyTab === 'sng'; x.classList.toggle('is-active', on); x.setAttribute('aria-selected', on); });
+    renderLobby();
+  });
+
   $('#create-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
@@ -1479,7 +1555,7 @@
       lastChatSig = chatSig;
       const chat = $('#chat');
       if (!t.chat.length) chat.replaceChildren(h('li', { class: 'sys' }, 'Здесь пока тихо. Поздоровайтесь со столом.'));
-      else renderList(chat, t.chat, (m) => h('li', null, h('b', null, m.name), m.text));
+      else renderList(chat, t.chat, (m) => h('li', null, chatNick(m), m.text));
     }
     const logSig = t.log.length ? t.log[t.log.length - 1].t + t.log[t.log.length - 1].text : '0';
     if (logSig !== lastLogSig) {
@@ -1638,7 +1714,7 @@
   requestAnimationFrame(tick);
 
   // shared helpers for durak.js
-  window.NR = { $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, renderLobby: () => renderLobby(), route: () => route() };
+  window.NR = { $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
 
   // ================= boot =================
   if (S.token) startApp(); else showAuth();

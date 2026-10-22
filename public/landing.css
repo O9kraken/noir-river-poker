@@ -214,3 +214,4 @@ a:focus-visible, summary:focus-visible { outline: 2px solid var(--gold-2); outli
   .faq details p { padding-right: 0; }
 }
 @media (max-width: 380px) { .pill:last-child { display: none; } }
+.lavatar.has-img { background-size: cover; background-position: center; }

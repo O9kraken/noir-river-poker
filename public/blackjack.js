@@ -293,7 +293,7 @@
   }
   function renderSide(st) {
     if (!st.chat.length) $('#bj-chat').replaceChildren(h('li', { class: 'sys' }, 'Здесь пока тихо.'));
-    else fill($('#bj-chat'), st.chat, (m) => h('li', null, h('b', null, m.name), m.text));
+    else fill($('#bj-chat'), st.chat, (m) => h('li', null, window.NR.chatNick(m), m.text));
     fill($('#bj-log'), st.log, (l) => h('li', { class: l.text.startsWith('—') ? 'sep' : '' }, l.text));
   }
   $('#bj-chat-form').addEventListener('submit', async (e) => {

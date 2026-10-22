@@ -25,7 +25,8 @@
     el.className = 'lavatar';
     el.style.setProperty('--hue', av && av.hue != null ? av.hue : hueOf(name));
     const sym = av && av.sym;
-    if (sym && SUITS[sym]) el.textContent = SUITS[sym];
+    if (av && typeof av.img === 'string' && /^\/avatar\/[\w-]+\?v=\w+$/.test(av.img)) { el.style.backgroundImage = `url("${av.img}")`; el.classList.add('has-img'); }
+    else if (sym && SUITS[sym]) el.textContent = SUITS[sym];
     else if (sym && PATHS[sym]) {
       el.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="${PATHS[sym]}"/></svg>`;
     } else el.textContent = initials(name);

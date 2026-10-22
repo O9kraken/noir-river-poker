@@ -48,7 +48,8 @@ function validateTemplate(raw) {
     if (payouts.length >= seats) throw new GameError('Призовых мест должно быть меньше, чем мест за столом');
     if (payouts.some((x, i) => i && x > payouts[i - 1])) throw new GameError('Выплаты должны идти по убыванию');
   }
-  if (!buyIn && !guarantee) throw new GameError('Бесплатному турниру нужна гарантия призового фонда');
+  const sponsor = int(raw.sponsor ?? 0, 0, 1000000, 'Призовые от организатора');
+  if (!buyIn && !guarantee && !sponsor) throw new GameError(raw.owner ? 'Укажите бай-ин или добавьте в фонд свои фишки' : 'Бесплатному турниру нужна гарантия призового фонда');
   let startAt = null;
   if (raw.startAt) {
     startAt = Number(raw.startAt);
@@ -56,7 +57,7 @@ function validateTemplate(raw) {
   }
   const minPlayers = startAt ? int(raw.minPlayers ?? 2, 2, seats, 'Минимум игроков') : seats;
   return {
-    name, game, seats, buyIn, guarantee, startStack, startSb, startBb, levelHands, actionTime, payouts,
+    name, game, seats, buyIn, guarantee, sponsor, startStack, startSb, startBb, levelHands, actionTime, payouts,
     startAt, minPlayers, recurring: raw.recurring !== false && raw.recurring !== 'false',
   };
 }
@@ -82,6 +83,9 @@ class SitAndGo {
     this.startStack = tpl.startStack;
     this.levelHands = deps.levelHands || tpl.levelHands || 5;
     this.guarantee = tpl.guarantee || 0;
+    this.sponsor = tpl.sponsor || 0; // chips the organiser put into the pool
+    this.owner = tpl.owner || null;
+    this.ownerName = tpl.ownerName || null;
     this.startSb = tpl.startSb || LEVELS[0][0];
     this.startBb = tpl.startBb || LEVELS[0][1];
     this.actionTime = tpl.actionTime || null;
@@ -118,7 +122,7 @@ class SitAndGo {
   /** Before the start the pool assumes a full table; afterwards it uses the real entrants. */
   get prizePool() {
     const n = this.status === 'registering' ? this.seats : this.entrants;
-    return Math.max(this.guarantee, this.buyIn * n);
+    return Math.max(this.guarantee, this.buyIn * n) + this.sponsor;
   }
 
   payouts() {
@@ -320,7 +324,8 @@ class SitAndGo {
       levelHands: this.levelHands, status: this.status, tableId: this.table ? this.table.id : null,
       players: this.players.map((p) => p.name), alive: this.alive().length,
       level: this.level + 1, winner: (this.players.find((p) => p.place === 1) || {}).name || null,
-      guarantee: this.guarantee, startAt: this.startAt, minPlayers: this.minPlayers, custom: this.custom,
+      guarantee: this.guarantee, sponsor: this.sponsor, owner: this.owner, ownerName: this.ownerName,
+      startAt: this.startAt, minPlayers: this.minPlayers, custom: this.custom,
       startBlinds: [this.startSb, this.startBb], actionTime: this.actionTime, entrants: this.entrants,
     };
   }

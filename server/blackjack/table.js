@@ -322,8 +322,8 @@ class BlackjackTable {
     this.seats = this.seats.map(() => null);
   }
 
-  addChat(name, text) {
-    this.chat.push({ t: this.now(), name, text });
+  addChat(name, text, hue = null) {
+    this.chat.push({ t: this.now(), name, text, hue });
     if (this.chat.length > 50) this.chat.shift();
     this._update();
   }

@@ -6,7 +6,7 @@ const express = require('express');
 const { Server } = require('socket.io');
 const { Table, GameError } = require('./engine/table');
 const { GAMES, gameOf } = require('./engine/games');
-const { Store, StoreError } = require('./store');
+const { Store, StoreError, AVATAR_MAX_BYTES } = require('./store');
 const { SitAndGo, TEMPLATES, validateTemplate, DAY } = require('./tournament');
 const { DurakTable } = require('./durak/table');
 const { BlackjackTable } = require('./blackjack/table');
@@ -39,6 +39,7 @@ function createServer({
   // TRUST_PROXY=true on platforms like Render where the proxy is remote.
   const tp = process.env.TRUST_PROXY;
   app.set('trust proxy', tp === 'true' ? true : tp && !Number.isNaN(Number(tp)) ? Number(tp) : 'loopback');
+  let avatarChangedHook = null;
   app.use(express.json({ limit: '10kb' }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -70,6 +71,37 @@ function createServer({
   });
   app.post('/api/logout', (req, res) => { store.logout(req.body?.token); res.json({ ok: true }); });
   app.get('/api/leaderboard', (req, res) => res.json(store.leaderboard()));
+  // own picture as the avatar: raw image body, up to 1 MB
+  const bearer = (req) => { const m = /^Bearer\s+(.+)$/.exec(req.get('authorization') || ''); return m && store.userByToken(m[1]); };
+  app.post('/api/avatar', express.raw({ type: () => true, limit: AVATAR_MAX_BYTES }), (req, res) => {
+    const u = bearer(req);
+    if (!u) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    try {
+      const avatar = store.setAvatarImage(u.id, req.body, req.get('content-type'));
+      if (avatarChangedHook) avatarChangedHook(u.id);
+      res.json({ avatar });
+    } catch (e) { authError(res, e); }
+  });
+  app.delete('/api/avatar', (req, res) => {
+    const u = bearer(req);
+    if (!u) return res.status(401).json({ error: 'Войдите в аккаунт' });
+    const avatar = store.clearAvatarImage(u.id);
+    if (avatarChangedHook) avatarChangedHook(u.id);
+    res.json({ avatar });
+  });
+  app.get('/avatar/:id', (req, res) => {
+    const img = store.avatarImage(String(req.params.id));
+    if (!img) return res.status(404).end();
+    res.set('Content-Type', img.mime);
+    res.set('Cache-Control', req.query.v === img.v ? 'public, max-age=31536000, immutable' : 'no-cache');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Content-Security-Policy', "default-src 'none'");
+    res.send(img.buf);
+  });
+  app.use((err, req, res, next) => {
+    if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Картинка больше 1 МБ' });
+    return next(err);
+  });
   // who is signed in (the landing page shows the account in its header)
   app.get('/api/me', (req, res) => {
     const m = /^Bearer\s+(.+)$/.exec(req.get('authorization') || '');
@@ -205,9 +237,9 @@ function createServer({
       pushProfile(userId);
     },
     onChange: () => broadcastSngs(),
-    onStarted: (sng) => next(sng), // keep registration open
+    onStarted: (sng) => { if (sng.tpl.owner) releaseOwned(sng.tpl, false); else next(sng); }, // keep registration open
     onCancelled: (sng) => {
-      next(sng);
+      if (sng.tpl.owner) releaseOwned(sng.tpl, true); else next(sng);
       setTimeout(() => { sngs.delete(sng.id); broadcastSngs(); }, sngLinger).unref();
     },
     onFinished: (sng) => {
@@ -219,6 +251,15 @@ function createServer({
       }, sngLinger).unref();
     },
   };
+  /** A player-made tournament that never started: give the organiser's chips back and forget it. */
+  function releaseOwned(tpl, refund) {
+    if (!tpl || !tpl.owner) return;
+    if (refund && tpl.sponsor && !tpl.sponsorDone) { store.deposit(tpl.owner, tpl.sponsor); pushProfile(tpl.owner); }
+    tpl.sponsorDone = true;
+    const i = store.data.sngTemplates.indexOf(tpl);
+    if (i !== -1) store.data.sngTemplates.splice(i, 1);
+    store.save();
+  }
   const allTemplates = () => sngTemplates.concat(store.data.sngTemplates);
   const tplById = (id) => allTemplates().find((t) => t.id === id);
   function spawnSng(tpl) {
@@ -241,9 +282,10 @@ function createServer({
   }
   sngTemplates.forEach(spawnSng);
   // custom (admin-made) tournaments survive restarts; a missed daily start moves to the next day
-  for (const tpl of store.data.sngTemplates) {
+  for (const tpl of store.data.sngTemplates.slice()) {
     if (tpl.spent) continue;
     if (tpl.startAt && tpl.startAt <= Date.now() + 30000) {
+      if (tpl.owner) { releaseOwned(tpl, true); continue; }
       if (!tpl.recurring) { tpl.spent = true; continue; }
       while (tpl.startAt <= Date.now() + 30000) tpl.startAt += DAY;
     }
@@ -473,6 +515,18 @@ function createServer({
     }, 400);
   }
 
+  /** Avatar changed: refresh the profile, the tables the player sits at and friends' lists. */
+  function refreshAvatar(uid) {
+    pushProfile(uid);
+    for (const t of allTables()) {
+      if (t.seatOf(uid) === -1) continue;
+      if (t.kind === 'durak' || t.kind === 'bj') t._update(); else t.onUpdate(t);
+    }
+    presenceChanged(uid);
+  }
+  avatarChangedHook = refreshAvatar;
+  const hueOf = (uid) => { const u = store.get(uid); return u && u.avatar && u.avatar.hue != null ? u.avatar.hue : null; };
+
   /** Take a player off every table and out of pending registrations (ban / admin kick). */
   function removeEverywhere(target) {
     for (const t of tables.values()) {
@@ -557,15 +611,21 @@ function createServer({
       p.where = p.me || p.friend ? whereIs(p.id) : [];
       return { profile: p };
     });
+    on('progress:get', () => store.progress(userId));
+    on('quest:claim', ({ id }) => {
+      const reward = store.claimQuest(userId, String(id));
+      pushProfile(userId);
+      return { reward, progress: store.progress(userId) };
+    });
+    on('ach:claim', ({ id }) => {
+      const reward = store.claimAchievement(userId, String(id));
+      pushProfile(userId);
+      return { reward, progress: store.progress(userId) };
+    });
+
     on('profile:avatar', ({ hue, sym }) => {
       const avatar = store.setAvatar(userId, hue, sym);
-      pushProfile(userId);
-      // seats show avatars: refresh the tables this player sits at
-      for (const t of allTables()) {
-        if (t.seatOf(userId) === -1) continue;
-        if (t.kind === 'durak' || t.kind === 'bj') t._update(); else t.onUpdate(t);
-      }
-      presenceChanged(userId);
+      refreshAvatar(userId);
       return { avatar };
     });
 
@@ -634,6 +694,35 @@ function createServer({
       const t = makeTable({ name: clean, game: gameOf(game), sb: st[0], bb: st[1], maxSeats, createdBy: userId, blindsEvery: every, private: !!priv });
       if (t.private) schedulePrivate(t);
       return { tableId: t.id };
+    });
+
+    on('sng:create', (raw) => {
+      raw = raw || {};
+      const mine = store.data.sngTemplates.filter((t) => t.owner === userId && !t.sponsorDone);
+      if (mine.length >= 2) throw new GameError('У вас уже 2 открытых турнира — дождитесь их старта');
+      if (raw.startAt && Number(raw.startAt) > Date.now() + 7 * DAY) throw new GameError('Старт — не позже чем через неделю');
+      const v = validateTemplate({ ...raw, guarantee: 0, recurring: false, owner: userId });
+      if (v.buyIn && v.buyIn < 10) throw new GameError('Бай-ин — от 10 фишек');
+      if (v.sponsor) store.withdraw(userId, v.sponsor);
+      const tpl = { id: 'p' + crypto.randomBytes(4).toString('hex'), custom: true, createdAt: Date.now(), ...v, owner: userId, ownerName: socket.data.name };
+      store.data.sngTemplates.push(tpl);
+      store.save();
+      pushProfile(userId);
+      const sng = spawnSng(tpl);
+      if (raw.register) {
+        try { sng.register(userId, socket.data.name); pushProfile(userId); } catch (e) { /* not enough chips: stays open */ }
+      }
+      return { sngId: sng.id };
+    });
+
+    on('sng:cancelOwn', ({ sngId }) => {
+      const x = getSng(sngId);
+      if (x.owner !== userId) throw new GameError('Отменить может только организатор');
+      if (x.status !== 'registering') throw new GameError('Турнир уже начался');
+      const players = x.players.map((p) => p.userId);
+      x.cancel(`Организатор отменил турнир «${x.name}», бай-ин возвращён`);
+      players.forEach(pushProfile);
+      pushProfile(userId);
     });
 
     on('sng:register', ({ sngId }) => {
@@ -754,7 +843,7 @@ function createServer({
     on('durak:chat', ({ tableId, text }) => {
       const t = getDurak(tableId);
       const clean = chatText(text);
-      if (clean) t.addChat(socket.data.name, clean);
+      if (clean) t.addChat(socket.data.name, clean, hueOf(userId));
     });
 
     // ----- blackjack -----
@@ -793,13 +882,13 @@ function createServer({
     on('bj:chat', ({ tableId, text }) => {
       const t = getBj(tableId);
       const clean = chatText(text);
-      if (clean) t.addChat(socket.data.name, clean);
+      if (clean) t.addChat(socket.data.name, clean, hueOf(userId));
     });
 
     on('table:chat', ({ tableId, text }) => {
       const t = getTable(tableId);
       const clean = chatText(text);
-      if (clean) t.addChat(socket.data.name, clean);
+      if (clean) t.addChat(socket.data.name, clean, hueOf(userId));
     });
 
 
@@ -968,7 +1057,8 @@ function createServer({
       }
       sngs.delete(x.id);
       for (const u of players) { pushProfile(u); notice(u, wasRegistering ? `Турнир «${x.name}» отменён, бай-ин возвращён` : `Турнир «${x.name}» отменён, призовой фонд разделён по фишкам`); }
-      if (wasRegistering && !(x.tpl.custom && !x.tpl.recurring) && !x.tpl.startAt) spawnSng(tplById(x.templateId));
+      if (wasRegistering && x.tpl.owner) releaseOwned(x.tpl, true);
+      else if (wasRegistering && !(x.tpl.custom && !x.tpl.recurring) && !x.tpl.startAt) spawnSng(tplById(x.templateId));
       else if (wasRegistering) next(x);
       broadcastSngs();
       audit(`Отменил турнир «${x.name}»`);
