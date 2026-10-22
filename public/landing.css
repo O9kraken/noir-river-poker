@@ -38,7 +38,7 @@ ul, ol { padding: 0; list-style: none; }
 button { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--gold-2); outline-offset: 3px; }
 
-.frame { width: 100%; max-width: 1440px; margin: 0 auto; padding: 14px; }
+.frame { width: 100%; margin: 0 auto; padding: 14px; }
 
 /* ---------- shared bits ---------- */
 .kicker { display: inline-flex; align-items: center; gap: 10px; font-size: 11.5px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: var(--gold-2); }
