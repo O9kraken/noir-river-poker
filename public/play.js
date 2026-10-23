@@ -554,7 +554,7 @@
       S.ch = res.ch || []; S.myCh = new Set(res.myCh || []); S.chStakes = res.chStakes || []; S.chClocks = res.chClocks || [];
       S.cap = res.cap || []; S.myCap = new Set(res.myCap || []); S.capStakes = res.capStakes || []; S.capTimes = res.capTimes || [];
       S.mf = res.mf || []; S.myMf = new Set(res.myMf || []); S.mfStakes = res.mfStakes || [];
-      S.pt = res.pt || []; S.myPt = new Set(res.myPt || []); S.ptStakes = res.ptStakes || [0]; S.ptGames = res.ptGames || {}; S.botLevels = res.botLevels || S.botLevels;
+      S.pt = res.pt || []; S.myPt = new Set(res.myPt || []); S.ptStakes = res.ptStakes || [0]; S.ptGames = res.ptGames || {}; S.ptDecks = res.ptDecks || {}; S.botLevels = res.botLevels || S.botLevels;
       S.bg = res.bg || []; S.myBg = new Set(res.myBg || []); S.bgStakes = res.bgStakes || []; S.bgTimes = res.bgTimes || [];
       fillExtraForms();
       S.durakStakes = res.durakStakes || [];

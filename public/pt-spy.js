@@ -24,7 +24,7 @@
     else if (g.phase === 'clue') {
       banner = h('div', { class: `sp-banner sp-${g.turnTeam}` },
         h('b', null, `Капитан ${g.names[g.turnTeam]} думает над подсказкой`),
-        st.turn ? ctx.timer(st.turn.left, null, 'bar') : null);
+        st.turn ? ctx.timer(st.turn.left, st.turn.ms, 'bar') : null);
     } else {
       banner = h('div', { class: `sp-banner sp-${g.turnTeam}` },
         h('span', { class: 'sp-clue' }, h('small', null, `Подсказка ${g.names[g.turnTeam]}`), h('b', null, g.clue.word.toUpperCase()), h('em', null, g.clue.n || '∞')),

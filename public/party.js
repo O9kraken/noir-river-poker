@@ -12,38 +12,51 @@
     dark: { title: 'Без тормозов', players: '3–10', time: '20–30 мин', art: '/art/pt-dark.webp', tag: 'Чёрный юмор 18+. Ведущий читает вопрос с пропуском, остальные вставляют самый ужасный ответ. Стыдно должно быть всем.', accent: 'dark' },
   };
   const OPTIONS = {
-    dungeon: { key: 'goal', label: 'До какого уровня', items: [[6, 'До 6 уровня — быстрая партия'], [8, 'До 8 уровня'], [10, 'До 10 уровня — классика']], def: 8 },
     dark: { key: 'goal', label: 'До скольких очков', items: [[5, 'До 5 очков'], [7, 'До 7 очков'], [10, 'До 10 очков']], def: 7 },
     spy: { key: 'clueSec', label: 'Время капитану', items: [[60, '60 секунд на подсказку'], [90, '90 секунд на подсказку'], [150, '150 секунд — без спешки']], def: 90 },
   };
+  // «Без цензуры»: where the game is built on text, the table can turn on the version with swearing
+  const MAT = {
+    dark: { def: true, label: 'Без цензуры — с матом', note: 'Добавляет в колоду вопросы и ответы с русским матом' },
+    dungeon: { def: false, label: 'Тексты карт с матом', note: 'Те же карты, но шутки на картах — покрепче' },
+  };
+  // the rules shown in the waiting room and in the «Правила» tab: [title, text, list?]
   const RULES = {
     bomb: [
-      ['Цель', 'Не взорваться. В колоде котобомб на одну меньше, чем игроков. Последний выживший забирает банк.'],
-      ['Ход', 'Играйте сколько угодно карт, а затем возьмите карту из колоды — это конец хода. Вытянули бомбу — нужен «Сапёр»: бомба обезврежена и вы тайно прячете её обратно в колоду, куда захотите. Нет сапёра — вы выбываете.'],
-      ['Карты', '«Смыться» — закончить ход без карты. «Перевести стрелки» — следующий ходит дважды. «Гадалка» — посмотреть три верхние карты, «Подкрутить» — ещё и переложить их. «Бардак» — перемешать колоду. «Со дна» — взять нижнюю карту. «Взятка» — соперник отдаёт карту на свой выбор.'],
-      ['Коты', 'Два одинаковых кота — вытяните случайную карту у соперника. Три — назовите карту и заберите её, если она есть.'],
-      ['Ни за что!', 'Отменяет любую карту, кроме бомбы и сапёра, — даже чужую и даже не в свой ход, пока горит таймер. Отмену можно отменить.'],
+      ['Цель', 'Не взорваться. В колоде лежат котобомбы — на одну меньше, чем игроков. Кто вытянул бомбу и не смог её обезвредить, выбывает. Последний выживший забирает банк (или просто победу, если стол на интерес).'],
+      ['Раздача', 'Каждый получает «Сапёра» и 7 карт. Ещё несколько сапёров и все бомбы замешиваются в колоду. На столе видно, сколько бомб осталось и какой шанс вытянуть бомбу прямо сейчас.'],
+      ['Ваш ход', 'Сначала сыграйте сколько угодно карт — по одной или парами/тройками котов. Затем обязательно возьмите верхнюю карту колоды: это конец хода. «Смыться» и «Перевести стрелки» заканчивают ход без взятия карты.'],
+      ['Котобомба', 'Вытянули бомбу и есть «Сапёр» — бомба обезврежена, и вы сами тайно кладёте её обратно в колоду: сверху, вторым, на дно или наугад. Нет сапёра — бум, вы выбыли, ваши карты уходят в сброс.'],
+      ['Ни за что!', 'Отменяет действие любой карты, кроме бомбы и сапёра. Играется в любой момент, даже не в свой ход, пока на столе горит таймер отмены. Отмену можно отменить ещё одним «Ни за что!» — и так до бесконечности.'],
+      ['Коты', 'Коты сами ничего не делают. Пара одинаковых котов — вытяните случайную карту у выбранного соперника. Тройка — назовите карту и заберите её, если она у него есть.'],
+      ['Совет', 'Держите сапёра до конца, «Гадалку» играйте, когда бомб в колоде много, а «Перевести стрелки» — когда видите бомбу сверху. И не забывайте: соседи слышат, как вы нервничаете в голосовом чате.'],
     ],
     spy: [
-      ['Команды', 'Алые и Лазурные. У каждой — капитан, он видит, какие слова принадлежат его агентам. Остальные — агенты, они видят только слова.'],
-      ['Подсказка', 'Капитан называет одно слово и число: сколько слов на поле с ним связано. Нельзя называть слово с поля или однокоренное. 0 — без ограничения.'],
-      ['Отгадки', 'Агенты отмечают слова, обсуждают и открывают по одному. Свой агент — можно продолжать (на одно больше числа подсказки). Прохожий или чужой агент — ход переходит.'],
-      ['Ликвидатор', 'Одно слово — ликвидатор. Открыли его — ваша команда сразу проиграла.'],
-      ['Победа', 'Команда, первой нашедшая всех своих агентов, побеждает и делит банк.'],
+      ['Команды', 'Игроки делятся на Алых и Лазурных. В каждой команде один капитан, остальные — агенты. Перед стартом можно выбрать команду и попроситься в капитаны. Капитан видит раскраску поля, агенты — только слова.'],
+      ['Поле', '25 слов: 9 агентов команды, которая ходит первой, 8 агентов другой, 7 мирных прохожих и 1 ликвидатор. Каждая партия — новое поле из словаря на 240+ слов.'],
+      ['Подсказка', 'Капитан называет одно слово и число — сколько слов на поле с ним связано. Нельзя называть слово с поля, однокоренное с ним или несколько слов. «0» — без ограничения.'],
+      ['Отгадки', 'Агенты обсуждают (лучше в голосовом чате!), отмечают слова и открывают по одному. Свой агент — можно продолжать, всего на одно слово больше числа подсказки. Прохожий или чужой агент — ход переходит к соперникам. Можно остановиться самим.'],
+      ['Ликвидатор', 'Открыли ликвидатора — ваша команда тут же проиграла, сколько бы агентов ни нашла до этого.'],
+      ['Победа', 'Первая команда, нашедшая всех своих агентов, побеждает. Банк делят все её игроки, включая капитана.'],
+      ['Совет', 'Капитан, не жадничайте: подсказка на 2 надёжнее, чем на 4. Агенты, следите за подсказками соперников — по ним видно, где их слова.'],
     ],
     dungeon: [
-      ['Цель', 'Первым дорасти до нужного уровня. Последний уровень можно взять только победой над монстром.'],
-      ['Ход', '1. Выбейте дверь: монстр — бой, проклятие — сработает на вас, остальное — в руку. 2. Если боя не было, найдите неприятности (выставьте монстра с руки) или пошарьте по углам (карта в руку). 3. Больше 5 карт — лишнее уйдёт самому слабому.'],
-      ['Бой', 'Ваша сила — уровень плюс снаряжение. Нужно больше, чем у монстра. Победили — уровень и сокровища. Не хватает сил — попросите помощи: помощник получит половину добычи. Или бегите: на кубике 5–6 — удрали, иначе вас настигает «непотребство» монстра.'],
-      ['Подставы', 'Любой может вмешаться в чужой бой: разовые карты (+сила герою или монстру), усилители монстров, «Бродячая тварь» с монстром. Проклятия можно накладывать на кого угодно.'],
-      ['Классы и вещи', 'Громила +1 в бою, Ловкач +1 к побегу, Колдун сжигает карты за +1, Знахарь +3 против нежити. Вещи надевают в свой ход; 1000 золотых = уровень.'],
+      ['Цель', 'Первым дорасти до 10 уровня. Все начинают с 1-го. Десятый уровень можно взять только победой над монстром — купить или вымолить его нельзя.'],
+      ['Ход', '1) Выбейте дверь. Монстр — сразу бой. Проклятие — срабатывает на вас. Любая другая карта — в руку. 2) Если боя не было: найдите неприятности (выставьте монстра с руки и деритесь) или пошарьте по углам (ещё карта двери в руку). 3) В конце хода больше 5 карт быть не может — лишнее уходит самому слабому игроку.'],
+      ['Бой', 'Ваша сила — уровень плюс бонусы снаряжения и класса. Нужно строго больше, чем у монстра. Победили — получаете уровень (за больших монстров — два) и сокровища. После «Бить!» у остальных есть 6 секунд, чтобы вмешаться.'],
+      ['Помощь и подставы', 'Не хватает сил — примите помощь: помощник складывает свою силу с вашей и получает половину сокровищ. Остальные могут подыграть монстру: разовые карты, усилители («Матёрый», «Голодный и злой»), «Бродячая тварь» с ещё одним монстром.'],
+      ['Бегство', 'Не можете победить — бегите. На кубике 5–6 — удрали (Ловкач и некоторые вещи дают +1). Не удрали — монстр делает с вами своё «непотребство»: отнимает уровни, вещи или убивает. Мёртвый теряет всё и возвращается в свой ход с новыми картами.'],
+      ['Снаряжение', 'Слоты: голова, броня, обувь, две руки (или одна двуручная вещь) и два «прочих». Надевать и снимать можно в свой ход вне боя. Вещи на 1000 золотых можно сдать скупщику за уровень. Нажмите на игрока сверху — увидите, что на нём надето.'],
+      ['Классы', 'Громила: +1 в любом бою. Ловкач: +1 к побегу. Колдун: в своём бою сжигает до трёх карт с руки, +1 за каждую. Знахарь: +3 против нежити. Некоторые вещи носит только свой класс.'],
+      ['Проклятия', 'Проклятие можно сыграть на любого игрока в любой момент вне боя: минус уровень, потеря вещи или карт. Отличный способ притормозить лидера.'],
     ],
     dark: [
-      ['Раунд', 'Ведущий читает чёрную карту с пропуском. Остальные выбирают из руки самый смешной или ужасный ответ.'],
-      ['Выбор', 'Ведущий не знает, кто что положил, и выбирает лучший ответ. Его автор получает очко. Ведущий меняется по кругу.'],
-      ['Пустая карта', 'У каждого одна пустая карта: впишите что угодно. Да, всё на вашей совести.'],
-      ['Победа', 'Первый, кто наберёт нужное число очков, побеждает.'],
-      ['18+', 'Тут чёрный юмор. Не нравится — нажмите «Пожаловаться» на ник или просто выйдите.'],
+      ['Раунд', 'Ведущий открывает чёрную карту — вопрос или фразу с пропуском. Остальные выбирают из своих 10 белых карт самый смешной, жёсткий или абсурдный ответ. На некоторые чёрные карты нужно два ответа — по порядку.'],
+      ['Выбор', 'Когда все ответили, карты открываются вперемешку: ведущий не знает, кто что положил. Он выбирает лучший ответ, его автор получает очко. Ведущий меняется по кругу.'],
+      ['Своя карта', 'У каждого есть одна пустая карта: впишите любой ответ — это ваш козырь. Ещё раз в партию можно сменить всю руку, заплатив одно очко.'],
+      ['Победа', 'Первый, кто наберёт нужное число очков, побеждает и забирает банк.'],
+      ['Без цензуры', 'Стол можно создать с колодой «без цензуры» — там вопросы и ответы с русским матом. На столе это видно в названии игры.'],
+      ['18+', 'Здесь чёрный юмор для взрослых. Если чья-то вписанная карта перешла грань — нажмите на ник в чате и пожалуйтесь, администраторы разберутся.'],
     ],
   };
 
@@ -126,14 +139,25 @@
       f.option.value = String(o.def);
     }
     $('#pt-create-desc').textContent = GAMES[game].tag;
+    matBox($('#pt-mat'), game);
   }
+  /** The «без цензуры» checkbox, shown only for the games built on text. */
+  function matBox(box, game) {
+    const m = MAT[game];
+    box.hidden = !m;
+    if (!m) return;
+    box.querySelector('input').checked = m.def;
+    box.querySelector('b').textContent = m.label;
+    box.querySelector('small').textContent = m.note;
+  }
+  const matOf = (form, game) => (MAT[game] ? { mat: form.mat.checked } : {});
   $$('[data-pt-game]').forEach((b) => b.addEventListener('click', () => fillCreate(b.dataset.ptGame)));
   $('#pt-create-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
     const game = f.game.value;
     const o = OPTIONS[game];
-    const res = await call('pt:create', { game, name: f.name.value, stake: Number(f.stake.value), maxPlayers: Number(f.players.value), options: o ? { [o.key]: Number(f.option.value) } : {}, private: f.private.checked });
+    const res = await call('pt:create', { game, name: f.name.value, stake: Number(f.stake.value), maxPlayers: Number(f.players.value), options: { ...(o ? { [o.key]: Number(f.option.value) } : {}), ...matOf(f, game) }, private: f.private.checked });
     if (!res) return;
     $('#modal-pt-create').close();
     f.name.value = '';
@@ -152,12 +176,13 @@
     lv.replaceChildren(...(S.botLevels || [{ id: 'normal', name: 'Любитель' }]).map((l) => h('option', { value: l.id }, l.name)));
     lv.value = 'normal';
     $('#pt-practice-note').textContent = game === 'spy' ? 'Боты-капитаны дают подсказки по темам слов, а агенты-боты ждут, пока вы подумаете.' : game === 'dark' ? 'Боты отвечают наугад — иногда это смешнее, чем кажется.' : 'Без фишек и статистики — просто разобраться в правилах.';
+    matBox($('#pt-practice-mat'), game);
     $('#modal-pt-practice').showModal();
   }
   $('#pt-practice-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
-    const res = await call('practice:create', { game: 'pt', variant: f.game.value, level: f.level.value, bots: Number(f.bots.value) });
+    const res = await call('practice:create', { game: 'pt', variant: f.game.value, level: f.level.value, bots: Number(f.bots.value), options: matOf(f, f.game.value) });
     if (!res) return;
     $('#modal-pt-practice').close();
     location.hash = res.href;
@@ -188,9 +213,18 @@
   const nameOf = (seat) => { const s = C.st.seats[seat]; return s ? s.name : '—'; };
   const avatarOf = (seat, cls = 'sm') => { const s = C.st.seats[seat]; return NR.avatarEl(s ? s.name : '?', s ? s.avatar : null, cls); };
   /** A countdown that the frame loop keeps fresh. */
+  /**
+   * A countdown that the frame loop keeps fresh. Without the full length known, the first time
+   * this deadline was seen gives it, so the ring does not refill on every update.
+   */
+  C.tmax = new Map();
   function timer(left, total, cls = '') {
     if (!left) return null;
-    return h('span', { class: 'pt-timer ' + cls, 'data-until': String(C.at + left), 'data-total': String(total || left) }, h('i', null), h('b', null, ''));
+    const until = C.at + left;
+    const key = cls + ':' + Math.round(until / 1500);
+    if (!C.tmax.has(key)) { C.tmax.set(key, Math.max(left, total || 0)); if (C.tmax.size > 60) C.tmax.delete(C.tmax.keys().next().value); }
+    const full = Math.max(total || 0, C.tmax.get(key));
+    return h('span', { class: 'pt-timer ' + cls, 'data-until': String(until), 'data-total': String(full) }, h('i', null), h('b', null, ''));
   }
 
   function render() {
@@ -259,7 +293,28 @@
         h('div', { class: 'pt-seats' }, ...seats),
         ...prefs,
         btns.length ? h('div', { class: 'pt-actions' }, ...btns) : null,
-        h('p', { class: 'muted small' }, G.tag))));
+        h('p', { class: 'muted small' }, G.tag)),
+      rulesBlock(st.game, st.options)));
+  }
+
+  /** The full rules and the deck, for the time while the company gathers. */
+  function rulesBlock(game, options = {}) {
+    const items = RULES[game] || [];
+    const deck = deckGallery(game);
+    return h('section', { class: 'pt-rules' },
+      h('h3', null, 'Как играть'),
+      h('div', { class: 'pt-rules-grid' }, ...items.map(([t, p], i) => h('article', { class: 'pt-rule' }, h('h4', null, h('i', null, String(i + 1)), t), h('p', null, p)))),
+      MAT[game] ? h('p', { class: 'pt-deck-note' }, options.mat ? 'За этим столом: без цензуры.' : 'За этим столом: без мата.') : null,
+      deck ? h('h3', null, 'Карты') : null,
+      deck ? h('p', { class: 'pt-deck-note' }, 'Наведите на карту (на телефоне — подержите палец), чтобы прочитать её целиком.') : null,
+      deck);
+  }
+  function deckGallery(game) {
+    const D = (S.ptDecks || {})[game];
+    const R = window.PartyGames && window.PartyGames[game];
+    if (!D || !R || !R.cardEl) return null;
+    const keys = Object.keys(D).filter((k) => !D[k].hidden);
+    return h('div', { class: 'pt-deck' }, ...keys.map((k) => R.cardEl(k, D)));
   }
 
   function renderResult() {
@@ -300,7 +355,7 @@
     fill($('#pt-log'), st.log, (l) => h('li', null, l.text));
     if (C.rulesFor !== st.game) {
       C.rulesFor = st.game;
-      $('#pt-rules-pane').replaceChildren(...(RULES[st.game] || []).map(([t, p]) => h('p', null, h('b', null, t + '. '), p)));
+      $('#pt-rules-pane').replaceChildren(...(RULES[st.game] || []).map(([t, p]) => h('p', null, h('b', null, t + '. '), p)), deckGallery(st.game) || '');
     }
   }
   $('#pt-chat-form').addEventListener('submit', async (e) => {
@@ -332,7 +387,7 @@
 
   // ----- shared bits for the games -----
   /** Players around the top of the board. extra(p) returns badges for each. */
-  function strip(ctx, players, { active = [], extra = () => null, cls = () => '', onPick = null, pickable = () => false } = {}) {
+  function strip(ctx, players, { active = [], extra = () => null, cls = () => '', onPick = null, pickable = () => false, quiet = false } = {}) {
     const st = ctx.st;
     return h('div', { class: 'pt-strip' }, ...players.map((p) => {
       const s = st.seats[p.seat];
@@ -340,10 +395,10 @@
       const tag = can ? 'button' : 'div';
       return h(tag, {
         ...(can ? { type: 'button', onclick: () => onPick(p.seat) } : {}),
-        class: ['pt-pl', active.includes(p.seat) && 'active', p.seat === ctx.seat && 'me', s && !s.connected && 'off', can && 'can', cls(p)].filter(Boolean).join(' '),
+        class: ['pt-pl', active.includes(p.seat) && 'active', p.seat === ctx.seat && 'me', s && !s.connected && 'off', can && (quiet ? 'click' : 'can'), cls(p)].filter(Boolean).join(' '),
         'data-seat': p.seat,
       },
-      h('span', { class: 'pt-pl-av' }, ctx.avatarOf(p.seat, 'sm'), st.turn && st.turn.seat === p.seat ? ctx.timer(st.turn.left, null, 'ring') : null),
+      h('span', { class: 'pt-pl-av' }, ctx.avatarOf(p.seat, 'sm'), st.turn && st.turn.seat === p.seat ? ctx.timer(st.turn.left, st.turn.ms, 'ring') : null),
       h('b', { class: 'pt-pl-name' }, p.name || ctx.nameOf(p.seat)),
       extra(p));
     }));
@@ -361,6 +416,57 @@
     const dx = rb.left + rb.width / 2 - (ra.left + ra.width / 2); const dy = rb.top + rb.height / 2 - (ra.top + ra.height / 2);
     el.animate([{ transform: 'translate(-50%,-50%) scale(.9) rotate(-8deg)', opacity: 0.2 }, { transform: 'translate(-50%,-50%) scale(1.05)', opacity: 1, offset: 0.25 }, { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.8) rotate(6deg)`, opacity: 0.9 }], { duration: opts.ms || 620, easing: 'cubic-bezier(.3,.7,.3,1)' }).onfinish = () => el.remove();
   }
+  // ----- zoom: hover a card (or hold a finger on it) to read it in full -----
+  let zoomEl = null; let zoomTimer = null; let zoomFrom = null; let zoomK = null;
+  function zoomHide() { clearTimeout(zoomTimer); zoomTimer = null; zoomFrom = null; zoomK = null; if (zoomEl) { zoomEl.remove(); zoomEl = null; } }
+  function zoomShow(card) {
+    if (zoomEl) { zoomEl.remove(); zoomEl = null; }
+    zoomFrom = card;
+    const copy = card.cloneNode(true);
+    copy.classList.remove('sel', 'sm', 'dim');
+    copy.removeAttribute('style');
+    copy.setAttribute('aria-hidden', 'true');
+    copy.tabIndex = -1;
+    zoomEl = h('div', { class: 'pt-zoom' }, copy);
+    document.body.append(zoomEl);
+    const r = card.getBoundingClientRect();
+    const w = zoomEl.offsetWidth; const hh = zoomEl.offsetHeight;
+    let x = r.left + r.width / 2 - w / 2;
+    let y = r.top - hh - 12;
+    if (y < 8) y = Math.min(innerHeight - hh - 8, r.bottom + 12);
+    if (y < 8) { y = 8; x = r.right + 12 + w < innerWidth ? r.right + 12 : r.left - w - 12; }
+    zoomEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, x)) + 'px';
+    zoomEl.style.top = Math.max(8, y) + 'px';
+  }
+  const zoomable = (t) => t && t.closest && t.closest('#pt-view [data-zoom], #party-view [data-zoom]');
+  // the table re-renders on every update, so a card is followed by what it is, not by its element
+  const zoomKey = (c) => (c.dataset.id ? 'id' + c.dataset.id : '') + ':' + ((c.querySelector('b') || {}).textContent || '');
+  const findByKey = (k) => [...document.querySelectorAll('#pt-view [data-zoom], #party-view [data-zoom]')].find((x) => zoomKey(x) === k && x.matches(':hover'));
+  document.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const c = zoomable(e.target);
+    if (!c) { if (zoomFrom || zoomK) { zoomHide(); zoomK = null; } return; }
+    const k = zoomKey(c);
+    if (k === zoomK) { zoomFrom = c; return; }
+    zoomHide();
+    zoomK = k;
+    zoomFrom = c;
+    zoomTimer = setTimeout(() => { const el = zoomFrom && zoomFrom.isConnected ? zoomFrom : findByKey(k); if (el && zoomK === k) zoomShow(el); }, 380);
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') { zoomHide(); return; }
+    const c = zoomable(e.target);
+    zoomHide();
+    if (!c) return;
+    zoomFrom = c;
+    zoomTimer = setTimeout(() => { if (zoomFrom === c && c.isConnected) { zoomShow(c); c.dataset.zoomed = '1'; } }, 420);
+  });
+  document.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') { clearTimeout(zoomTimer); if (zoomEl) setTimeout(zoomHide, 900); } });
+  document.addEventListener('click', (e) => { const c = zoomable(e.target); if (c && c.dataset.zoomed) { delete c.dataset.zoomed; e.stopPropagation(); e.preventDefault(); } }, true);
+  addEventListener('scroll', zoomHide, true);
+  addEventListener('hashchange', zoomHide);
+  document.addEventListener('contextmenu', (e) => { if (zoomable(e.target) && e.pointerType !== 'mouse') e.preventDefault(); });
+
   document.addEventListener('click', (e) => { const a = e.target.closest && e.target.closest('[data-party-go]'); if (a) C.filter = a.dataset.partyGo; });
   window.PartyKit = { strip, fly, GAMES, REDUCE };
 

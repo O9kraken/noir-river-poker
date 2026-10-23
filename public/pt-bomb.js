@@ -13,15 +13,16 @@
     if (back) return h('div', { class: 'bk-card back' + (small ? ' sm' : '') }, h('span', { 'aria-hidden': 'true' }, '✶'));
     const K = kinds[k] || { name: k };
     const art = h('span', { class: 'bk-art', 'aria-hidden': 'true' });
-    if (k === 'bomb') art.innerHTML = ICON.bomb; else if (K.cat) art.innerHTML = ICON.cat; else art.textContent = GLYPH[k] || '?';
+    if (window.PartyArt && window.PartyArt.has('bomb', k)) art.innerHTML = window.PartyArt.bomb(k);
+    else if (k === 'bomb') art.innerHTML = ICON.bomb; else if (K.cat) art.innerHTML = ICON.cat; else art.textContent = GLYPH[k] || '?';
     const tag = onclick ? 'button' : 'div';
     return h(tag, {
       ...(onclick ? { type: 'button', onclick, 'aria-pressed': !!sel } : {}),
       class: `bk-card t-${TONE[k] || 'plain'}${sel ? ' sel' : ''}${small ? ' sm' : ''}${dim ? ' dim' : ''}`,
       style: tilt ? `--tilt:${tilt}deg` : '',
       'data-id': id != null ? id : '',
-      title: K.text || '',
-    }, art, h('b', null, K.name), small ? null : h('small', null, K.text));
+      'data-zoom': '1',
+    }, art, h('b', null, K.name), h('small', null, K.text));
   }
 
   function render(board, dock, ctx) {
@@ -154,5 +155,5 @@
     if (ev.type === 'shuffle') { const d = document.querySelector('#bk-deck .bk-stack'); if (d) { d.classList.remove('shuf'); void d.offsetWidth; d.classList.add('shuf'); } }
   }
 
-  (window.PartyGames ||= {}).bomb = { render };
+  (window.PartyGames ||= {}).bomb = { render, cardEl };
 })();

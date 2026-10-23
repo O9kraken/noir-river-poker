@@ -1266,6 +1266,7 @@
       <label class="field"><span>Ставка</span><select name="stake"></select></label>
     </div>
     <label class="field" id="pt-opt"><span id="pt-opt-label">Параметр</span><select name="option"></select></label>
+    <label class="check priv-check" id="pt-mat" hidden><input type="checkbox" name="mat"> <span><b>Без цензуры</b><small></small></span></label>
     <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" data-close>Отмена</button>
@@ -1282,6 +1283,7 @@
       <label class="field"><span>Соперники</span><select name="bots"></select></label>
       <label class="field"><span>Уровень ботов</span><select name="level"></select></label>
     </div>
+    <label class="check priv-check" id="pt-practice-mat" hidden><input type="checkbox" name="mat"> <span><b>Без цензуры</b><small></small></span></label>
     <p class="muted small" id="pt-practice-note"></p>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" data-close>Отмена</button>
@@ -1415,6 +1417,7 @@
 <script src="/ratings.js"></script>
 <script src="/shop.js"></script>
 <script src="/report.js"></script>
+<script src="/pt-art.js"></script>
 <script src="/party.js"></script>
 <script src="/pt-bomb.js"></script>
 <script src="/pt-spy.js"></script>

@@ -35,7 +35,7 @@
     const black = h('div', { class: 'dt-black' + (winnerReveal ? ' done' : '') },
       h('p', null, ...promptEl(g.prompt, winnerReveal ? winnerReveal.texts : g.phase === 'answer' && !amJudge ? picked : null)),
       h('small', null, g.pick === 2 ? 'Нужно два ответа — по порядку' : 'БЕЗ ТОРМОЗОВ · 18+'),
-      g.phase === 'answer' ? ctx.timer(g.answerLeft, 75000, 'bar') : g.phase === 'judge' && st.turn ? ctx.timer(st.turn.left, null, 'bar') : null);
+      g.phase === 'answer' ? ctx.timer(g.answerLeft, 75000, 'bar') : g.phase === 'judge' && st.turn ? ctx.timer(st.turn.left, st.turn.ms, 'bar') : null);
     let center;
     if (g.phase === 'answer') {
       const done = g.players.filter((p) => p.answered).length;

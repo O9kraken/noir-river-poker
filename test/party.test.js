@@ -108,3 +108,29 @@ test('шпионы: подсказка не может быть словом с 
   assert.ok(g.validClue('два слова'));
   assert.equal(g.validClue('абракадабра'), null);
 });
+
+test('настолки: партию можно сохранить посреди игры и доиграть на «новом сервере»', () => {
+  for (const game of ['bomb', 'spy', 'dungeon', 'dark']) {
+    const n = game === 'spy' ? 4 : 3;
+    const mk = (w, rng) => new PartyTable({ id: 't', name: 'T', game, stake: 0, maxPlayers: n }, { onGameEnd: (tt, r) => { tt.ended = r; } },
+      { games: GAMES, timers: w.timers, now: w.now, rng, randomInt: (k) => Math.floor(rng() * k), countdown: 10, resultPause: 10 });
+    const w1 = world(); const rng = seeded(11);
+    const a = mk(w1, rng);
+    const ids = new Set();
+    for (let i = 0; i < n; i++) { ids.add(`bot:${i}`); a.sit(`bot:${i}`, `Б${i}`, i); }
+    let steps = 0;
+    while (steps < 12 && !a.ended) { steps += 1; const d = a.botDelay(ids); if (d != null) { w1.advance(Math.min(d, 300)); a.botStep(ids, 'normal', rng); } else w1.advance(1500); }
+    assert.equal(a.status, 'playing', `${game}: партия идёт`);
+    const snap = JSON.parse(JSON.stringify(a.snapshot()));
+    // the new server: the same seats, then the game
+    const w2 = world();
+    const b = mk(w2, seeded(12));
+    for (const s of snap.seats) b.sit(s.userId, s.name, s.seat);
+    assert.ok(b.restoreGame(snap.game, () => true));
+    assert.equal(b.status, 'playing');
+    assert.deepEqual(JSON.parse(JSON.stringify(b.g.view(0))).players, JSON.parse(JSON.stringify(a.g.view(0))).players, `${game}: те же игроки и счёт`);
+    steps = 0;
+    while (steps < 30000 && !b.ended) { steps += 1; const d = b.botDelay(ids); if (d != null) { w2.advance(Math.min(d, 300)); b.botStep(ids, 'normal', rng); } else w2.advance(1500); }
+    assert.ok(b.ended, `${game}: доиграли после перезапуска`);
+  }
+});
