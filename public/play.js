@@ -111,11 +111,14 @@
     const hue = av && av.hue != null ? av.hue : hueOf(name);
     const img = av && typeof av.img === 'string' && AV_IMG_RE.test(av.img) ? av.img : '';
     const frame = av && typeof av.frame === 'string' && /^[a-z]{2,12}$/.test(av.frame) ? av.frame : '';
-    const key = `${name}|${hue}|${av && av.sym}|${img}|${frame}`;
+    const badge = av && typeof av.badge === 'string' && /^[a-z]{2,12}$/.test(av.badge) ? av.badge : '';
+    const key = `${name}|${hue}|${av && av.sym}|${img}|${frame}|${badge}`;
     if (el._avKey === key) return el;
     el._avKey = key;
-    for (const c of [...el.classList]) if (c.startsWith('fr-')) el.classList.remove(c);
+    for (const c of [...el.classList]) if (c.startsWith('fr-') || c.startsWith('bd-')) el.classList.remove(c);
+    el.classList.remove('framed', 'badged');
     if (frame) el.classList.add('fr-' + frame, 'framed');
+    if (badge) el.classList.add('bd-' + badge, 'badged');
     el.style.setProperty('--hue', hue);
     el.classList.toggle('av-img', !!img);
     el.style.backgroundImage = img ? `url("${img}")` : '';
@@ -615,7 +618,7 @@
     socket.on('announce', (a) => setAnnouncement(a));
     socket.on('notice', (n) => {
       toast(n.text);
-      if (n.type === 'closed' && n.tableId && location.hash.includes(n.tableId)) location.hash = '#/';
+      if (n.type === 'closed' && n.tableId && location.hash.includes(n.tableId)) location.hash = n.href || '#/';
     });
   }
 
@@ -737,6 +740,7 @@
     for (const c of [...b.classList]) if (c.startsWith('lk-')) b.classList.remove(c);
     if (l.back && l.back !== 'back-classic') b.classList.add('lk-' + l.back);
     if (l.felt && l.felt !== 'felt-classic') b.classList.add('lk-' + l.felt, 'lk-felt');
+    if (l.deck && l.deck !== 'deck-classic') b.classList.add('lk-' + l.deck, 'lk-deck');
   }
   function renderMe() {
     if (!S.me) return;

@@ -46,18 +46,48 @@ const SHOP = [
   { id: 'frame-ruby', cat: 'frame', name: 'Рубин', price: 7000 },
   { id: 'frame-neon', cat: 'frame', name: 'Неон', price: 12000, note: 'переливается' },
   { id: 'frame-crown', cat: 'frame', name: 'Корона', price: 25000, note: 'золото и корона' },
+  { id: 'frame-bronze', cat: 'frame', name: 'Бронза', price: 1500 },
+  { id: 'frame-ice', cat: 'frame', name: 'Лёд', price: 8000 },
+  { id: 'frame-platinum', cat: 'frame', name: 'Платина', price: 9000 },
+  { id: 'frame-fire', cat: 'frame', name: 'Пламя', price: 15000, note: 'горит' },
+  { id: 'frame-rainbow', cat: 'frame', name: 'Радуга', price: 18000, note: 'вращается' },
+  { id: 'frame-diamond', cat: 'frame', name: 'Бриллиант', price: 40000, note: 'искрится' },
   { id: 'back-classic', cat: 'back', name: 'Бордо', price: 0 },
   { id: 'back-emerald', cat: 'back', name: 'Изумрудная', price: 1500 },
   { id: 'back-midnight', cat: 'back', name: 'Полночь', price: 2500 },
   { id: 'back-noir', cat: 'back', name: 'Нуар с золотом', price: 4000 },
   { id: 'back-river', cat: 'back', name: 'Река', price: 6000 },
   { id: 'back-aurora', cat: 'back', name: 'Северное сияние', price: 9000 },
+  { id: 'back-carbon', cat: 'back', name: 'Карбон', price: 3500 },
+  { id: 'back-suits', cat: 'back', name: 'Масти', price: 4500 },
+  { id: 'back-sakura', cat: 'back', name: 'Сакура', price: 5000 },
+  { id: 'back-lava', cat: 'back', name: 'Лава', price: 7000 },
+  { id: 'back-royal', cat: 'back', name: 'Королевская', price: 8000 },
   { id: 'felt-classic', cat: 'felt', name: 'Клубное зелёное', price: 0 },
   { id: 'felt-burgundy', cat: 'felt', name: 'Бордовое', price: 3000 },
   { id: 'felt-midnight', cat: 'felt', name: 'Полночное синее', price: 3000 },
   { id: 'felt-graphite', cat: 'felt', name: 'Графит', price: 4000 },
   { id: 'felt-royal', cat: 'felt', name: 'Королевский пурпур', price: 6000 },
   { id: 'felt-sand', cat: 'felt', name: 'Песок пустыни', price: 6000 },
+  { id: 'felt-teal', cat: 'felt', name: 'Бирюза', price: 3000 },
+  { id: 'felt-forest', cat: 'felt', name: 'Ночной лес', price: 4000 },
+  { id: 'felt-ocean', cat: 'felt', name: 'Океан', price: 5000 },
+  { id: 'felt-cosmos', cat: 'felt', name: 'Космос', price: 9000 },
+  { id: 'deck-classic', cat: 'deck', name: 'Слоновая кость', price: 0 },
+  { id: 'deck-mint', cat: 'deck', name: 'Мятная', price: 3000 },
+  { id: 'deck-vintage', cat: 'deck', name: 'Винтаж', price: 3000 },
+  { id: 'deck-night', cat: 'deck', name: 'Ночная', price: 5000, note: 'тёмные карты' },
+  { id: 'deck-gold', cat: 'deck', name: 'Золотой обрез', price: 7000 },
+  { id: 'badge-none', cat: 'badge', name: 'Без значка', price: 0 },
+  { id: 'badge-spade', cat: 'badge', name: 'Пики', price: 1500 },
+  { id: 'badge-heart', cat: 'badge', name: 'Черви', price: 1500 },
+  { id: 'badge-diamond', cat: 'badge', name: 'Бубны', price: 1500 },
+  { id: 'badge-club', cat: 'badge', name: 'Трефы', price: 1500 },
+  { id: 'badge-star', cat: 'badge', name: 'Звезда', price: 3000 },
+  { id: 'badge-bolt', cat: 'badge', name: 'Молния', price: 4000 },
+  { id: 'badge-skull', cat: 'badge', name: 'Череп', price: 5000 },
+  { id: 'badge-crown', cat: 'badge', name: 'Корона', price: 8000 },
+  { id: 'badge-dice', cat: 'badge', name: 'Кости', price: 4000 },
   { id: 'title-none', cat: 'title', name: 'Без титула', price: 0 },
   { id: 'title-lucky', cat: 'title', name: 'Счастливчик', price: 2000 },
   { id: 'title-shark', cat: 'title', name: 'Акула', price: 4000 },
@@ -65,13 +95,22 @@ const SHOP = [
   { id: 'title-tycoon', cat: 'title', name: 'Магнат', price: 8000 },
   { id: 'title-gm', cat: 'title', name: 'Гроссмейстер', price: 8000 },
   { id: 'title-don', cat: 'title', name: 'Дон', price: 10000 },
+  { id: 'title-quiet', cat: 'title', name: 'Тихий омут', price: 2500 },
+  { id: 'title-allin', cat: 'title', name: 'Ва-банк', price: 3000 },
+  { id: 'title-cheat', cat: 'title', name: 'Шулер', price: 4000 },
+  { id: 'title-spy', cat: 'title', name: 'Агент под прикрытием', price: 4000 },
+  { id: 'title-bomb', cat: 'title', name: 'Сапёр', price: 4000 },
+  { id: 'title-hero', cat: 'title', name: 'Гроза подземелий', price: 6000 },
+  { id: 'title-nobrakes', cat: 'title', name: 'Без тормозов', price: 6000 },
+  { id: 'title-river', cat: 'title', name: 'Король реки', price: 15000 },
+  { id: 'title-patron', cat: 'title', name: 'Меценат', price: 30000 },
   { id: 'title-legend', cat: 'title', name: 'Легенда клуба', price: 50000 },
 ];
 // the current version of the rules and the privacy policy: a new one asks everyone to accept again
 const LEGAL_VERSION = '2026-10-23';
 const REPORT_REASONS = { abuse: 'Оскорбления', spam: 'Спам или реклама', cheat: 'Нечестная игра', image: 'Недопустимый аватар', other: 'Другое' };
 
-const SHOP_DEFAULT = { frame: 'frame-none', back: 'back-classic', felt: 'felt-classic', title: 'title-none' };
+const SHOP_DEFAULT = { frame: 'frame-none', back: 'back-classic', felt: 'felt-classic', title: 'title-none', deck: 'deck-classic', badge: 'badge-none' };
 const titleOf = (u) => { const t = u.shop && u.shop.eq.title; const it = t && t !== 'title-none' ? SHOP.find((x) => x.id === t) : null; return it ? it.name : null; };
 
 function emptyStats() {
@@ -417,6 +456,7 @@ class Store {
       sym: AVATAR_SYMBOLS.includes(sym) ? sym : '',
       ...(u.avatar && u.avatar.img ? { img: u.avatar.img } : {}),
       ...(u.avatar && u.avatar.frame ? { frame: u.avatar.frame } : {}),
+      ...(u.avatar && u.avatar.badge ? { badge: u.avatar.badge } : {}),
     };
     this.save();
     return u.avatar;
@@ -800,6 +840,11 @@ class Store {
     if (it.cat === 'frame') {
       u.avatar = { ...(u.avatar || { hue: null, sym: '' }) };
       if (it.id === 'frame-none') delete u.avatar.frame; else u.avatar.frame = it.id.slice(6);
+    }
+    // the badge too: a small sign on the avatar everyone sees
+    if (it.cat === 'badge') {
+      u.avatar = { ...(u.avatar || { hue: null, sym: '' }) };
+      if (it.id === 'badge-none') delete u.avatar.badge; else u.avatar.badge = it.id.slice(6);
     }
   }
 

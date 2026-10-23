@@ -80,7 +80,7 @@ class DungeonGame {
 
   _armTurn() {
     this.host.clear('fight');
-    const ms = this.phase === 'fight' ? 75000 : 45000;
+    const ms = this.phase === 'fight' ? 75000 : this.phase === 'charity' ? 30000 : 45000;
     this.host.turn(this.cur, ms, () => this._auto());
   }
   resume() {
@@ -90,7 +90,8 @@ class DungeonGame {
   _auto() {
     if (this.phase === 'start') { this._kick(this.cur); return; }
     if (this.phase === 'after') { this._loot(this.cur); return; }
-    if (this.phase === 'fight') { this._resolveFight(); }
+    if (this.phase === 'fight') { this._resolveFight(); return; }
+    if (this.phase === 'charity') this._give(this.cur, this._cheapest(this.p(this.cur), this.p(this.cur).hand.length - HAND_LIMIT).map((c) => c.id), true);
   }
 
   // ---------- turns ----------
@@ -106,22 +107,46 @@ class DungeonGame {
     this.cur = this.order[(i + 1) % this.order.length];
     this._beginTurn();
   }
-  /** End of turn: too many cards go to the lowest-level player (or to the discard). */
+  /**
+   * End of turn: more than five cards in hand — the player chooses which ones to give away
+   * (to the lowest-level player, or to the discard if that is them). Until then they may still
+   * put on gear, sell or use levels to shrink the hand. On timeout the cheapest cards go.
+   */
   _charity() {
     const p = this.p(this.cur);
     if (p.hand.length > HAND_LIMIT) {
-      const extra = p.hand.length - HAND_LIMIT;
-      const val = (c) => { const d = this.def(c); return d.type === 'level' ? 100 : d.type === 'oneshot' ? 50 : d.gold || 10; };
-      const give = [...p.hand].sort((a, b) => val(a) - val(b)).slice(0, extra);
-      p.hand = p.hand.filter((c) => !give.includes(c));
-      const others = this.order.filter((s) => s !== this.cur);
-      const low = Math.min(...others.map((s) => this.p(s).level));
-      const lowest = others.filter((s) => this.p(s).level === low);
-      if (p.level <= low || !lowest.length) give.forEach((c) => this._discard(c));
-      else { const to = lowest[0]; this.p(to).hand.push(...give); this.host.sys(`${this._n(this.cur)} раздаёт лишнее: ${give.length} карт → ${this._n(to)}`); }
+      this.phase = 'charity';
+      this._event('charity', this.cur, `${this._n(this.cur)}: в руке ${p.hand.length} карт при лимите ${HAND_LIMIT} — выбирает, что отдать`);
+      this._armTurn();
+      return;
     }
     this._next();
   }
+  _cardVal(c) { const d = this.def(c); return d.type === 'level' ? 100 : d.type === 'oneshot' ? 50 : d.gold || 10; }
+  _cheapest(p, n) { return [...p.hand].sort((a, b) => this._cardVal(a) - this._cardVal(b)).slice(0, Math.max(0, n)); }
+  _charityTo() {
+    const p = this.p(this.cur);
+    const others = this.order.filter((s) => s !== this.cur);
+    const low = Math.min(...others.map((s) => this.p(s).level));
+    const lowest = others.filter((s) => this.p(s).level === low);
+    return p.level <= low || !lowest.length ? null : lowest[0];
+  }
+  /** Give away exactly the extra cards. */
+  _give(seat, ids, auto = false) {
+    const p = this._mine(seat, ['charity']);
+    const need = p.hand.length - HAND_LIMIT;
+    const list = [...new Set((Array.isArray(ids) ? ids : []).map(Number))];
+    if (list.length !== need) throw new GameError(`Выберите ровно ${need} ${need === 1 ? 'карту' : need < 5 ? 'карты' : 'карт'}`);
+    const give = list.map((id) => this._peekHand(p, id));
+    p.hand = p.hand.filter((c) => !give.includes(c));
+    const to = this._charityTo();
+    const names = give.map((c) => this.def(c).name).join(', ');
+    if (to == null) { give.forEach((c) => this._discard(c)); this._event('gave', seat, `${this._n(seat)}${auto ? ' не успел выбрать и' : ''} сбрасывает лишнее: ${names}`); }
+    else { this.p(to).hand.push(...give); this._event('gave', seat, `${this._n(seat)}${auto ? ' не успел выбрать и' : ''} отдаёт лишнее ${this._n(to)}: ${names}`, { to }); }
+    this._next();
+  }
+  /** After gear/sale/level during the charity phase: maybe the hand already fits. */
+  _charityCheck() { if (this.phase === 'charity' && this.p(this.cur).hand.length <= HAND_LIMIT) this._next(); }
 
   act(seat, type, x) {
     if (this.phase === 'over') throw new GameError('Партия окончена');
@@ -143,6 +168,7 @@ class DungeonGame {
       case 'burn': return this._burn(seat, x.card);
       case 'go': return this._go(seat);
       case 'run': return this._run(seat);
+      case 'give': return this._give(seat, x.cards);
       default: throw new GameError('Неизвестный ход');
     }
   }
@@ -189,7 +215,7 @@ class DungeonGame {
   }
 
   _equip(seat, cardId) {
-    const p = this._mine(seat, ['start', 'after']);
+    const p = this._mine(seat, ['start', 'after', 'charity']);
     const c = this._peekHand(p, cardId);
     const d = this.def(c);
     if (d.type !== 'gear') throw new GameError('Это не снаряжение');
@@ -205,10 +231,11 @@ class DungeonGame {
     } else { if (p.eq.misc.length >= 2) back.push(p.eq.misc.shift()); p.eq.misc.push(c); }
     p.hand.push(...back);
     this._event('equip', seat, null, { card: c.k });
+    this._charityCheck();
   }
 
   _unequip(seat, cardId) {
-    const p = this._mine(seat, ['start', 'after']);
+    const p = this._mine(seat, ['start', 'after', 'charity']);
     const id = Number(cardId);
     for (const s of SLOTS) if (p.eq[s] && p.eq[s].id === id) { p.hand.push(p.eq[s]); p.eq[s] = null; return; }
     for (const k of ['hands', 'misc']) { const i = p.eq[k].findIndex((x) => x.id === id); if (i !== -1) { p.hand.push(p.eq[k].splice(i, 1)[0]); return; } }
@@ -216,7 +243,7 @@ class DungeonGame {
   }
 
   _class(seat, cardId) {
-    const p = this._mine(seat, ['start', 'after']);
+    const p = this._mine(seat, ['start', 'after', 'charity']);
     const c = this._peekHand(p, cardId);
     const d = this.def(c);
     if (d.type !== 'class') throw new GameError('Это не класс');
@@ -227,6 +254,7 @@ class DungeonGame {
     // gear for another class falls off
     for (const it of this._items(p)) if (this.def(it).only && this.def(it).only !== p.cls) this._unequip(seat, it.id);
     this._event('class', seat, `${this._n(seat)} теперь ${d.name}`, { card: c.k });
+    this._charityCheck();
   }
 
   _level(seat, cardId) {
@@ -239,10 +267,11 @@ class DungeonGame {
     this._discard(c);
     p.level += 1;
     this._event('level', seat, `${this._n(seat)}: «${this.def(c).name}» — ${p.level} уровень`, { card: c.k });
+    this._charityCheck();
   }
 
   _sell(seat, ids) {
-    const p = this._mine(seat, ['start', 'after']);
+    const p = this._mine(seat, ['start', 'after', 'charity']);
     const list = (Array.isArray(ids) ? ids : []).map(Number);
     if (!list.length) throw new GameError('Выберите вещи');
     const all = [...p.hand, ...this._items(p)];
@@ -260,6 +289,7 @@ class DungeonGame {
     }
     p.level += lv;
     this._event('sell', seat, `${this._n(seat)} сдаёт барахло скупщику: +${lv} ур. (${p.level})`);
+    this._charityCheck();
   }
 
   _curse(seat, cardId, target) {
@@ -272,11 +302,18 @@ class DungeonGame {
     this._discard(c);
     this._event('curse', seat, `${this._n(seat)} проклинает ${this._n(target)}: «${d.name}»`, { card: c.k, target });
     this._applyBad(target, d.effect);
+    if (seat === this.cur) this._charityCheck();
   }
 
   _applyBad(seat, bad) {
     const p = this.p(seat);
-    const drop = (c) => { if (c) this._discard(c); return c; };
+    const lost = [];
+    const drop = (c) => { if (c) { this._discard(c); lost.push(this.def(c).name); } return c; };
+    this._applyBadInner(p, bad, drop);
+    if (bad === 'death') this.host.sys(`${this._n(seat)} погибает и теряет все карты${lost.length ? ` (${lost.length})` : ''}. Уровень и класс остаются.`);
+    else if (lost.length) this.host.sys(`${this._n(seat)} теряет: ${lost.join(', ')}`);
+  }
+  _applyBadInner(p, bad, drop) {
     if (bad === 'lvl1' || bad === 'lvl2' || bad === 'lvl3') p.level = Math.max(1, p.level - Number(bad[3]));
     else if (SLOTS.includes(bad)) { drop(p.eq[bad]); p.eq[bad] = null; }
     else if (bad === 'hand') { if (p.eq.hands.length) drop(p.eq.hands.splice(Math.floor(this.rng() * p.eq.hands.length), 1)[0]); }
@@ -468,7 +505,7 @@ class DungeonGame {
   leave(seat) {
     const p = this.ps.get(seat);
     if (!p) return;
-    for (const c of [...this._items(p), ...p.hand]) this._discard(c);
+    for (const c of [...this._items(p), ...p.hand, p.clsCard]) this._discard(c);
     this.ps.delete(seat);
     this.order = this.order.filter((s) => s !== seat);
     if (this.order.length < 2) {
@@ -480,7 +517,7 @@ class DungeonGame {
     if (this.fight && this.fight.helper === seat) this.fight.helper = null;
     if (this.fight) this.fight.offers = this.fight.offers.filter((s) => s !== seat);
     if (this.cur === seat) {
-      if (this.fight) { this.fight.monsters.forEach((m) => this._discard(m.card)); this.fight = null; this.host.clear('fight'); }
+      if (this.fight) this._endFight();
       this.cur = this.order[0];
       this._beginTurn();
     }
@@ -494,7 +531,8 @@ class DungeonGame {
     return {
       type: 'dungeon',
       goal: this.goal,
-      order: this.order, cur: this.cur, phase: this.phase,
+      order: this.order, cur: this.cur, phase: this.phase, handLimit: HAND_LIMIT,
+      charity: this.phase === 'charity' ? { need: Math.max(0, this.p(this.cur).hand.length - HAND_LIMIT), to: this._charityTo() } : null,
       players: this.order.map((s) => {
         const p = this.p(s);
         return {
@@ -526,7 +564,7 @@ class DungeonGame {
       if (bs.fightSeen !== this._fightKey()) return 1600;
       return null;
     }
-    if (seat === this.cur) return 1300;
+    if (seat === this.cur) return this.phase === 'charity' ? 900 : 1300;
     return null;
   }
   _fightKey() { const f = this.fight; return f ? `${this.seq}:${f.monsters.length}:${f.pfx}:${f.mfx}:${f.helper}:${f.offers.length}` : ''; }
@@ -573,6 +611,7 @@ class DungeonGame {
       return;
     }
     if (seat !== this.cur) return;
+    if (this.phase === 'charity') { this._give(seat, this._cheapest(p, p.hand.length - HAND_LIMIT).map((c) => c.id)); return; }
     // housekeeping first: class, gear, levels, selling
     const cls = has('class')[0];
     if (cls && !p.cls) { this._class(seat, cls.id); return; }

@@ -34,6 +34,25 @@ test('лавка: покупка, надевание, рамка видна на
   assert.throws(() => store.buy(id, 'nope'), /нет/);
 });
 
+test('лавка: нашивка видна на аватаре, лицо карт — в образе игрока', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const store = new Store(path.join(dir, 'u.json'));
+  const { user } = store.register('Нашивка', 'secret1');
+  const id = user.id;
+  store.buy(id, 'badge-spade');
+  assert.equal(store.brief(id).avatar.badge, 'spade');
+  store.buy(id, 'frame-bronze');
+  store.setAvatar(id, 200, '');
+  assert.equal(store.get(id).avatar.badge, 'spade', 'нашивка остаётся при смене аватара');
+  assert.equal(store.get(id).avatar.frame, 'bronze');
+  store.equip(id, 'badge-none');
+  assert.equal(store.get(id).avatar.badge, undefined);
+  store.buy(id, 'deck-night');
+  assert.equal(store.profile(id).looks.deck, 'deck-night');
+  for (const cat of ['frame', 'back', 'felt', 'title', 'deck', 'badge']) assert.ok(SHOP.some((x) => x.cat === cat && !x.price), `бесплатный вариант в «${cat}»`);
+  assert.equal(new Set(SHOP.map((x) => x.id)).size, SHOP.length, 'id товаров уникальны');
+});
+
 test('резервная копия: скачать и восстановить через админку; не админу нельзя', async (t) => {
   const { createServer } = require('../server');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));

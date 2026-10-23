@@ -350,7 +350,7 @@
   }
   function avatarEditor(p) {
     if (!editorOpen) return null;
-    const cur = { hue: p.avatar && p.avatar.hue != null ? p.avatar.hue : NR.hueOf(p.name), sym: (p.avatar && p.avatar.sym) || '', img: (p.avatar && p.avatar.img) || undefined, frame: (p.avatar && p.avatar.frame) || undefined };
+    const cur = { hue: p.avatar && p.avatar.hue != null ? p.avatar.hue : NR.hueOf(p.name), sym: (p.avatar && p.avatar.sym) || '', img: (p.avatar && p.avatar.img) || undefined, frame: (p.avatar && p.avatar.frame) || undefined, badge: (p.avatar && p.avatar.badge) || undefined };
     const preview = NR.avatarEl(p.name, cur, 'xl');
     const redraw = () => NR.fillAvatar(preview, p.name, cur);
     const hues = h('div', { class: 'av-hues', role: 'radiogroup', 'aria-label': 'Цвет' }, HUES.map((hu) => h('button', {

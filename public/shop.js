@@ -1,11 +1,13 @@
-/* The club shop: avatar frames and titles everyone sees, card backs and felt for your own tables. */
+/* The club shop: avatar frames, patches and titles everyone sees; card backs, faces and felt for your own tables. */
 (() => {
   'use strict';
   const NR = window.NR;
   const { $, h, fmt, call, toast, S, Sound } = NR;
   const CATS = [
     ['frame', 'Рамки аватара', 'Рамку видят все: за столами, в чатах, в профиле и рейтингах.'],
+    ['badge', 'Нашивки', 'Нашивка на уголке аватара — её видят все: за столами, в чатах и рейтингах.'],
     ['back', 'Рубашки карт', 'Рубашка карт в покере, дураке и блэкджеке — для ваших столов.'],
+    ['deck', 'Лицо карт', 'Цвет и отделка лицевой стороны карт — так карты выглядят у вас во всех карточных играх.'],
     ['felt', 'Сукно', 'Цвет сукна на ваших столах: покер, дурак, блэкджек.'],
     ['title', 'Титулы', 'Титул виден в вашем профиле рядом с именем.'],
   ];
@@ -35,6 +37,14 @@
       const av = { ...(me.avatar || {}) };
       if (it.id === 'frame-none') delete av.frame; else av.frame = it.id.slice(6);
       return h('div', { class: 'shop-prev prev-frame' }, NR.avatarEl(me.name, av, 'xl'));
+    }
+    if (it.cat === 'badge') {
+      const av = { ...(me.avatar || {}) };
+      if (it.id === 'badge-none') delete av.badge; else av.badge = it.id.slice(6);
+      return h('div', { class: 'shop-prev prev-frame' }, NR.avatarEl(me.name, av, 'xl'));
+    }
+    if (it.cat === 'deck') {
+      return h('div', { class: `shop-prev prev-back prev-deck lk-${it.id} lk-deck` }, NR.cardEl('Ah', 'pv1'), NR.cardEl('Ks', 'pv2'), NR.cardEl('Qd', 'pv3'));
     }
     if (it.cat === 'back') {
       return h('div', { class: `shop-prev prev-back lk-${it.id}` }, NR.cardEl(null, 'pv1'), NR.cardEl(null, 'pv2'), NR.cardEl('As', 'pv3'));

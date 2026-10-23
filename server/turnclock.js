@@ -45,7 +45,7 @@ class TurnClock {
   /** The client of `seat` has the turn on screen. */
   seen(seat, key) {
     const c = this.cur;
-    if (!c || c.seen || c.paused || c.seat !== seat || c.key !== key) return false;
+    if (!c || c.seen || c.paused || c.held != null || c.seat !== seat || c.key !== key) return false;
     c.seen = true;
     const left = Math.max(1000, Math.min(c.ms, c.start + c.ms + this.grace - this.now()));
     this._set(left);
@@ -55,7 +55,7 @@ class TurnClock {
   /** A player's connection changed. */
   connection(seat, connected) {
     const c = this.cur;
-    if (!c || c.seat !== seat) return false;
+    if (!c || c.seat !== seat || c.held != null) return false;
     if (!connected && !c.paused) { this._arm('pause'); return true; }
     if (connected && c.paused) { this._arm('resume'); return true; }
     return false;
@@ -97,11 +97,27 @@ class TurnClock {
     }, ms);
   }
 
+  /** The whole table is paused: freeze the turn where it is. */
+  hold() {
+    const c = this.cur;
+    if (!c || c.held != null) return;
+    c.held = Math.max(0, (c.deadline || this.now()) - this.now());
+    if (this._t) { this.timers.clear(this._t); this._t = null; }
+  }
+  release() {
+    const c = this.cur;
+    if (!c || c.held == null) return;
+    const left = Math.max(1000, c.held);
+    c.held = null;
+    if (c.paused) c.paused = this.now(); // the offline budget is not spent during a table pause
+    this._set(left);
+  }
+
   /** For the table's public state. */
   view() {
     const c = this.cur;
     if (!c) return { key: null, left: 0, ms: 0, paused: null };
-    const raw = Math.max(0, c.deadline - this.now());
+    const raw = c.held != null ? c.held : Math.max(0, c.deadline - this.now());
     return {
       key: c.key, seat: c.seat, ms: c.ms,
       // before the confirmation, show the plain full time rather than the grace-padded one

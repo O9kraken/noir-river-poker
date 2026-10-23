@@ -3,6 +3,9 @@ const crypto = require('crypto');
 const { GameError } = require('../engine/table');
 const { TurnClock } = require('../turnclock');
 
+const PAUSES_PER_GAME = 3;
+const PAUSE_MS = 3 * 60 * 1000;
+const PAUSE_MS_PRACTICE = 15 * 60 * 1000;
 const isBot = (u) => typeof u === 'string' && u.startsWith('bot:');
 
 /**
@@ -48,6 +51,7 @@ class PartyTable {
     this.resultPause = opts.resultPause ?? 14000;
     // turn clocks: tests run them faster; with bots there is no rush, so practice tables give twice the time
     this.speed = opts.speed ?? (cfg.practice ? 2 : 1);
+    this.practice = !!cfg.practice;
     this.clock = new TurnClock({ timers: this.timers, now: this.now, grace: opts.seenGrace ?? 6000, pauseMs: opts.pauseMs ?? 45000, awayMs: 1500 });
     this.seats = Array(this.maxSeats).fill(null);
     this.status = 'waiting'; // waiting | countdown | playing | result
@@ -87,6 +91,7 @@ class PartyTable {
     if (i === -1) return;
     const s = this.seats[i];
     if (this.status === 'playing' && this.inGame(i)) {
+      if (this.paused) this._endPause();
       this.sys(`${s.name} уходит из-за стола`);
       this.players = this.players.filter((p) => p.seat !== i);
       this.deps.onInPlay && this.deps.onInPlay(s.userId, 0);
@@ -159,6 +164,7 @@ class PartyTable {
       }
     }
     this.gameNo += 1;
+    this.pauseUsed = {};
     this.pot = this.stake * seats.length;
     this.chat = [];
     this.left = [];
@@ -196,14 +202,61 @@ class PartyTable {
     this.clear(name);
     const len = scale ? this.ms(ms) : Math.max(10, Math.round(ms * Math.min(1, this.speed)));
     const at = this.now() + len;
-    const h = this.timers.set(() => { this._named.delete(name); if (this.status === 'playing') { fn(); this._update(); } }, len);
-    this._named.set(name, { h, at, len });
+    const run = () => { this._named.delete(name); if (this.status === 'playing') { fn(); this._update(); } };
+    if (this.paused) { this._named.set(name, { h: null, at, len, run, held: len }); return at; }
+    const h = this.timers.set(run, len);
+    this._named.set(name, { h, at, len, run });
     return at;
   }
-  clear(name) { const t = this._named.get(name); if (t) { this.timers.clear(t.h); this._named.delete(name); } }
-  timerLeft(name) { const t = this._named.get(name); return t ? Math.max(0, t.at - this.now()) : 0; }
+  clear(name) { const t = this._named.get(name); if (t) { if (t.h != null) this.timers.clear(t.h); this._named.delete(name); } }
+  timerLeft(name) { const t = this._named.get(name); return t ? (t.held != null ? t.held : Math.max(0, t.at - this.now())) : 0; }
   timerLen(name) { const t = this._named.get(name); return t ? t.len : 0; }
-  _clearAll() { for (const k of [...this._named.keys()]) this.clear(k); this.clock.stop(); }
+  _clearAll() { this._endPause(); for (const k of [...this._named.keys()]) this.clear(k); this.clock.stop(); }
+
+  // ---------- pause ----------
+  /** Any player in the game may pause it: every clock stops, moves wait. A few pauses per player per game. */
+  pause(userId) {
+    if (this.status !== 'playing' || !this.g) throw new GameError('Партия не идёт');
+    const seat = this.seatOf(userId);
+    if (seat === -1 || !this.inGame(seat)) throw new GameError('Пауза — для участников партии');
+    if (this.paused) throw new GameError('Игра уже на паузе');
+    this.pauseUsed ||= {};
+    const used = this.pauseUsed[userId] || 0;
+    if (!this.practice && used >= PAUSES_PER_GAME) throw new GameError(`Пауза — не больше ${PAUSES_PER_GAME} раз за партию`);
+    this.pauseUsed[userId] = used + 1;
+    const ms = this.practice ? PAUSE_MS_PRACTICE : PAUSE_MS;
+    this.paused = { seat, name: this.seats[seat].name, at: this.now(), until: this.now() + ms };
+    this.clock.hold();
+    for (const t of this._named.values()) {
+      if (t.h == null) continue;
+      this.timers.clear(t.h); t.h = null; t.held = Math.max(0, t.at - this.now());
+    }
+    this._pauseT = this.timers.set(() => { this._pauseT = null; if (this.paused) { this.sys('Пауза закончилась сама — играем дальше'); this.unpause(null, true); } }, ms);
+    this.sys(`${this.paused.name} ставит игру на паузу (до ${Math.round(ms / 60000)} мин)`);
+    this._update();
+  }
+  unpause(userId, auto = false) {
+    if (!this.paused) return;
+    if (!auto) {
+      const seat = this.seatOf(userId);
+      if (seat === -1 || !this.inGame(seat)) throw new GameError('Снять паузу может участник партии');
+      this.sys(`${this.seats[seat].name} снимает паузу`);
+    }
+    this._endPause();
+    this._update();
+  }
+  _endPause() {
+    if (!this.paused) return;
+    this.paused = null;
+    if (this._pauseT) { this.timers.clear(this._pauseT); this._pauseT = null; }
+    for (const [name, t] of this._named) {
+      if (t.held == null) continue;
+      const left = Math.max(1000, t.held);
+      t.held = null; t.at = this.now() + left;
+      t.h = this.timers.set(t.run, left);
+    }
+    this.clock.release();
+  }
 
   seen(userId, key) {
     const i = this.seatOf(userId);
@@ -257,6 +310,7 @@ class PartyTable {
 
   act(userId, type, payload) {
     if (this.status !== 'playing' || !this.g) throw new GameError('Партия не идёт');
+    if (this.paused) throw new GameError('Игра на паузе');
     const seat = this.seatOf(userId);
     if (seat === -1 || !this.inGame(seat)) throw new GameError('Вы не в этой партии');
     this.g.act(seat, String(type || ''), payload || {});
@@ -282,7 +336,7 @@ class PartyTable {
     if (this.status === 'waiting' || this.status === 'countdown') {
       return this.seats.some((s) => s && botIds.has(s.userId) && !s.ready) ? 500 : null;
     }
-    if (this.status !== 'playing' || !this.g || !this.g.botDelay) return null;
+    if (this.status !== 'playing' || !this.g || !this.g.botDelay || this.paused) return null;
     let best = null;
     for (const p of this.players) {
       if (!botIds.has(p.userId)) continue;
@@ -297,7 +351,7 @@ class PartyTable {
       if (s) this.setReady(s.userId, true);
       return;
     }
-    if (this.status !== 'playing' || !this.g) return;
+    if (this.status !== 'playing' || !this.g || this.paused) return;
     let pick = null;
     for (const p of this.players) {
       if (!botIds.has(p.userId)) continue;
@@ -378,7 +432,9 @@ class PartyTable {
       log: this.log.slice(-30),
       chat: this.chat.slice(-60),
       result: this.status === 'result' ? this.result : null,
-      turn: tv ? { seat: tv.seat, left: tv.left, ms: tv.ms, paused: !!tv.paused, key: tv.seat === mySeat ? tv.key : null } : null,
+      turn: tv ? { seat: tv.seat, left: tv.left, ms: tv.ms, paused: !!tv.paused || !!this.paused, key: tv.seat === mySeat ? tv.key : null } : null,
+      paused: this.paused ? { name: this.paused.name, left: Math.max(0, this.paused.until - this.now()), mine: this.paused.seat === mySeat } : null,
+      pausesLeft: this.practice ? null : Math.max(0, PAUSES_PER_GAME - ((this.pauseUsed || {})[viewerId] || 0)),
       g: null,
     };
     if (this.g && (this.status === 'playing' || this.status === 'result')) st.g = this.g.view(st.inGame ? mySeat : -1, this.status === 'result');

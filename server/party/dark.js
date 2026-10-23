@@ -9,7 +9,7 @@
 const { GameError, shuffle } = require('./base');
 const { PROMPTS, ANSWERS, PROMPTS_MAT, ANSWERS_MAT, gaps } = require('./dark-cards');
 
-const HAND = 10;
+const HAND = 7;
 /** Up to this share (of the printed deck's size) of a new deck comes from the players' pool. */
 const CUSTOM_SHARE = 0.4;
 

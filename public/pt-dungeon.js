@@ -35,6 +35,8 @@
     return el;
   }
 
+  const plural = (n) => (n === 1 ? 'карту' : n < 5 ? 'карты' : 'карт');
+
   function render(board, dock, ctx) {
     const { g, st, seat, ui, send } = ctx;
     const D = g.cards;
@@ -103,7 +105,9 @@
       const last = g.ev && g.ev.type === 'flee' ? h('div', { class: 'dg-rolls' }, ...g.ev.rolls.map((r) => h('span', { class: r.ok ? 'ok' : 'bad' }, h('i', { class: 'dg-die', 'data-v': r.die }, String(r.die)), `${ctx.nameOf(r.seat)}: ${r.ok ? 'удрал от' : 'не удрал от'} «${r.monster}»`))) : null;
       center = h('div', { class: 'dg-door' },
         h('div', { class: 'dg-door-art', 'aria-hidden': 'true' }, h('span', null)),
-        h('b', null, myTurn ? (g.phase === 'start' ? 'Ваш ход. За дверью что-то шуршит…' : 'Боя не было. Что дальше?') : `Ходит ${ctx.nameOf(g.cur)}`),
+        h('b', null, g.phase === 'charity' ? (myTurn ? `Лимит руки — ${g.handLimit} карт. Лишние: ${g.charity.need}` : `${ctx.nameOf(g.cur)} выбирает, какие карты отдать`) : myTurn ? (g.phase === 'start' ? 'Ваш ход. За дверью что-то шуршит…' : 'Боя не было. Что дальше?') : `Ходит ${ctx.nameOf(g.cur)}`),
+        g.phase === 'charity' && myTurn ? h('small', { class: 'muted' }, `Выберите в руке ${g.charity.need} ${plural(g.charity.need)} — ${g.charity.to != null ? `они уйдут игроку ${ctx.nameOf(g.charity.to)} (самый низкий уровень)` : 'они уйдут в сброс'}. Можно сначала надеть вещи, продать их или поднять уровень.`) : null,
+        myTurn && g.phase !== 'charity' && hand.length > g.handLimit ? h('small', { class: 'dg-limit' }, `В руке ${hand.length} карт при лимите ${g.handLimit}: в конце хода лишние придётся отдать. Наденьте вещи или используйте карты.`) : null,
         last,
         acts.length ? h('div', { class: 'pt-actions' }, ...acts) : null,
         st.turn && st.turn.seat === g.cur ? ctx.timer(st.turn.left, st.turn.ms, 'bar') : null);
@@ -118,8 +122,12 @@
     const one = selCards.length === 1 ? selCards[0] : null;
     const d1 = one ? D[one.k] : null;
     const inHand = one && hand.some((c) => c.id === one.id);
-    const between = myTurn && (g.phase === 'start' || g.phase === 'after') && !f;
+    const between = myTurn && (g.phase === 'start' || g.phase === 'after' || g.phase === 'charity') && !f;
+    const charity = myTurn && g.phase === 'charity' && g.charity;
+    if (charity && !ui.mode) ui.mode = 'give';
+    if (!charity && ui.mode === 'give') { ui.mode = null; ui.sel = []; }
     const toggle = (c) => {
+      if (ui.mode === 'give') { const i = ui.sel.indexOf(c.id); if (i === -1) ui.sel.push(c.id); else ui.sel.splice(i, 1); ctx.rerender(); return; }
       if (ui.mode === 'wander') { ui.sel = [ui.sel[0], c.id]; ctx.rerender(); return; }
       if (ui.mode === 'sell') { const i = ui.sel.indexOf(c.id); if (i === -1) ui.sel.push(c.id); else ui.sel.splice(i, 1); ctx.rerender(); return; }
       ui.mode = null;
@@ -129,7 +137,17 @@
     const acts = [];
     const B = (label, fn, cls = 'btn-dark') => h('button', { type: 'button', class: `btn btn-sm ${cls}`, onclick: fn }, label);
     const clear = () => { ui.sel = []; ui.mode = null; };
-    if (ui.mode === 'sell') {
+    if (ui.mode === 'give') {
+      const picked = ui.sel.filter((id) => hand.some((c) => c.id === id));
+      const need = g.charity.need;
+      acts.push(h('span', { class: 'bk-hint strong' }, `Отдать ${picked.length} из ${need}`),
+        h('button', { type: 'button', class: 'btn btn-sm btn-gold', disabled: picked.length !== need, onclick: () => { send('give', { cards: picked }); clear(); } }, g.charity.to != null ? `Отдать ${ctx.nameOf(g.charity.to)}` : 'Сбросить'));
+      if (d1 && inHand && d1.type === 'gear') acts.push(B('Надеть', () => { send('equip', { card: one.id }); clear(); }));
+      if (d1 && inHand && d1.type === 'level') acts.push(B('+1 уровень', () => { send('level', { card: one.id }); clear(); }));
+      if (d1 && inHand && d1.type === 'class') acts.push(B(`Стать: ${d1.name}`, () => { send('class', { card: one.id }); clear(); }));
+      acts.push(B('Продать вещи…', () => { ui.mode = 'sell'; ui.sel = []; ctx.rerender(); }, 'btn-ghost'));
+      if (ui.sel.length) acts.push(B('Сбросить выбор', () => { ui.sel = []; ctx.rerender(); }, 'btn-ghost'));
+    } else if (ui.mode === 'sell') {
       const gold = selCards.reduce((a, c) => a + (D[c.k].gold || 0), 0);
       acts.push(h('span', { class: 'bk-hint' }, `Скупщик: ${gold} зол. → +${Math.floor(gold / 1000)} ур.`), B('Продать', () => { send('sell', { cards: ui.sel }); clear(); }, 'btn-gold'), B('Отмена', () => { clear(); ctx.rerender(); }, 'btn-ghost'));
     } else if (ui.mode === 'curse') acts.push(h('span', { class: 'bk-hint strong' }, 'Кого проклинаем? Нажмите на игрока вверху'), B('Отмена', () => { clear(); ctx.rerender(); }, 'btn-ghost'));

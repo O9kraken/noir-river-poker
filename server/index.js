@@ -696,6 +696,64 @@ function createServer({
   ].forEach((d) => CK.make({ ...d, permanent: true }));
   const extraTables = () => Object.values(extra).flatMap((k) => [...k.map.values()]);
 
+  // ----- «Настолки»: nobody keeps a seat at a table they walked away from -----
+  const PT_AWAY_MS = ptOpts.awayMs ?? 3 * 60 * 1000; // seated but not on the table page (waiting room)
+  const PT_AWAY_PLAY_MS = ptOpts.awayPlayMs ?? 10 * 60 * 1000; // the same during a game
+  const PT_EMPTY_MS = ptOpts.emptyMs ?? 2 * 60 * 1000; // a player-made table with nobody at it
+  const PT_IDLE_MS = ptOpts.idleMs ?? 20 * 60 * 1000; // a waiting table where nothing happens
+  function ptWatchers(t) {
+    const out = new Set();
+    const room = io.sockets.adapter.rooms.get('pt:' + t.id);
+    if (room) for (const sid of room) { const sock = io.sockets.sockets.get(sid); if (sock) out.add(sock.data.userId); }
+    return out;
+  }
+  function ptClose(t, why) {
+    const here = ptWatchers(t);
+    const msg = { text: `Стол «${t.name}» закрыт: ${why}`, type: 'closed', tableId: t.id, href: '#/party' };
+    for (const s of t.seats) if (s && !String(s.userId).startsWith('bot:') && !here.has(s.userId)) notice(s.userId, msg.text, { type: 'table' });
+    const seated = t.seats.filter(Boolean).map((s) => s.userId);
+    t.destroy();
+    PT.map.delete(t.id);
+    io.to('pt:' + t.id).emit('notice', msg);
+    seated.forEach((u) => presenceChanged(u));
+    PT.broadcastLobby();
+  }
+  function ptSweep(now = Date.now()) {
+    for (const t of [...PT.map.values()]) {
+      if (t.practice) continue;
+      const here = ptWatchers(t);
+      const playing = t.status === 'playing' || t.status === 'result';
+      for (const s of t.seats) {
+        if (!s || String(s.userId).startsWith('bot:')) continue;
+        if (here.has(s.userId)) { s.awaySince = null; continue; }
+        s.awaySince ||= now;
+        if (now - s.awaySince >= (playing ? PT_AWAY_PLAY_MS : PT_AWAY_MS)) {
+          t.leave(s.userId);
+          notice(s.userId, `Вы встали из-за стола «${t.name}» — вас не было за ним ${Math.round((playing ? PT_AWAY_PLAY_MS : PT_AWAY_MS) / 60000)} мин`, { type: 'table' });
+          presenceChanged(s.userId);
+        }
+      }
+      if (t.permanent) continue;
+      if (t.playerCount() === 0) {
+        t.emptySince ||= now;
+        if (now - t.emptySince >= PT_EMPTY_MS) ptClose(t, 'за ним никого не осталось');
+        continue;
+      }
+      t.emptySince = null;
+      if (!playing && now - t.lastActivity >= PT_IDLE_MS) ptClose(t, `за ${Math.round(PT_IDLE_MS / 60000)} минут игра так и не началась`);
+    }
+  }
+  const ptSweeper = setInterval(() => ptSweep(), ptOpts.sweepMs ?? 15000);
+  /** A player sits down somewhere new: their seats at other waiting party tables are freed, own empty tables close. */
+  function ptLeaveOthers(uid, exceptId) {
+    for (const t of [...PT.map.values()]) {
+      if (t.id === exceptId || t.practice || t.seatOf(uid) === -1) continue;
+      if (t.status === 'playing' || t.status === 'result') continue;
+      t.leave(uid);
+      if (!t.permanent && t.createdBy === uid && t.playerCount() === 0) ptClose(t, 'создатель ушёл за другой стол');
+    }
+  }
+
   // remove idle player-created tables
   const cleanup = setInterval(() => {
     const now = Date.now();
@@ -1395,6 +1453,7 @@ function createServer({
         if (idx === -1) throw new GameError('Все места заняты');
         t.sit(userId, socket.data.name, idx);
         socket.join(kind + ':' + t.id);
+        if (kind === 'pt') ptLeaveOthers(userId, t.id);
         presenceChanged(userId);
       });
       on(kind + ':leave', ({ tableId }) => {
@@ -1516,6 +1575,7 @@ function createServer({
       const st = Number(stake);
       const mp = Math.floor(Number(maxPlayers));
       if (!PT_STAKES.includes(st) || !(mp >= G.meta.min && mp <= G.meta.max)) throw new GameError('Неверные параметры стола');
+      ptLeaveOthers(userId, null);
       if (ownCount(PT) >= 3) throw new GameError('Можно создать не больше 3 столов');
       const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `${G.meta.title} у ${socket.data.name}`;
       const t = PT.make({ game: String(game), name: clean, stake: st, maxPlayers: mp, options: options || {}, createdBy: userId, private: !!priv });
@@ -1525,6 +1585,7 @@ function createServer({
     on('pt:ready', ({ tableId, value }) => { PT.get(tableId).setReady(userId, !!value); });
     on('pt:pref', ({ tableId, pref }) => { PT.get(tableId).setPref(userId, pref || {}); });
     on('pt:act', ({ tableId, type, data }) => { PT.get(tableId).act(userId, String(type || ''), data || {}); });
+    on('pt:pause', ({ tableId, value }) => { const t = PT.get(tableId); if (value === false) t.unpause(userId); else t.pause(userId); });
     on('pt:seen', ({ tableId, key }) => { PT.get(tableId).seen(userId, String(key || '')); });
     on('mf:ready', ({ tableId, value }) => { MF.get(tableId).setReady(userId, !!value); });
     on('mf:night', ({ tableId, kind, target }) => { MF.get(tableId).nightAction(userId, String(kind), target); });
@@ -1579,6 +1640,11 @@ function createServer({
           durakGames: [...durakTables.values()].filter((t) => t.status === 'playing').length,
           bjTables: bjTables.size,
           bjPlayers: [...bjTables.values()].reduce((a, t) => a + t.playerCount(), 0),
+          ptTables: PT.map.size,
+          ptPlayers: [...PT.map.values()].reduce((a, t) => a + t.seats.filter((x) => x && !String(x.userId).startsWith('bot:')).length, 0),
+          ptGames: [...PT.map.values()].filter((t) => t.status === 'playing').length,
+          darkCards: (store.data.darkCards || []).length,
+          darkFlagged: (store.data.darkCards || []).filter((c) => (c.flags || []).length).length,
           uptimeMs: Date.now() - STARTED_AT,
           storage: { ...(store.backend.status ? store.backend.status() : { kind: store.backend.kind }), ephemeral: store.backend.kind === 'file' && !!process.env.RENDER },
           memoryMb: Math.round(process.memoryUsage().rss / 1048576),
@@ -1599,7 +1665,8 @@ function createServer({
           seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, bet: x.bet, connected: x.connected }),
         })),
         extra: extraTables().map((t) => ({
-          ...t.summary(), title: extra[t.kind].title, chat: t.chat.length,
+          ...t.summary(), kind: t.kind, title: extra[t.kind].title, chat: t.chat.length, practice: !!t.practice, idleMin: Math.floor((Date.now() - (t.lastActivity || Date.now())) / 60000),
+          creator: t.createdBy ? (store.brief(t.createdBy) || {}).name || null : null,
           seats: t.seats.map((x) => x && { userId: x.userId, name: x.name, connected: x.connected }),
         })),
         announcement: store.data.announcement,
@@ -1864,6 +1931,40 @@ function createServer({
       }
     });
 
+    /** Several tables of any games at once: close them or clear their chats. */
+    admin('admin:bulk', ({ items, action }) => {
+      const list = Array.isArray(items) ? items.slice(0, 500) : [];
+      if (!list.length) throw new GameError('Выберите столы');
+      if (!['close', 'clearChat'].includes(action)) throw new GameError('Неизвестное действие');
+      let done = 0; const skipped = [];
+      for (const it of list) {
+        const kind = String((it && it.kind) || '');
+        const id = String((it && it.id) || '');
+        const t = findTable(kind === 'poker' ? 'table' : kind, id);
+        if (!t) continue;
+        if (action === 'clearChat') { t.chat = []; (t._update ? t._update() : t.onUpdate && t.onUpdate(t)); done += 1; continue; }
+        if (kind === 'table' || kind === 'poker') {
+          if (t.tournament) { skipped.push(t.name); continue; }
+          io.to('table:' + t.id).emit('notice', { type: 'closed', tableId: t.id, text: `Стол «${t.name}» закрыт администратором, фишки возвращены` });
+          t.destroy(); tables.delete(t.id); broadcastLobby();
+        } else if (kind === 'durak') {
+          io.to('durak:' + t.id).emit('notice', { type: 'closed', tableId: t.id, text: `Стол «${t.name}» закрыт администратором, ставки возвращены` });
+          t.destroy(); durakTables.delete(t.id); broadcastDurakLobby();
+        } else if (kind === 'bj') {
+          io.to('bj:' + t.id).emit('notice', { type: 'closed', tableId: t.id, text: `Стол «${t.name}» закрыт администратором, ставки возвращены` });
+          t.destroy(); bjTables.delete(t.id); broadcastBjLobby();
+        } else if (extra[kind]) {
+          io.to(kind + ':' + t.id).emit('notice', { type: 'closed', tableId: t.id, href: kind === 'pt' ? '#/party' : undefined, text: `Стол «${t.name}» закрыт администратором, ставки возвращены` });
+          const seated = t.seats.filter(Boolean).map((x) => x.userId);
+          t.destroy(); extra[kind].map.delete(t.id); extra[kind].broadcastLobby();
+          seated.forEach((u) => presenceChanged(u));
+        } else continue;
+        done += 1;
+      }
+      audit(action === 'close' ? `Закрыл столов разом: ${done}` : `Очистил чат у столов: ${done}`);
+      return { done, skipped };
+    });
+
     admin('admin:createBj', ({ name, limits, permanent }) => {
       const lim = BJ_LIMITS[Number(limits)];
       if (!lim) throw new GameError('Неверные лимиты');
@@ -1890,8 +1991,10 @@ function createServer({
     });
   });
 
+  let closing = false;
   /** A player who stays away this long loses the seats. */
   function dropLater(userId, ms) {
+    if (closing) return; // the server is stopping: nothing to free later
     clearTimeout(disconnectTimers.get(userId));
     disconnectTimers.set(userId, setTimeout(() => {
       disconnectTimers.delete(userId);
@@ -1988,11 +2091,13 @@ function createServer({
   restoreTables();
 
   function shutdown() {
+    closing = true;
     // the last picture of the tables, before they are closed and the chips go back to balances
     saveTables(true);
     snapFrozen = true;
     clearInterval(snapTimer);
     clearInterval(cleanup);
+    clearInterval(ptSweeper);
     voice.stop();
     for (const t of allTables()) if (t.bots) t.bots.stop();
     for (const x of sngs.values()) x.shutdown();
@@ -2007,7 +2112,7 @@ function createServer({
     return done;
   }
 
-  return { app, server, io, store, tables, sngs, durakTables, bjTables, extra, shutdown };
+  return { app, server, io, store, tables, sngs, durakTables, bjTables, extra, shutdown, ptSweep };
 }
 
 /** Production start: PostgreSQL when DATABASE_URL is set, otherwise the JSON file. */

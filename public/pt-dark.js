@@ -74,10 +74,29 @@
       else { ui.pick.push(id); if (ui.pick.length > g.pick) ui.pick.shift(); }
       ctx.rerender();
     };
-    if (!ui.blankInput) ui.blankInput = h('input', { maxlength: '80', placeholder: 'Свой вариант…', 'aria-label': 'Своя карта', oninput: (e) => { ui.blankText = e.target.value; const p = document.querySelector('.dt-black .dk-gap'); if (p && ui.pick.includes('blank')) p.textContent = e.target.value || '…'; } });
+    const submit = async (cards, text) => {
+      const usedBlank = cards.includes('blank');
+      const res = await send('answer', { cards, text });
+      if (res) { ui.pick = []; if (usedBlank) { ui.blankText = ''; ui.blankInput = null; ui.blankSend = null; } }
+    };
+    const sendOwn = () => {
+      const text = (ui.blankText || '').trim();
+      if (!text) { ui.blankInput && ui.blankInput.focus(); return; }
+      if (g.pick === 1) { submit(['blank'], text); return; }
+      if (!ui.pick.includes('blank')) { ui.pick.push('blank'); if (ui.pick.length > g.pick) ui.pick.shift(); }
+      if (ui.pick.length === g.pick) submit(ui.pick.slice(), text);
+      else { window.NR.toast && window.NR.toast('Нужно два ответа: выберите ещё одну карту'); ctx.rerender(); }
+    };
+    ui.sendOwn = sendOwn;
+    const syncOwn = () => { if (ui.blankSend) ui.blankSend.disabled = !(ui.blankText || '').trim(); };
+    if (!ui.blankInput) ui.blankInput = h('textarea', { maxlength: '80', rows: '3', placeholder: 'Свой вариант…', 'aria-label': 'Своя карта', oninput: (e) => { ui.blankText = e.target.value; if (ui.blankSend) ui.blankSend.disabled = !e.target.value.trim(); const p = document.querySelector('.dt-black .dk-gap'); if (p && ui.pick.includes('blank')) p.textContent = e.target.value || '…'; }, onkeydown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ui.sendOwn(); } } });
+    if (!ui.blankSend) ui.blankSend = h('button', { type: 'button', class: 'btn btn-gold btn-sm dt-own-send', disabled: !(ui.blankText || '').trim(), onclick: () => ui.sendOwn() }, g.pick === 2 ? 'Отправить со второй картой' : 'Отправить свою');
+    ui.blankSend.textContent = g.pick === 2 ? (ui.pick.length === 2 || ui.pick.some((x) => x !== 'blank') ? 'Отправить вместе' : 'Отправить со второй картой') : 'Отправить свою';
+    syncOwn();
     const blank = g.blank ? h('div', { class: 'dt-wcard blank' + (ui.pick.includes('blank') ? ' sel' : '') },
-      h('button', { type: 'button', class: 'dt-blank-btn', 'aria-pressed': ui.pick.includes('blank'), onclick: () => toggle('blank') }, ui.pick.includes('blank') ? '✓ Своя карта' : '✎ Своя карта'),
+      h('span', { class: 'dt-blank-btn' }, '✎ Своя карта'),
       ui.blankInput,
+      ui.blankSend,
       h('small', { class: 'dt-blank-note' }, 'Можно в каждом раунде. Карта останется в колоде клуба.')) : null;
     const cards = (g.hand || []).map((c) => {
       const card = h('button', { type: 'button', class: 'dt-wcard' + (c.custom ? ' custom' : '') + (ui.pick.includes(c.id) ? ' sel' : ''), 'aria-pressed': ui.pick.includes(c.id), onclick: () => toggle(c.id) }, ui.pick.includes(c.id) && g.pick > 1 ? h('i', null, `${ui.pick.indexOf(c.id) + 1}`) : null, c.t, byLine(c));
@@ -94,7 +113,7 @@
     dock.replaceChildren(h('div', { class: 'dt-dock' },
       h('div', { class: 'dt-acts' },
         h('span', { class: 'bk-hint' }, g.pick === 2 ? 'Выберите два ответа по порядку' : 'Выберите ответ'),
-        h('button', { type: 'button', class: 'btn btn-gold btn-sm', disabled: !ready, onclick: async () => { const usedBlank = ui.pick.includes('blank'); const res = await send('answer', { cards: ui.pick, text: ui.blankText }); if (res) { ui.pick = []; if (usedBlank) { ui.blankText = ''; ui.blankInput = null; } } } }, 'Отправить'),
+        h('button', { type: 'button', class: 'btn btn-gold btn-sm', disabled: !ready, onclick: () => submit(ui.pick.slice(), ui.blankText) }, 'Отправить'),
         g.canSwap ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { if (confirm('Поменять все карты за одно очко? Можно один раз за партию.')) send('swap'); } }, 'Сменить карты (−1 очко)') : null),
       h('div', { class: 'dt-hand' }, blank, ...cards)));
   }

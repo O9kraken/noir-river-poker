@@ -100,7 +100,9 @@
     const flagged = (d.darkCards || []).filter((c) => c.flagCount > 0).length;
     const cb = $('#adm-card-count');
     if (cb) { cb.hidden = !flagged; cb.textContent = flagged; }
-    const view = { overview, users, tables, sng, durak, bj, extra, announce, reports, cards }[A.tab];
+    const ac = $('#adm-all-count');
+    if (ac) { const n = allRows(d).filter((r) => !r.players && !r.t.permanent && !r.t.practice).length; ac.hidden = !n; ac.textContent = n; ac.title = 'Пустые столы, созданные игроками'; }
+    const view = { overview, all, users, tables, sng, durak, bj, extra, announce, reports, cards }[A.tab];
     main.replaceChildren(...[view(d)].flat().filter(Boolean));
   }
 
@@ -163,6 +165,8 @@
         tile('Турниры', s.sngRunning, `в регистрации: ${s.sngRegistering} игр.`),
         tile('Дурак', s.durakGames, `партий на ${s.durakTables} столах`),
         tile('Блэкджек', s.bjPlayers, `игроков на ${s.bjTables} столах`),
+        tile('Настолки', s.ptPlayers, `игроков на ${s.ptTables} столах · идёт ${s.ptGames}`),
+        tile('Карты игроков', fmt(s.darkCards), s.darkFlagged ? `с жалобами: ${s.darkFlagged}` : 'в колоде «Без тормозов»'),
         tile('Работает', uptime(s.uptimeMs)),
         tile('Память', `${s.memoryMb} МБ`)),
       h('h2', { class: 'h3 adm-h' }, 'Кто онлайн'),
@@ -253,6 +257,102 @@
             ] : h('span', { class: 'muted small' }, 'аккаунт удалён'),
             r.done ? null : h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => run('admin:report', { id: r.id, action: 'resolve' }, 'Отмечено') }, 'Решено')));
       })];
+  }
+
+  // ---------- all tables of all games, with bulk actions ----------
+  const KIND_TITLE = { table: 'Покер', durak: 'Дурак', bj: 'Блэкджек' };
+  function allRows(d) {
+    const rows = [];
+    for (const t of d.cash || []) rows.push({ kind: 'table', t, game: 'Покер', href: `/play#/table/${t.id}` });
+    for (const t of d.durak || []) rows.push({ kind: 'durak', t, game: 'Дурак', href: `/play#/durak/${t.id}` });
+    for (const t of d.bj || []) rows.push({ kind: 'bj', t, game: 'Блэкджек', href: `/play#/bj/${t.id}` });
+    for (const t of d.extra || []) rows.push({ kind: t.kind, t, game: t.kind === 'pt' ? `Настолки · ${t.gameTitle || ''}` : t.title, href: `/play#/${t.kind}/${t.id}` });
+    for (const r of rows) {
+      r.key = `${r.kind}:${r.t.id}`;
+      r.players = r.t.players != null ? r.t.players : (r.t.seats || []).filter(Boolean).length;
+      r.max = r.t.maxSeats || (r.t.seats || []).length || 0;
+      r.live = ['playing', 'running', 'spinning', 'result'].includes(r.t.status) || r.t.inHand;
+      r.group = r.kind === 'pt' ? 'pt' : r.kind;
+    }
+    return rows;
+  }
+  function all(d) {
+    A.sel ||= new Set();
+    A.allF ||= { game: '', state: '', q: '' };
+    const rows = allRows(d);
+    const keys = new Set(rows.map((r) => r.key));
+    for (const k of [...A.sel]) if (!keys.has(k)) A.sel.delete(k);
+    const F = A.allF;
+    const q = F.q.trim().toLowerCase();
+    const STATES = [['', 'Все'], ['empty', 'Пустые'], ['people', 'С игроками'], ['live', 'Идёт игра'], ['user', 'Созданы игроками'], ['practice', 'Тренировки'], ['private', 'Приватные'], ['permanent', 'Постоянные']];
+    const pass = (r) => {
+      if (F.game && r.group !== F.game) return false;
+      if (q && !(`${r.t.name} ${r.game} ${r.t.owner || ''} ${r.t.creator || ''} ${(r.t.seats || []).filter(Boolean).map((x) => x.name).join(' ')}`.toLowerCase().includes(q))) return false;
+      switch (F.state) {
+        case 'empty': return r.players === 0;
+        case 'people': return r.players > 0;
+        case 'live': return !!r.live;
+        case 'user': return !r.t.permanent && !r.t.practice && !r.t.tournament;
+        case 'practice': return !!r.t.practice;
+        case 'private': return !!r.t.private;
+        case 'permanent': return !!r.t.permanent;
+        default: return true;
+      }
+    };
+    const shown = rows.filter(pass);
+    const groups = [['', 'Все игры'], ...[...new Map(rows.map((r) => [r.group, r.kind === 'pt' ? 'Настолки' : r.kind === 'table' ? 'Покер' : KIND_TITLE[r.kind] || r.t.title || r.game])).entries()]];
+    const gameSel = h('select', { class: 'adm-input', 'aria-label': 'Игра', onchange: (e) => { F.game = e.target.value; render(); } }, ...groups.map(([v, t]) => h('option', { value: v }, t)));
+    gameSel.value = F.game;
+    const search = h('input', { class: 'adm-input', type: 'search', placeholder: 'Название, создатель или игрок', value: F.q, 'aria-label': 'Поиск столов', oninput: (e) => { F.q = e.target.value; clearTimeout(A.allT); A.allT = setTimeout(() => { render(); const i = $('#adm-all-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); } });
+    search.id = 'adm-all-q';
+    const selected = rows.filter((r) => A.sel.has(r.key));
+    const allShownSel = shown.length && shown.every((r) => A.sel.has(r.key));
+    const items = () => selected.map((r) => ({ kind: r.kind, id: r.t.id }));
+    const bulk = async (action) => {
+      if (!selected.length) return;
+      if (action === 'close') {
+        const busy = selected.filter((r) => r.players > 0).length;
+        const perm = selected.filter((r) => r.t.permanent).length;
+        if (!confirm(`Закрыть столов: ${selected.length}?${busy ? `\nЗа ${busy} из них сидят игроки — ставки вернутся.` : ''}${perm ? `\nСреди них постоянных: ${perm}.` : ''}`)) return;
+      }
+      const res = await call('admin:bulk', { items: items(), action });
+      if (res) {
+        toast(action === 'close' ? `Закрыто: ${res.done}${res.skipped && res.skipped.length ? ` (турнирные пропущены: ${res.skipped.length})` : ''}` : `Чат очищен у ${res.done}`);
+        if (action === 'close') A.sel.clear();
+        load(true);
+      }
+    };
+    const bar = h('div', { class: 'adm-bulk' + (selected.length ? ' on' : '') },
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!allShownSel, onchange: (e) => { shown.forEach((r) => (e.target.checked ? A.sel.add(r.key) : A.sel.delete(r.key))); render(); } }), h('span', null, allShownSel ? 'Снять все' : `Выбрать все (${shown.length})`)),
+      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { rows.filter((r) => r.players === 0 && !r.t.permanent).forEach((r) => A.sel.add(r.key)); render(); } }, 'Отметить пустые'),
+      h('span', { class: 'adm-bulk-n' }, selected.length ? `Выбрано: ${selected.length}` : 'Ничего не выбрано'),
+      h('button', { type: 'button', class: 'btn btn-dark btn-sm', disabled: !selected.length, onclick: () => bulk('clearChat') }, 'Очистить чат'),
+      h('button', { type: 'button', class: 'btn btn-red btn-sm', disabled: !selected.length, onclick: () => bulk('close') }, selected.length ? `Закрыть выбранные (${selected.length})` : 'Закрыть выбранные'),
+      selected.length ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { A.sel.clear(); render(); } }, 'Сбросить') : null);
+    const stat = (label, n) => h('span', { class: 'pill' }, `${label}: ${n}`);
+    const ST = { waiting: 'ждут', countdown: 'старт', playing: 'игра', result: 'итоги', betting: 'ставки', spinning: 'спин', registering: 'регистрация', running: 'идёт' };
+    const list = h('div', { class: 'adm-tlist' },
+      h('div', { class: 'adm-trow head' }, h('span', null), h('span', null, 'Стол'), h('span', null, 'Игра'), h('span', null, 'Игроки'), h('span', null, 'Статус'), h('span', null, '')),
+      ...shown.map((r) => {
+        const t = r.t;
+        const on = A.sel.has(r.key);
+        const flags = [t.permanent ? 'постоянный' : null, t.private ? 'приватный' : null, t.practice ? 'с ботами' : null, t.tournament ? 'турнир' : null].filter(Boolean);
+        return h('div', { class: 'adm-trow' + (on ? ' sel' : ''), onclick: (e) => { if (e.target.closest('a,button,input')) return; on ? A.sel.delete(r.key) : A.sel.add(r.key); render(); } },
+          h('input', { type: 'checkbox', checked: on, 'aria-label': `Выбрать ${t.name}`, onchange: (e) => { e.target.checked ? A.sel.add(r.key) : A.sel.delete(r.key); render(); } }),
+          h('span', { class: 'adm-tname' }, h('b', null, t.name), h('small', { class: 'muted' }, [t.creator || t.owner ? `создал ${t.creator || t.owner}` : null, ...flags, t.idleMin >= 5 ? `тихо ${t.idleMin} мин` : null].filter(Boolean).join(' · ') || ' ')),
+          h('span', { class: 'muted small' }, r.game),
+          h('span', null, h('b', null, `${r.players}`), h('span', { class: 'muted' }, r.max ? `/${r.max}` : ''), r.players ? h('small', { class: 'muted adm-tseats' }, (t.seats || []).filter(Boolean).map((x) => x.name + (x.connected === false ? ' (офлайн)' : '')).join(', ')) : null),
+          h('span', { class: 'status ' + (r.live ? 'running' : 'registering') }, ST[t.status] || t.status || (t.inHand ? 'раздача' : r.players ? 'за столом' : 'пусто')),
+          h('a', { class: 'btn btn-ghost btn-sm', href: r.href, target: '_blank', rel: 'noopener' }, 'Открыть'));
+      }));
+    return [
+      h('div', { class: 'adm-chips' }, stat('Всего', rows.length), stat('С игроками', rows.filter((r) => r.players).length), stat('Пустых', rows.filter((r) => !r.players).length), stat('Идёт игра', rows.filter((r) => r.live).length)),
+      h('div', { class: 'adm-toolbar' }, gameSel, search),
+      h('div', { class: 'adm-chips' }, ...STATES.map(([k, t]) => h('button', { type: 'button', class: 'btn btn-sm ' + (F.state === k ? 'btn-gold' : 'btn-dark'), onclick: () => { F.state = k; render(); } }, t))),
+      bar,
+      shown.length ? list : h('div', { class: 'empty' }, 'Столов по фильтру нет.'),
+      h('p', { class: 'muted small' }, 'Пустые столы, созданные игроками, закрываются сами: настолки — через 2 минуты, остальные — через 10. Игрок, ушедший в лобби из-за стола настолок, освобождает место через 3 минуты.'),
+    ];
   }
 
   // ---------- «Без тормозов»: cards written by players ----------
@@ -527,7 +627,7 @@
         h('span', { class: 'status registering' }, t.title),
         t.permanent ? h('span', { class: 'status finished' }, 'постоянный') : null,
         h('span', { class: 'status ' + (t.status === 'betting' || t.status === 'waiting' ? 'registering' : 'running') }, ST[t.status] || t.status),
-        h('span', { class: 'muted small' }, t.kind === 'rl' ? `Фишка от ${fmt(t.minBet)} · за спин до ${fmt(t.maxBet)} · у стола ${t.players}/${t.maxSeats}` : `Ставка ${fmt(t.stake)} · ${t.clockMin} мин · за доской ${t.players}/2`),
+        h('span', { class: 'muted small' }, t.kind === 'rl' ? `Фишка от ${fmt(t.minBet)} · за спин до ${fmt(t.maxBet)} · у стола ${t.players}/${t.maxSeats}` : t.clockMin ? `Ставка ${fmt(t.stake)} · ${t.clockMin} мин · за доской ${t.players}/2` : `${t.gameTitle ? t.gameTitle + ' · ' : ''}${t.stake ? `ставка ${fmt(t.stake)}` : 'на интерес'} · за столом ${t.players}/${t.maxSeats}${t.practice ? ' · с ботами' : ''}${t.creator ? ` · создал ${t.creator}` : ''}`),
         h('div', { class: 'adm-chips' }, t.seats.filter(Boolean).map((s) => h('span', { class: 'pill adm-seat' },
           `${s.name}${s.connected ? '' : ' · офлайн'}`,
           h('button', { type: 'button', class: 'adm-x', 'aria-label': `Убрать ${s.name}`, onclick: () => { if (confirm(`Убрать ${s.name}?`)) run('admin:extra', { kind: t.kind, tableId: t.id, action: 'kick', target: s.userId }, 'Игрок убран'); } }, '×'))))),
