@@ -29,6 +29,42 @@ const HISTORY_DAYS = 45;
 
 const dayKey = (t = Date.now()) => new Date(t + 3 * 3600 * 1000).toISOString().slice(0, 10); // Moscow day
 
+/**
+ * The club shop: looks bought with chips. Frames and titles are seen by everyone,
+ * card backs and felt colour change the player's own tables.
+ */
+const SHOP = [
+  { id: 'frame-none', cat: 'frame', name: 'Без рамки', price: 0 },
+  { id: 'frame-silver', cat: 'frame', name: 'Серебро', price: 2500 },
+  { id: 'frame-gold', cat: 'frame', name: 'Золото', price: 5000 },
+  { id: 'frame-emerald', cat: 'frame', name: 'Изумруд', price: 7000 },
+  { id: 'frame-ruby', cat: 'frame', name: 'Рубин', price: 7000 },
+  { id: 'frame-neon', cat: 'frame', name: 'Неон', price: 12000, note: 'переливается' },
+  { id: 'frame-crown', cat: 'frame', name: 'Корона', price: 25000, note: 'золото и корона' },
+  { id: 'back-classic', cat: 'back', name: 'Бордо', price: 0 },
+  { id: 'back-emerald', cat: 'back', name: 'Изумрудная', price: 1500 },
+  { id: 'back-midnight', cat: 'back', name: 'Полночь', price: 2500 },
+  { id: 'back-noir', cat: 'back', name: 'Нуар с золотом', price: 4000 },
+  { id: 'back-river', cat: 'back', name: 'Река', price: 6000 },
+  { id: 'back-aurora', cat: 'back', name: 'Северное сияние', price: 9000 },
+  { id: 'felt-classic', cat: 'felt', name: 'Клубное зелёное', price: 0 },
+  { id: 'felt-burgundy', cat: 'felt', name: 'Бордовое', price: 3000 },
+  { id: 'felt-midnight', cat: 'felt', name: 'Полночное синее', price: 3000 },
+  { id: 'felt-graphite', cat: 'felt', name: 'Графит', price: 4000 },
+  { id: 'felt-royal', cat: 'felt', name: 'Королевский пурпур', price: 6000 },
+  { id: 'felt-sand', cat: 'felt', name: 'Песок пустыни', price: 6000 },
+  { id: 'title-none', cat: 'title', name: 'Без титула', price: 0 },
+  { id: 'title-lucky', cat: 'title', name: 'Счастливчик', price: 2000 },
+  { id: 'title-shark', cat: 'title', name: 'Акула', price: 4000 },
+  { id: 'title-bluff', cat: 'title', name: 'Мастер блефа', price: 5000 },
+  { id: 'title-tycoon', cat: 'title', name: 'Магнат', price: 8000 },
+  { id: 'title-gm', cat: 'title', name: 'Гроссмейстер', price: 8000 },
+  { id: 'title-don', cat: 'title', name: 'Дон', price: 10000 },
+  { id: 'title-legend', cat: 'title', name: 'Легенда клуба', price: 50000 },
+];
+const SHOP_DEFAULT = { frame: 'frame-none', back: 'back-classic', felt: 'felt-classic', title: 'title-none' };
+const titleOf = (u) => { const t = u.shop && u.shop.eq.title; const it = t && t !== 'title-none' ? SHOP.find((x) => x.id === t) : null; return it ? it.name : null; };
+
 function emptyStats() {
   return {
     poker: { hands: 0, won: 0, net: 0, biggestPot: 0, bestHand: -1, showdowns: 0 },
@@ -163,6 +199,7 @@ class Store {
       friendRequests: u.friendReq.in.length,
       rewardsReady: this.rewardsReady(userId),
       dmUnread: this.dmUnread(userId),
+      looks: { ...u.shop.eq }, title: titleOf(u),
     };
   }
 
@@ -180,6 +217,8 @@ class Store {
     u.achClaimed ||= [];
     u.quests ||= null;
     u.rating ||= {};
+    u.shop ||= { owned: [], eq: { ...SHOP_DEFAULT } };
+    u.shop.eq = { ...SHOP_DEFAULT, ...u.shop.eq };
     for (const k of RATED) {
       if (!u.rating[k] || typeof u.rating[k] !== 'object') u.rating[k] = { r: RATING_START, games: 0, peak: RATING_START };
     }
@@ -350,6 +389,7 @@ class Store {
       hue: Number.isFinite(h) ? ((Math.round(h) % 360) + 360) % 360 : null,
       sym: AVATAR_SYMBOLS.includes(sym) ? sym : '',
       ...(u.avatar && u.avatar.img ? { img: u.avatar.img } : {}),
+      ...(u.avatar && u.avatar.frame ? { frame: u.avatar.frame } : {}),
     };
     this.save();
     return u.avatar;
@@ -445,7 +485,7 @@ class Store {
     const chips = this._chips(u);
     const rank = Object.values(this.data.users).filter((x) => this._chips(x) > chips).length + 1;
     return {
-      id: u.id, name: u.name, avatar: u.avatar, created: u.created, role: u.role,
+      id: u.id, name: u.name, avatar: u.avatar, created: u.created, role: u.role, title: titleOf(u),
       chips, rank, players: Object.keys(this.data.users).length,
       stats: u.stats,
       achievements: achievements(u),
@@ -579,6 +619,49 @@ class Store {
   }
 
   /** Move chips from balance to a table. */
+  // ---------- shop ----------
+  shopView(userId) {
+    const u = this.findUser(userId);
+    const owned = new Set(u.shop.owned);
+    return {
+      balance: u.balance,
+      items: SHOP.map((it) => ({ ...it, owned: !it.price || owned.has(it.id), equipped: u.shop.eq[it.cat] === it.id })),
+    };
+  }
+
+  buy(userId, id) {
+    const u = this.findUser(userId);
+    const it = SHOP.find((x) => x.id === id);
+    if (!it) throw new StoreError('Такого товара нет');
+    if (!it.price || u.shop.owned.includes(id)) throw new StoreError('Уже у вас');
+    if (u.balance < it.price) throw new StoreError('Не хватает фишек на балансе');
+    u.balance -= it.price;
+    u.shop.owned.push(id);
+    this._equip(u, it);
+    this.snapshot(userId);
+    this.save();
+    return this.shopView(userId);
+  }
+
+  equip(userId, id) {
+    const u = this.findUser(userId);
+    const it = SHOP.find((x) => x.id === id);
+    if (!it) throw new StoreError('Такого товара нет');
+    if (it.price && !u.shop.owned.includes(id)) throw new StoreError('Сначала купите');
+    this._equip(u, it);
+    this.save();
+    return this.shopView(userId);
+  }
+
+  _equip(u, it) {
+    u.shop.eq[it.cat] = it.id;
+    // the frame travels with the avatar, so everyone at the table sees it
+    if (it.cat === 'frame') {
+      u.avatar = { ...(u.avatar || { hue: null, sym: '' }) };
+      if (it.id === 'frame-none') delete u.avatar.frame; else u.avatar.frame = it.id.slice(6);
+    }
+  }
+
   withdraw(userId, amount) {
     const u = this.data.users[userId];
     if (!Number.isInteger(amount) || amount <= 0) throw new StoreError('Неверная сумма');
@@ -909,4 +992,4 @@ function achievements(u) {
   });
 }
 
-module.exports = { Store, StoreError, START_BALANCE, DAILY_BONUS, WHEEL, RATED, SEASON_PRIZES, SEASON_MIN_GAMES, newSeason, AVATAR_SYMBOLS, AVATAR_MAX_BYTES, QUESTS, dayKey };
+module.exports = { SHOP, Store, StoreError, START_BALANCE, DAILY_BONUS, WHEEL, RATED, SEASON_PRIZES, SEASON_MIN_GAMES, newSeason, AVATAR_SYMBOLS, AVATAR_MAX_BYTES, QUESTS, dayKey };

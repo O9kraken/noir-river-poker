@@ -7,14 +7,35 @@
 const KINDS = /^(table|durak|bj|rl|ck|ch|cap|mf|bg)$/;
 const MAX_PEERS = 10;
 
+const STUN = { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] };
+let fetched = { at: 0, list: null };
+
+/**
+ * Where browsers look for a route to each other. STUN is enough on most home networks;
+ * strict mobile and office networks need a TURN relay:
+ *  - TURN_URL / TURN_USER / TURN_PASS — your own relay (coturn) or any provider's static credentials;
+ *  - METERED_TURN_URL — a credentials link like https://APP.metered.live/api/v1/turn/credentials?apiKey=KEY
+ *    (Metered's free plan); the list is fetched and kept for an hour.
+ */
 function iceServers() {
-  const list = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
-  // a TURN relay helps players behind strict mobile or office networks
+  const list = [STUN];
   if (process.env.TURN_URL) {
     list.push({ urls: process.env.TURN_URL.split(',').map((x) => x.trim()), username: process.env.TURN_USER || '', credential: process.env.TURN_PASS || '' });
   }
+  if (fetched.list) list.push(...fetched.list);
   return list;
 }
+async function refreshTurn() {
+  const url = process.env.METERED_TURN_URL;
+  if (!url || Date.now() - fetched.at < 3600 * 1000) return;
+  fetched.at = Date.now();
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) fetched.list = data.filter((x) => x && x.urls);
+  } catch (e) { fetched.at = Date.now() - 3300 * 1000; /* try again in five minutes */ }
+}
+const hasTurn = () => !!(process.env.TURN_URL || fetched.list);
 
 function createVoice(io, { findTable, nameOf, avatarOf }) {
   const rooms = new Map(); // key -> Map(socketId -> { userId, name, muted })
@@ -54,6 +75,7 @@ function createVoice(io, { findTable, nameOf, avatarOf }) {
       }
     }
   }
+  refreshTurn();
   const timer = setInterval(sweep, 700);
   if (timer.unref) timer.unref();
 
@@ -77,7 +99,8 @@ function createVoice(io, { findTable, nameOf, avatarOf }) {
       for (const p of peers) io.to(p.sid).emit('voice:joined', me);
       const pol = policyFor(key, userId);
       lastPolicy.set(socket.id, JSON.stringify(pol));
-      return { sid: socket.id, peers, policy: pol, iceServers: iceServers() };
+      refreshTurn();
+      return { sid: socket.id, peers, policy: pol, iceServers: iceServers(), relay: hasTurn() };
     });
     on('voice:leave', () => { leave(socket.id); });
     on('voice:signal', ({ to, data }) => {

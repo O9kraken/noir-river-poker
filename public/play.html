@@ -181,6 +181,10 @@
         <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21V11M16 21V7M12 21V3M4 21h16"/></svg></span>
         <span class="gnav-txt"><b>Рейтинги</b><small>сезон недели</small></span>
       </a>
+      <a class="gnav-all gnav-rt gnav-shop" href="#/shop">
+        <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16l-1.2 10.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8z"/><path d="M8.5 9V7a3.5 3.5 0 0 1 7 0v2"/></svg></span>
+        <span class="gnav-txt"><b>Лавка</b><small>рамки, рубашки, сукно</small></span>
+      </a>
       <div class="gnav-list" role="tablist" aria-orientation="vertical" aria-label="Выбор игры">
         <button type="button" role="tab" class="gnav-item is-active" data-lobby-tab="cash" aria-selected="true">
           <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 2.5C9.5 6.5 4 9 4 13.2c0 2.9 3.3 4.3 6.2 2.3L8.8 21h6.4l-1.4-5.5c2.9 2 6.2.6 6.2-2.3C20 9 14.5 6.5 12 2.5z"/></svg></span>
@@ -336,6 +340,20 @@
   </main>
 
   <!-- RATINGS -->
+  <main id="shop-view" class="ratings-page shop-page" hidden>
+    <div class="games-head">
+      <a href="#/" class="btn btn-ghost btn-sm"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Лобби</a>
+      <div>
+        <p class="eyebrow">Лавка клуба</p>
+        <h1 class="h1">Стиль за фишки</h1>
+      </div>
+      <div class="shop-wallet" id="shop-wallet"></div>
+    </div>
+    <div class="tabs shop-tabs" role="tablist" id="shop-tabs"></div>
+    <p class="muted shop-note" id="shop-note"></p>
+    <section class="shop-grid" id="shop-grid" aria-live="polite"></section>
+  </main>
+
   <main id="ratings-view" class="ratings-page" hidden>
     <div class="games-head">
       <a href="#/" class="btn btn-ghost btn-sm"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Лобби</a>
@@ -1245,5 +1263,6 @@
 <script src="/notify.js"></script>
 <script src="/wheel.js"></script>
 <script src="/ratings.js"></script>
+<script src="/shop.js"></script>
 </body>
 </html>

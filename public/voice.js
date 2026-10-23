@@ -34,6 +34,8 @@
     if (!navigator.mediaDevices || !window.RTCPeerConnection) { toast('Этот браузер не поддерживает голосовой чат', true); return; }
     V.joining = true;
     render();
+    // inside the tap: wake the audio context so the talk indicators and playback are allowed
+    const c0 = ctx(); if (c0 && c0.state === 'suspended') c0.resume().catch(() => {});
     try {
       if (!V.stream) {
         V.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
@@ -47,7 +49,7 @@
     const res = await call('voice:join', { kind: t.kind, id: t.id });
     V.joining = false;
     if (!res) { stopStream(); render(); return; }
-    V.key = t.key; V.sid = res.sid; V.ice = res.iceServers; V.policy = res.policy;
+    V.key = t.key; V.sid = res.sid; V.ice = res.iceServers; V.policy = res.policy; V.relay = !!res.relay;
     applyPolicy();
     for (const p of res.peers) connect(p, true);
     if (window.Music) window.Music.duck(true);
@@ -79,24 +81,36 @@
   }
 
   // ---------- peers ----------
+  // the voices play through real <audio> elements in the page (Safari and iOS will not play detached ones)
+  const sink = h('div', { class: 'voice-sink', 'aria-hidden': 'true' });
+  document.body.append(sink);
   function connect(p, initiator) {
-    if (V.peers.has(p.sid)) return V.peers.get(p.sid);
+    if (V.peers.has(p.sid)) {
+      const known = V.peers.get(p.sid);
+      if (p.userId) Object.assign(known, { userId: p.userId, name: p.name, avatar: p.avatar, muted: p.muted }); // details arrived after the first signal
+      applyPolicy();
+      return known;
+    }
     const pc = new RTCPeerConnection({ iceServers: V.ice });
-    const audio = new Audio();
+    const audio = document.createElement('audio');
     audio.autoplay = true;
     audio.setAttribute('playsinline', '');
-    const peer = { ...p, pc, audio, level: 0, speaking: false, restarted: false };
+    sink.append(audio);
+    const peer = { ...p, pc, audio, level: 0, speaking: false, restarted: false, pending: [], since: Date.now(), warned: false };
     V.peers.set(p.sid, peer);
     if (V.stream) V.stream.getTracks().forEach((tr) => pc.addTrack(tr, V.stream));
     pc.onicecandidate = (e) => { if (e.candidate) call('voice:signal', { to: p.sid, data: { candidate: e.candidate } }, true); };
     pc.ontrack = (e) => {
-      audio.srcObject = e.streams[0];
-      audio.play().catch(() => {});
+      audio.srcObject = e.streams[0] || new MediaStream([e.track]);
+      audio.play().catch(() => blocked());
       peerMeter(peer, e.streams[0]);
       applyPolicy();
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' && initiator && !peer.restarted) { peer.restarted = true; offer(peer, true); }
+      const s = pc.connectionState;
+      if (s === 'connected') peer.warned = false;
+      if (s === 'failed' && initiator && !peer.restarted) { peer.restarted = true; offer(peer, true); }
+      else if (s === 'failed') cantReach(peer);
       render();
     };
     if (initiator) offer(peer);
@@ -115,6 +129,7 @@
     if (!p) return;
     try { p.pc.close(); } catch (e) { /* closed */ }
     p.audio.srcObject = null;
+    p.audio.remove();
     V.peers.delete(sid);
     render();
   }
@@ -126,13 +141,18 @@
     try {
       if (data.sdp) {
         await peer.pc.setRemoteDescription(data.sdp);
+        // candidates that came before the description can be used now
+        for (const cand of peer.pending.splice(0)) await peer.pc.addIceCandidate(cand).catch(() => {});
         if (data.sdp.type === 'offer') {
           const a = await peer.pc.createAnswer();
           await peer.pc.setLocalDescription(a);
           call('voice:signal', { to: from, data: { sdp: peer.pc.localDescription } }, true);
         }
-      } else if (data.candidate) await peer.pc.addIceCandidate(data.candidate);
-    } catch (e) { /* stale candidate */ }
+      } else if (data.candidate) {
+        if (!peer.pc.remoteDescription) peer.pending.push(data.candidate);
+        else await peer.pc.addIceCandidate(data.candidate);
+      }
+    } catch (e) { /* a stale message */ }
   }
 
   /** The game's rules: whether my mic may send, and whose voices are played. */
@@ -141,6 +161,27 @@
     if (V.stream) V.stream.getAudioTracks().forEach((tr) => { tr.enabled = !V.muted && pol.speak !== false; });
     for (const p of V.peers.values()) p.audio.muted = !(pol.hear == null || pol.hear.includes(p.userId));
   }
+
+  /** The browser refused to start playback without a tap: ask for one, then start every voice. */
+  function blocked() {
+    if (V.askedTap) return;
+    V.askedTap = true;
+    toast('Нажмите в любом месте страницы, чтобы услышать собеседников');
+    const go = () => { V.askedTap = false; for (const p of V.peers.values()) p.audio.play().catch(() => {}); const c = ctx(); if (c) c.resume().catch(() => {}); };
+    window.addEventListener('pointerdown', go, { once: true });
+  }
+  /** No route between two browsers: say why, once. */
+  function cantReach(peer) {
+    if (peer.warned) return;
+    peer.warned = true;
+    toast(V.relay ? `Не получается соединиться с ${peer.name}: проверьте интернет` : `Не получается соединиться с ${peer.name}: сеть не пропускает прямое соединение. Владельцу сайта нужно подключить TURN-сервер (см. README)`, true);
+  }
+  // a connection that hangs in «checking» for long is as good as failed
+  setInterval(() => {
+    for (const p of V.peers.values()) {
+      if (['new', 'connecting'].includes(p.pc.connectionState) && Date.now() - p.since > 15000) cantReach(p);
+    }
+  }, 3000);
 
   // ---------- who is talking ----------
   let actx = null;

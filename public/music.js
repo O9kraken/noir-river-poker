@@ -23,12 +23,12 @@
   };
 
   const Music = {
-    on: true, vol: 0.5, mood: 'lounge', bus: null, timer: null, bar: 0, nextBar: 0, crackle: null, playing: false,
+    on: false, vol: 0.5, mood: 'lounge', bus: null, timer: null, bar: 0, nextBar: 0, crackle: null, playing: false,
 
     init() {
       try {
         const on = localStorage.getItem('nr_music');
-        if (on === '0') this.on = false;
+        this.on = on === '1'; // off until the player turns it on
         const v = parseFloat(localStorage.getItem('nr_mvol'));
         if (v >= 0 && v <= 1) this.vol = v;
       } catch (e) { /* ignore */ }

@@ -1154,6 +1154,9 @@ function createServer({
       const k = ['durak', 'chess', 'nardy'].includes(kind) ? kind : 'checkers';
       return { list: store.ratingTable(k), me: (store.get(userId).rating || {})[k] };
     });
+    on('shop:get', () => ({ shop: store.shopView(userId) }));
+    on('shop:buy', ({ id }) => { const shop = store.buy(userId, String(id || '')); pushProfile(userId); return { shop }; });
+    on('shop:equip', ({ id }) => { const shop = store.equip(userId, String(id || '')); pushProfile(userId); return { shop }; });
     on('season:get', ({ game }) => ({ season: store.seasonView(String(game || 'total'), userId) }));
 
     on('table:act', ({ tableId, type, amount }) => {

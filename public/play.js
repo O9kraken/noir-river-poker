@@ -110,9 +110,12 @@
   function fillAvatar(el, name, av) {
     const hue = av && av.hue != null ? av.hue : hueOf(name);
     const img = av && typeof av.img === 'string' && AV_IMG_RE.test(av.img) ? av.img : '';
-    const key = `${name}|${hue}|${av && av.sym}|${img}`;
+    const frame = av && typeof av.frame === 'string' && /^[a-z]{2,12}$/.test(av.frame) ? av.frame : '';
+    const key = `${name}|${hue}|${av && av.sym}|${img}|${frame}`;
     if (el._avKey === key) return el;
     el._avKey = key;
+    for (const c of [...el.classList]) if (c.startsWith('fr-')) el.classList.remove(c);
+    if (frame) el.classList.add('fr-' + frame, 'framed');
     el.style.setProperty('--hue', hue);
     el.classList.toggle('av-img', !!img);
     el.style.backgroundImage = img ? `url("${img}")` : '';
@@ -557,18 +560,20 @@
     if (!S.socket) return;
     const gm = location.hash === '#/games';
     const rt = location.hash === '#/ratings';
+    const sh = location.hash === '#/shop';
     $('#games-view').hidden = !gm;
     $('#ratings-view').hidden = !rt;
+    $('#shop-view').hidden = !sh;
     if (!rt && window.RatingsUI) window.RatingsUI.close();
-    if (gm || rt) {
+    if (gm || rt || sh) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
       S.tableId = null;
       S.ts = null;
       for (const ui of [window.DurakUI, window.BjUI, window.RouletteUI, window.CheckersUI]) if (ui) ui.close();
       for (const [k, ui] of Object.entries(EXTRA_VIEWS)) { if (ui()) ui().close(); $(`#${k}-view`).hidden = true; }
       for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view', '#profile-view']) $(v).hidden = true;
-      document.title = gm ? 'Все игры — NOIR RIVER' : 'Рейтинги — NOIR RIVER';
-      if (gm) renderLobby(); else if (window.RatingsUI) window.RatingsUI.open();
+      document.title = gm ? 'Все игры — NOIR RIVER' : sh ? 'Лавка — NOIR RIVER' : 'Рейтинги — NOIR RIVER';
+      if (gm) renderLobby(); else if (sh) { if (window.ShopUI) window.ShopUI.open(); } else if (window.RatingsUI) window.RatingsUI.open();
       window.scrollTo(0, 0);
       return;
     }
@@ -656,8 +661,17 @@
   }
 
   // ================= header =================
+  /** Bought looks: the card back and felt are themes on the page; the frame rides on the avatar. */
+  function applyLooks(l) {
+    if (!l) return;
+    const b = document.body;
+    for (const c of [...b.classList]) if (c.startsWith('lk-')) b.classList.remove(c);
+    if (l.back && l.back !== 'back-classic') b.classList.add('lk-' + l.back);
+    if (l.felt && l.felt !== 'felt-classic') b.classList.add('lk-' + l.felt, 'lk-felt');
+  }
   function renderMe() {
     if (!S.me) return;
+    applyLooks(S.me.looks);
     $('#me-balance').textContent = fmt(S.me.balance);
     $('#me-inplay').textContent = S.me.inPlay ? `+ ${fmt(S.me.inPlay)} в игре` : 'на балансе';
     $('#me-name').replaceChildren(...[
@@ -1068,9 +1082,10 @@
       h('h2', { class: 'tcard-title' }, o.title),
       o.sub ? h('p', { class: 'tcard-sub' }, o.sub) : null,
       h('dl', { class: 'tcard-stats' }, o.stats.map(([k, v, title]) => h('div', title ? { title } : null, h('dt', null, k), h('dd', null, v)))),
-      o.fill ? h('div', { class: 'tcard-fill' }, dotsEl, h('span', null, o.fill.label)) : null,
       o.names ? h('p', { class: 'tcard-names', title: o.names }, o.names) : null,
-      h('div', { class: 'tcard-act' }, o.action));
+      h('div', { class: 'tcard-foot' },
+        o.fill ? h('div', { class: 'tcard-fill' }, dotsEl, h('span', null, o.fill.label)) : h('span'),
+        h('div', { class: 'tcard-act' }, o.action)));
   }
 
   function renderCashList() {
@@ -2168,7 +2183,7 @@
       } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cells[i].click(); }
     };
   }
-  window.NR = { boardKeys, $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
+  window.NR = { applyLooks, boardKeys, $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
 
   // ================= boot =================
   if (S.token) startApp(); else showAuth();

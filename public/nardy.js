@@ -8,6 +8,9 @@
   const REASON_ME = { oin: 'Все шашки выброшены', mars: 'Марс! Соперник не успел выбросить ни одной шашки', time: 'Соперник трижды не успел сходить', resign: 'Соперник сдался', left: 'Соперник ушёл' };
   const abs = (c, p) => (c === 'w' ? p - 1 : (p + 11) % 24);
   const other = (c) => (c === 'w' ? 'b' : 'w');
+  const ownOf = (c, i) => (c === 'w' ? i + 1 : ((i + 12) % 24) + 1);
+  /** Moves come in the mover's own point numbers; the board is drawn in the viewer's. 0 = borne off. */
+  const toView = (color, p) => (p === 0 ? 0 : ownOf(C.view, abs(color, p)));
   const C = { id: null, st: null, prev: null, at: 0, sel: null, view: 'w', points: [], rollUntil: 0 };
   const send = (ev, extra = {}) => call(ev, { tableId: C.id, ...extra });
 
@@ -33,7 +36,16 @@
     const n = st.nardy; const pn = C.prev && C.prev.nardy;
     if (n && n.dice && (!pn || !pn.dice || pn.turnNo !== n.turnNo) && !REDUCE) C.rollUntil = performance.now() + 600;
     if (!n || !n.legal.length || !n.legal.some((m) => m.from === C.sel)) C.sel = null;
+    // a checker has just moved: note where it was on screen before the board is redrawn
+    let flight = null;
+    if (n && pn && !REDUCE && n.played.length > (pn.turnNo === n.turnNo ? pn.played.length : 0)) {
+      const m = n.played[n.played.length - 1];
+      const color = st.turn;
+      const from = toView(color, m.from);
+      flight = { color, from, to: toView(color, m.to), rect: checkerRect(from, color) };
+    }
     render();
+    if (flight) fly(flight);
     effects();
   }
 
@@ -75,7 +87,7 @@
     const targets = new Map();
     if (mine && C.sel != null) for (const m of n.legal) if (m.from === C.sel) targets.set(m.to, m);
     const lt = n && n.lastTurn;
-    const recent = new Set(n && n.played ? n.played.map((m) => m.to) : []);
+    const recent = new Set(n && n.played ? n.played.map((m) => toView(st.turn, m.to)) : []);
     for (let p = 1; p <= 24; p++) {
       const el = C.points[p];
       const x = at(p);
@@ -224,30 +236,42 @@
   }
 
   // ---------- motion & sound ----------
-  function pointCenter(p, top) {
-    const board = $('#bg-board').getBoundingClientRect();
-    const el = p === 0 ? $('#bg-tray .me') : C.points[p].querySelector('.bg-stack');
-    const r = el.getBoundingClientRect();
-    return { x: r.left + r.width / 2 - board.left, y: (top ? r.top : r.top + r.height / 2) - board.top };
+  /** Screen box of the top checker on a point (or of the point itself / the tray when empty). */
+  function checkerRect(p, color) {
+    if (p === 0) return $(`#bg-tray .${color === C.view ? 'me' : 'them'}`).getBoundingClientRect();
+    const stack = C.points[p].querySelector('.bg-stack');
+    const top = stack.querySelector('.bg-ck:last-child');
+    return (top || stack).getBoundingClientRect();
   }
-  function glide(m, color) {
-    if (REDUCE || !m) return;
-    const layer = $('#bg-layer');
-    const from = pointCenter(m.from); const to = pointCenter(m.to);
+  let flightChain = Promise.resolve();
+  /** The moved checker flies from its old place to its new one in an arc that stays over the board. */
+  function fly(f) {
+    const board = $('#bg-board').getBoundingClientRect();
     const sample = $('#bg-board .bg-stack .bg-ck');
     const size = sample ? sample.getBoundingClientRect().width : 28;
-    const ghost = h('i', { class: `bg-ck ${color} flying`, style: `width:${size}px;height:${size}px;margin:${-size / 2}px 0 0 ${-size / 2}px` });
-    layer.append(ghost);
-    const lift = Math.min(120, 40 + Math.hypot(to.x - from.x, to.y - from.y) * 0.25);
-    const a = ghost.animate([
-      { transform: `translate(${from.x}px, ${from.y}px) scale(1)` },
-      { transform: `translate(${(from.x + to.x) / 2}px, ${(from.y + to.y) / 2 - lift}px) scale(1.25)`, offset: 0.5 },
-      { transform: `translate(${to.x}px, ${to.y}px) scale(1)` },
-    ], { duration: 360, easing: 'cubic-bezier(.35,.1,.25,1)' });
-    // hide the real checker until the flying one lands
-    const target = m.to ? C.points[m.to].querySelector('.bg-stack i:last-child') : null;
-    if (target) target.animate([{ opacity: 0 }, { opacity: 0, offset: 0.99 }, { opacity: 1 }], { duration: 360 });
-    a.onfinish = () => ghost.remove();
+    const dest = f.to ? C.points[f.to].querySelector('.bg-stack .bg-ck:last-child') : null;
+    const toRect = dest ? dest.getBoundingClientRect() : checkerRect(f.to, f.color);
+    const c = (r) => ({ x: r.left + r.width / 2 - board.left, y: r.top + r.height / 2 - board.top });
+    const a = c(f.rect); const b = c(toRect);
+    const midY = board.height / 2;
+    const m = { x: (a.x + b.x) / 2, y: ((a.y + b.y) / 2) * 0.55 + midY * 0.45 };
+    if (dest) dest.style.visibility = 'hidden';
+    const run = () => new Promise((resolve) => {
+      const layer = $('#bg-layer');
+      if (!layer) { resolve(); return; }
+      const ghost = h('i', { class: `bg-ck ${f.color} flying`, style: `width:${size}px;height:${size}px;margin:${-size / 2}px 0 0 ${-size / 2}px` });
+      layer.append(ghost);
+      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      const anim = ghost.animate([
+        { transform: `translate(${a.x}px, ${a.y}px) scale(1)` },
+        { transform: `translate(${m.x}px, ${m.y}px) scale(1.18)`, offset: 0.5 },
+        { transform: `translate(${b.x}px, ${b.y}px) scale(1)` },
+      ], { duration: Math.min(520, 260 + dist * 0.5), easing: 'cubic-bezier(.4,.1,.25,1)' });
+      const done = () => { ghost.remove(); if (dest) dest.style.visibility = ''; resolve(); };
+      anim.onfinish = done; anim.oncancel = done;
+    });
+    // quick successive moves (the computer's) fly one after another
+    flightChain = flightChain.then(run, run);
   }
 
   function effects() {
@@ -258,7 +282,6 @@
     if (n && n.dice && (!pn || !pn.dice || pn.turnNo !== n.turnNo)) Sound.play('dice');
     if (n && pn && n.played.length > (pn.turnNo === n.turnNo ? pn.played.length : 0)) {
       const m = n.played[n.played.length - 1];
-      glide(m, st.turn);
       Sound.play(m.to === 0 ? 'chips' : 'move', 0.05);
     }
     if (st.myColor && st.turn === st.myColor && prev.turn !== st.myColor && st.status === 'playing') Sound.play('turn', 0.15);

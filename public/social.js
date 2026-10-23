@@ -188,6 +188,7 @@
       h('div', { class: 'phead-main' },
         h('p', { class: 'eyebrow' }, p.me ? 'Мой профиль' : p.online ? 'Онлайн' : 'Профиль игрока'),
         h('h1', { class: 'h1' }, p.name, p.role === 'admin' ? h('span', { class: 'status registering' }, 'админ') : null),
+        p.title ? h('p', { class: 'shop-title-pill big' }, p.title) : null,
         h('p', { class: 'muted' }, `В клубе с ${since} · друзей: ${p.friends}`),
         h('div', { class: 'phead-act' },
           relation,
@@ -345,7 +346,7 @@
   }
   function avatarEditor(p) {
     if (!editorOpen) return null;
-    const cur = { hue: p.avatar && p.avatar.hue != null ? p.avatar.hue : NR.hueOf(p.name), sym: (p.avatar && p.avatar.sym) || '', img: (p.avatar && p.avatar.img) || undefined };
+    const cur = { hue: p.avatar && p.avatar.hue != null ? p.avatar.hue : NR.hueOf(p.name), sym: (p.avatar && p.avatar.sym) || '', img: (p.avatar && p.avatar.img) || undefined, frame: (p.avatar && p.avatar.frame) || undefined };
     const preview = NR.avatarEl(p.name, cur, 'xl');
     const redraw = () => NR.fillAvatar(preview, p.name, cur);
     const hues = h('div', { class: 'av-hues', role: 'radiogroup', 'aria-label': 'Цвет' }, HUES.map((hu) => h('button', {
