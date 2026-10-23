@@ -8,6 +8,7 @@ const checkersAI = require('./checkers-ai');
 const durakAI = require('./durak-ai');
 const pokerAI = require('./poker-ai');
 const chessAI = require('./chess-ai');
+const nardyAI = require('./nardy-ai');
 const { CELLS: CAP_CELLS, GROUPS: CAP_GROUPS } = require('../capital/board');
 const MAFIA_ROLES = new Set(['maf', 'don']);
 
@@ -81,6 +82,14 @@ class BotDriver {
     const t = this.table;
     if (this.kind === 'cap') return this._capPending();
     if (this.kind === 'mf') return this._mfPending();
+    if (this.kind === 'bg') {
+      const bi = t.seats.findIndex((s) => s && this.ids.has(s.userId));
+      if (bi === -1) return null;
+      if (t.status === 'waiting' && !t.seats[bi].ready) return this._pause(300, 700);
+      if (t.status !== 'playing' || !t.game || t.game.turn !== t.colorOf(bi) || t.game.result) return null;
+      if (!t.game.dice) return this._pause(600, 1100);
+      return t.game.done() ? null : this._pause(380, 700);
+    }
     if (this.kind === 'ck' || this.kind === 'ch') {
       const bi = t.seats.findIndex((s) => s && this.ids.has(s.userId));
       if (bi === -1) return null;
@@ -117,6 +126,19 @@ class BotDriver {
     const t = this.table;
     if (this.kind === 'cap') { this._capStep(); return; }
     if (this.kind === 'mf') { this._mfStep(); return; }
+    if (this.kind === 'bg') {
+      const bi = t.seats.findIndex((s) => s && this.ids.has(s.userId));
+      const bot = t.seats[bi];
+      if (t.status === 'waiting') { if (!bot.ready) t.setReady(bot.userId, true); return; }
+      const g = t.game;
+      if (t.status !== 'playing' || g.turn !== t.colorOf(bi)) return;
+      if (!g.dice) { t.roll(bot.userId); this.bgPlan = g.need ? nardyAI.chooseTurn(g, this.level, this.random) : []; return; }
+      if (!this.bgPlan || !this.bgPlan.length) this.bgPlan = nardyAI.chooseTurn(g, this.level, this.random);
+      const m = this.bgPlan.shift();
+      if (!m) return;
+      try { t.move(bot.userId, { from: m.from, die: m.die }); } catch (e) { this.bgPlan = null; throw e; }
+      return;
+    }
     if (this.kind === 'ch') {
       const bi = t.seats.findIndex((s) => s && this.ids.has(s.userId));
       const bot = t.seats[bi];

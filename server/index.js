@@ -17,6 +17,7 @@ const { CheckersTable } = require('./checkers/table');
 const { ChessTable } = require('./chess/table');
 const { CapitalTable } = require('./capital/table');
 const { MafiaTable } = require('./mafia/table');
+const { NardyTable } = require('./nardy/table');
 const { createVoice } = require('./voice');
 const { BotDriver, makeBots, isBot, LEVELS: BOT_LEVELS, LEVEL_NAMES } = require('./bots');
 
@@ -38,6 +39,8 @@ const CH_CLOCKS = [3, 5, 10, 15];
 const CAP_STAKES = [100, 200, 500, 1000, 5000];
 const CAP_TIMES = [30, 45, 60, 0];
 const MF_STAKES = [50, 100, 250, 500, 1000];
+const BG_STAKES = [50, 100, 250, 500, 1000, 5000];
+const BG_TIMES = [30, 45, 60];
 const REACTIONS = ['👍', '😂', '😮', '😎', '🔥', '😢', '🙏', '🎉'];
 const ADMIN_NAMES = (process.env.ADMIN_NAMES || '').split(',').map((x) => x.trim()).filter(Boolean);
 const STARTED_AT = Date.now();
@@ -45,7 +48,7 @@ const STARTED_AT = Date.now();
 function createServer({
   dataFile = DATA_FILE, actionTime = ACTION_TIME, tableOpts = {},
   sngTemplates = TEMPLATES, levelHands = Number(process.env.SNG_LEVEL_HANDS) || 0, sngLinger = 120000,
-  durakOpts = {}, bjOpts = {}, rlOpts = {}, ckOpts = {}, chOpts = {}, capOpts = {}, mfOpts = {}, adminNames = ADMIN_NAMES, store: givenStore = null, botOpts = {},
+  durakOpts = {}, bjOpts = {}, rlOpts = {}, ckOpts = {}, chOpts = {}, capOpts = {}, mfOpts = {}, bgOpts = {}, adminNames = ADMIN_NAMES, store: givenStore = null, botOpts = {},
 } = {}) {
   const store = givenStore || new Store(dataFile, { adminNames });
   const app = express();
@@ -586,6 +589,16 @@ function createServer({
   const MF = registerKind('mf', MafiaTable, 'Мафия', mfOpts, (tt, results) => {
     for (const r of results) if (r.userId) store.recordGame(r.userId, 'mafia', { table: tt.name, net: r.net, win: r.win, role: r.role });
   });
+  const BG = registerKind('bg', NardyTable, 'Нарды', bgOpts, (tt, results) => {
+    const mars = tt.lastResult && tt.lastResult.reason === 'mars';
+    for (const r of results) if (r.userId) store.recordGame(r.userId, 'nardy', { table: tt.name, net: r.net, win: r.win, mars });
+    rate('nardy', results.map((r) => ({ userId: r.userId, score: r.win ? 1 : r.draw ? 0.5 : 0 })));
+  });
+  [
+    { id: 'bg-club', name: 'Нарды у реки', stake: 100, turnSec: 45 },
+    { id: 'bg-fast', name: 'Шеш-беш', stake: 250, turnSec: 30 },
+    { id: 'bg-big', name: 'Длинная партия', stake: 1000, turnSec: 60 },
+  ].forEach((d) => BG.make({ ...d, permanent: true }));
   [
     { id: 'ch-club', name: 'Шахматный клуб', stake: 100, clockMs: 10 * 60000 },
     { id: 'ch-blitz', name: 'Блиц', stake: 250, clockMs: 5 * 60000 },
@@ -798,6 +811,14 @@ function createServer({
       list.forEach((b, k) => t.sit(b.userId, b.name, k + 1));
       return { kind: 'cap', id: t.id, href: `#/cap/${t.id}` };
     }
+    if (game === 'bg') {
+      const [bot] = makeBots(1, crypto.randomInt(10));
+      const t = BG.make({ level, name: `Тренировка · ${tag}`, stake: 0, turnSec: 60, createdBy: uid, private: true, practice: true });
+      t.bots = new BotDriver(t, 'bg', [bot], level, botOpts);
+      t.sit(uid, name, 0);
+      t.sit(bot.userId, bot.name, 1);
+      return { kind: 'bg', id: t.id, href: `#/bg/${t.id}` };
+    }
     if (game === 'mf') {
       const n = Math.min(9, Math.max(4, Math.floor(Number(bots)) || 6));
       const list = makeBots(n, crypto.randomInt(10));
@@ -897,6 +918,7 @@ function createServer({
       ckStakes: CK_STAKES,
       ch: CH.list(), myCh: [...CH.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), chStakes: CH_STAKES, chClocks: CH_CLOCKS,
       cap: CAP.list(), myCap: [...CAP.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), capStakes: CAP_STAKES, capTimes: CAP_TIMES,
+      bg: BG.list(), myBg: [...BG.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), bgStakes: BG_STAKES, bgTimes: BG_TIMES,
       mf: MF.list(), myMf: [...MF.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), mfStakes: MF_STAKES,
       ckClocks: CK_CLOCKS,
       reactions: REACTIONS,
@@ -994,14 +1016,14 @@ function createServer({
     on('friends:invite', ({ id, href }) => {
       const fid = String(id);
       if (!store.areFriends(userId, fid)) throw new GameError('Приглашать можно только друзей');
-      const m = /^#\/(table|durak|bj|rl|ck|ch|cap|mf)\/([\w-]+)$/.exec(String(href || ''));
+      const m = /^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg)\/([\w-]+)$/.exec(String(href || ''));
       if (!m) throw new GameError('Неверная ссылка');
       const t = m[1] === 'table' ? tables.get(m[2]) : m[1] === 'durak' ? durakTables.get(m[2]) : m[1] === 'bj' ? bjTables.get(m[2]) : extra[m[1]].map.get(m[2]);
       if (!t) throw new GameError('Стол не найден');
       if (Date.now() - lastInvite < 1500) throw new GameError('Не так быстро');
       lastInvite = Date.now();
       if (!isOnline(fid)) throw new GameError('Друг сейчас не в сети');
-      const game = { poker: t.tournament ? 'Sit & Go' : 'Покер', durak: 'Дурак', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки', ch: 'Шахматы', cap: 'Капитал', mf: 'Мафия' }[KIND_OF(t)];
+      const game = { poker: t.tournament ? 'Sit & Go' : 'Покер', durak: 'Дурак', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки', ch: 'Шахматы', cap: 'Капитал', mf: 'Мафия', bg: 'Нарды' }[KIND_OF(t)];
       io.to('user:' + fid).emit('invite', { from: store.brief(userId), href, title: t.name, game });
     });
 
@@ -1117,7 +1139,7 @@ function createServer({
     let lastReact = 0;
     on('react', ({ room, emoji }) => {
       if (!REACTIONS.includes(emoji)) throw new GameError('Нет такой реакции');
-      const m = /^(table|durak|bj|rl|ck|ch|cap|mf):([\w-]+)$/.exec(String(room || ''));
+      const m = /^(table|durak|bj|rl|ck|ch|cap|mf|bg):([\w-]+)$/.exec(String(room || ''));
       if (!m) throw new GameError('Стол не найден');
       const t = m[1] === 'table' ? tables.get(m[2]) : m[1] === 'durak' ? durakTables.get(m[2]) : m[1] === 'bj' ? bjTables.get(m[2]) : extra[m[1]].map.get(m[2]);
       if (!t) throw new GameError('Стол не найден');
@@ -1129,7 +1151,7 @@ function createServer({
     });
 
     on('ratings:get', ({ kind }) => {
-      const k = ['durak', 'chess'].includes(kind) ? kind : 'checkers';
+      const k = ['durak', 'chess', 'nardy'].includes(kind) ? kind : 'checkers';
       return { list: store.ratingTable(k), me: (store.get(userId).rating || {})[k] };
     });
     on('season:get', ({ game }) => ({ season: store.seasonView(String(game || 'total'), userId) }));
@@ -1324,6 +1346,23 @@ function createServer({
     on('ch:resign', ({ tableId }) => { CH.get(tableId).resign(userId); });
     on('ch:draw', ({ tableId }) => { CH.get(tableId).offerDraw(userId); });
     on('ch:declineDraw', ({ tableId }) => { CH.get(tableId).declineDraw(userId); });
+    // ----- нарды -----
+    on('bg:create', ({ name, stake, turn, private: priv }) => {
+      if (BG.map.size >= MAX_TABLES) throw new GameError('Слишком много столов');
+      const st = Number(stake);
+      const tn = Number(turn);
+      if (!BG_STAKES.includes(st) || !BG_TIMES.includes(tn)) throw new GameError('Неверные параметры стола');
+      if (ownCount(BG) >= 3) throw new GameError('Можно создать не больше 3 столов');
+      const clean = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 24) || `Нарды у ${socket.data.name}`;
+      const t = BG.make({ name: clean, stake: st, turnSec: tn, createdBy: userId, private: !!priv });
+      if (t.private) schedulePrivate(t);
+      return { tableId: t.id };
+    });
+    on('bg:ready', ({ tableId, value }) => { BG.get(tableId).setReady(userId, !!value); });
+    on('bg:roll', ({ tableId }) => { BG.get(tableId).roll(userId); });
+    on('bg:move', ({ tableId, from, die }) => { BG.get(tableId).move(userId, { from, die }); });
+    on('bg:undo', ({ tableId }) => { BG.get(tableId).undo(userId); });
+    on('bg:resign', ({ tableId }) => { BG.get(tableId).resign(userId); });
     // ----- Капитал -----
     on('cap:create', ({ name, stake, maxPlayers, time, private: priv }) => {
       if (CAP.map.size >= MAX_TABLES) throw new GameError('Слишком много столов');
