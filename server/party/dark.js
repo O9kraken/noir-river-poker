@@ -6,33 +6,35 @@
  * Every player also has one blank card to write anything they like.
  */
 const { GameError, shuffle } = require('./base');
-const { PROMPTS, ANSWERS, gaps } = require('./dark-cards');
+const { PROMPTS, ANSWERS, PROMPTS_MAT, ANSWERS_MAT, gaps } = require('./dark-cards');
 
 const HAND = 10;
 
 class DarkGame {
   static get meta() { return { id: 'dark', title: 'Без тормозов', min: 3, max: 10 }; }
-  static options(o) { return { goal: [5, 7, 10].includes(Number(o.goal)) ? Number(o.goal) : 7 }; }
+  static options(o) { return { goal: [5, 7, 10].includes(Number(o.goal)) ? Number(o.goal) : 7, mat: o.mat !== false && o.mat !== 0 && o.mat !== '0' }; }
 
   constructor(host, players, options) {
     this.host = host;
     this.rng = host.rng;
     this.goal = options.goal;
+    this.mat = !!options.mat;
+    this.allPrompts = this.mat ? PROMPTS.concat(PROMPTS_MAT) : PROMPTS;
     this.seq = 0;
     this.ev = null;
     this.order = players.map((p) => p.seat);
     this.score = new Map(this.order.map((s) => [s, 0]));
     let id = 0;
-    this.answers = shuffle(ANSWERS.map((t) => ({ id: ++id, t })), this.rng);
+    this.answers = shuffle((this.mat ? ANSWERS.concat(ANSWERS_MAT) : ANSWERS).map((t) => ({ id: ++id, t })), this.rng);
     this.used = [];
-    this.prompts = shuffle(PROMPTS.slice(), this.rng);
+    this.prompts = shuffle(this.allPrompts.slice(), this.rng);
     this.hands = new Map(this.order.map((s) => [s, []]));
     this.blank = new Map(this.order.map((s) => [s, 1]));
     for (const s of this.order) this._refill(s);
     this.judge = this.order[Math.floor(this.rng() * this.order.length)];
     this.round = 0;
     this.history = [];
-    host.sys(`Играем до ${this.goal} очков. У каждого есть одна пустая карта — впишите что угодно. 18+.`);
+    host.sys(`Играем до ${this.goal} очков. У каждого есть одна пустая карта — впишите что угодно. 18+${this.mat ? ', без цензуры' : ''}.`);
     this._newRound();
   }
 
@@ -46,7 +48,7 @@ class DarkGame {
 
   _newRound() {
     this.round += 1;
-    if (!this.prompts.length) this.prompts = shuffle(PROMPTS.slice(), this.rng);
+    if (!this.prompts.length) this.prompts = shuffle(this.allPrompts.slice(), this.rng);
     this.prompt = this.prompts.shift();
     this.pick = Math.max(1, gaps(this.prompt));
     this.subs = new Map(); // seat -> [{ id, t, blank }]
@@ -55,6 +57,12 @@ class DarkGame {
     this.host.stopTurn();
     this.host.timer('answer', 75000, () => this._toJudge());
     this._event('round', this.judge, `Раунд ${this.round}. Ведущий — ${this._n(this.judge)}`);
+  }
+
+  resume() {
+    if (this.phase === 'answer') this.host.timer('answer', 75000, () => this._toJudge());
+    else if (this.phase === 'judge') this.host.turn(this.judge, 60000, () => this._choose(this.judge, Math.floor(this.rng() * this.reveal.length), true));
+    else if (this.phase === 'show') this.host.timer('show', 4000, () => this._nextJudge(), false);
   }
 
   _players() { return this.order.filter((s) => s !== this.judge); }

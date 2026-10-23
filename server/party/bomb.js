@@ -169,7 +169,17 @@ class BombGame {
     this._window();
   }
 
-  _window() { this.host.timer('nope', 2600, () => this._resolve()); }
+  _window() { this.host.timer('nope', 3500, () => this._resolve(), false); }
+
+  /** After a restart: arm the clocks for the phase the game was in. */
+  resume() {
+    const pi = this.phaseInfo;
+    if (this.phase === 'insert') { this.host.timer('phase', 20000, () => this._insert(pi.seat, 'random')); return; }
+    this.host.turn(this.cur, 30000, () => this._autoTurn());
+    if (this.phase === 'favor') this.host.timer('phase', 15000, () => { const h = this._hand(pi.from); if (h.length) this._give(pi.from, h[Math.floor(this.rng() * h.length)].id); });
+    if (this.phase === 'alter') this.host.timer('phase', 20000, () => this._order(pi.seat, null));
+    if (this.pending) this._window();
+  }
 
   _nope(seat, p) {
     if (!this.pending) throw new GameError('Отменять нечего');

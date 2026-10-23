@@ -45,7 +45,8 @@ class PartyTable {
     this.rng = opts.rng || (() => this.randomInt(1e9) / 1e9);
     this.countdownMs = opts.countdown ?? 4000;
     this.resultPause = opts.resultPause ?? 14000;
-    this.speed = opts.speed ?? 1; // tests run the game clocks faster
+    // turn clocks: tests run them faster; with bots there is no rush, so practice tables give twice the time
+    this.speed = opts.speed ?? (cfg.practice ? 2 : 1);
     this.clock = new TurnClock({ timers: this.timers, now: this.now, grace: opts.seenGrace ?? 6000, pauseMs: opts.pauseMs ?? 45000, awayMs: 1500 });
     this.seats = Array(this.maxSeats).fill(null);
     this.status = 'waiting'; // waiting | countdown | playing | result
@@ -187,15 +188,17 @@ class PartyTable {
   turnView() { const v = this.clock.view(); return v && v.seat != null ? v : null; }
 
   /** A plain named timer (windows, everyone-answers phases). */
-  timer(name, ms, fn) {
+  timer(name, ms, fn, scale = true) {
     this.clear(name);
-    const at = this.now() + this.ms(ms);
-    const h = this.timers.set(() => { this._named.delete(name); if (this.status === 'playing') { fn(); this._update(); } }, this.ms(ms));
-    this._named.set(name, { h, at });
+    const len = scale ? this.ms(ms) : Math.max(10, Math.round(ms * Math.min(1, this.speed)));
+    const at = this.now() + len;
+    const h = this.timers.set(() => { this._named.delete(name); if (this.status === 'playing') { fn(); this._update(); } }, len);
+    this._named.set(name, { h, at, len });
     return at;
   }
   clear(name) { const t = this._named.get(name); if (t) { this.timers.clear(t.h); this._named.delete(name); } }
   timerLeft(name) { const t = this._named.get(name); return t ? Math.max(0, t.at - this.now()) : 0; }
+  timerLen(name) { const t = this._named.get(name); return t ? t.len : 0; }
   _clearAll() { for (const k of [...this._named.keys()]) this.clear(k); this.clock.stop(); }
 
   seen(userId, key) {
@@ -302,6 +305,54 @@ class PartyTable {
     this._update();
   }
 
+  // ---------- surviving a restart ----------
+  /** Everything needed to bring the table back after a deploy, as plain JSON. */
+  snapshot() {
+    const snap = { seats: this.seats.map((s, i) => s && { seat: i, userId: s.userId, name: s.name, pref: s.pref }).filter(Boolean) };
+    if (this.status === 'playing' && this.g) {
+      snap.game = {
+        gameNo: this.gameNo, stake: this.stake, players: this.players, left: this.left || [],
+        chat: this.chat.slice(-60), log: this.log.slice(-60), state: encode(this.g, new Set(['host', 'rng', '_bots'])),
+      };
+    }
+    return snap;
+  }
+
+  /**
+   * Continue a game from a snapshot. The seats are already taken (connected: false);
+   * charge(userId, amount) takes the stake again, as the restart returned it to the balance.
+   */
+  restoreGame(game, charge) {
+    const players = game.players.filter((p) => this.seatOf(p.userId) === p.seat);
+    if (players.length < 1) return false;
+    let pot = 0;
+    for (const p of players) {
+      if (this.stake && !isBot(p.userId)) { if (charge(p.userId, this.stake)) { pot += this.stake; this.deps.onInPlay && this.deps.onInPlay(p.userId, this.stake); } }
+    }
+    const g = Object.create(this.Game.prototype);
+    Object.assign(g, decode(game.state));
+    g.host = this;
+    g.rng = this.rng;
+    this.players = players;
+    this.left = game.left || [];
+    this.gameNo = game.gameNo;
+    this.pot = pot;
+    this.chat = game.chat || [];
+    this.log = game.log || [];
+    this.status = 'playing';
+    this.result = null;
+    this.g = g;
+    this.clock.resetBudgets();
+    for (const s of this.seats) if (s) s.ready = false;
+    // a player who did not come back is treated as having left
+    const gone = game.players.filter((p) => !players.includes(p));
+    for (const p of gone) { this.left.push(p); try { g.leave(p.seat); } catch (e) { /* the game copes */ } }
+    if (this.status !== 'playing') return true;
+    this.sys('Сервер перезапускался — партия продолжается с того же места');
+    if (g.resume) g.resume();
+    return true;
+  }
+
   // ---------- views ----------
   summary() {
     return {
@@ -323,12 +374,36 @@ class PartyTable {
       log: this.log.slice(-30),
       chat: this.chat.slice(-60),
       result: this.status === 'result' ? this.result : null,
-      turn: tv ? { seat: tv.seat, left: tv.left, paused: !!tv.paused, key: tv.seat === mySeat ? tv.key : null } : null,
+      turn: tv ? { seat: tv.seat, left: tv.left, ms: tv.ms, paused: !!tv.paused, key: tv.seat === mySeat ? tv.key : null } : null,
       g: null,
     };
     if (this.g && (this.status === 'playing' || this.status === 'result')) st.g = this.g.view(st.inGame ? mySeat : -1, this.status === 'result');
     return st;
   }
+}
+
+/** JSON with Maps and Sets. */
+function encode(v, skip) {
+  if (v instanceof Map) return { $map: [...v].map(([k, x]) => [k, encode(x)]) };
+  if (v instanceof Set) return { $set: [...v].map((x) => encode(x)) };
+  if (Array.isArray(v)) return v.map((x) => encode(x));
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const [k, x] of Object.entries(v)) if (!(skip && skip.has(k)) && typeof x !== 'function') o[k] = encode(x);
+    return o;
+  }
+  return v;
+}
+function decode(v) {
+  if (Array.isArray(v)) return v.map(decode);
+  if (v && typeof v === 'object') {
+    if (v.$map) return new Map(v.$map.map(([k, x]) => [k, decode(x)]));
+    if (v.$set) return new Set(v.$set.map(decode));
+    const o = {};
+    for (const [k, x] of Object.entries(v)) o[k] = decode(x);
+    return o;
+  }
+  return v;
 }
 
 /** Fisher–Yates with the table's random source. */
@@ -337,4 +412,4 @@ function shuffle(arr, rng) {
   return arr;
 }
 
-module.exports = { PartyTable, shuffle, isBot, GameError };
+module.exports = { PartyTable, shuffle, isBot, GameError, encode, decode };

@@ -5,19 +5,21 @@
  * (it can only be reached by winning a fight). Everyone else may help you — or make your life harder.
  */
 const { GameError, shuffle } = require('./base');
-const { CARDS, CLASS_NAMES, BAD_TEXT } = require('./dungeon-cards');
+const { CARDS, CARDS_MAT, CLASS_NAMES, BAD_TEXT } = require('./dungeon-cards');
 
 const HAND_LIMIT = 5;
 const SLOTS = ['head', 'body', 'feet'];
 
 class DungeonGame {
   static get meta() { return { id: 'dungeon', title: 'Подземелье', min: 3, max: 6 }; }
-  static options(o) { return { goal: [6, 8, 10].includes(Number(o.goal)) ? Number(o.goal) : 8 }; }
+  // the classic: up to level 10; «Без цензуры» swaps the card jokes for saltier ones
+  static options(o) { return { goal: 10, mat: o.mat === true || o.mat === 1 || o.mat === '1' }; }
 
   constructor(host, players, options) {
     this.host = host;
     this.rng = host.rng;
     this.goal = options.goal;
+    this.mat = !!options.mat;
     this.seq = 0;
     this.ev = null;
     this.order = players.map((p) => p.seat);
@@ -80,6 +82,10 @@ class DungeonGame {
     this.host.clear('fight');
     const ms = this.phase === 'fight' ? 75000 : 45000;
     this.host.turn(this.cur, ms, () => this._auto());
+  }
+  resume() {
+    this._armTurn();
+    if (this.fight && this.fight.final) this.host.timer('fight', 6000, () => this._resolveFight(), false);
   }
   _auto() {
     if (this.phase === 'start') { this._kick(this.cur); return; }
@@ -506,7 +512,7 @@ class DungeonGame {
       } : null,
       decks: { doors: this.doors.length, treasures: this.treasures.length, doorTop: (this.doorDiscard[this.doorDiscard.length - 1] || {}).k || null, trTop: (this.trDiscard[this.trDiscard.length - 1] || {}).k || null },
       ev: this.ev ? { ...this.ev, card: this.ev.cardFor && !this.ev.cardFor.includes(seat) && !over ? null : this.ev.card } : null,
-      cards: CARDS, classes: CLASS_NAMES, badText: BAD_TEXT,
+      cards: this.mat ? CARDS_MAT : CARDS, classes: CLASS_NAMES, badText: BAD_TEXT,
     };
   }
 

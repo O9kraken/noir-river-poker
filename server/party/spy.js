@@ -68,6 +68,12 @@ class SpyGame {
     });
   }
 
+  resume() {
+    if (this.phase === 'clue') { this._armClue(); return; }
+    const team = this.turnTeam;
+    this.host.timer('guess', 150000, () => { this.host.sys(`${TEAM_NAMES[team]} не успели — ход переходит`); this._pass(); });
+  }
+
   _pass() {
     this.turnTeam = other(this.turnTeam);
     this.phase = 'clue';

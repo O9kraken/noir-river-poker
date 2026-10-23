@@ -18,7 +18,7 @@ class TurnClock {
     this.cur = null;
     this.budget = new Map();
     this._t = null;
-    this._seq = 0;
+    this._seq = Math.floor(Math.random() * 1e6); // keys stay unique across restarts
   }
 
   /** New game: everyone's pause budget is full again. */

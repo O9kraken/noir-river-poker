@@ -17,7 +17,8 @@ const { CheckersTable } = require('./checkers/table');
 const { ChessTable } = require('./chess/table');
 const { CapitalTable } = require('./capital/table');
 const { MafiaTable } = require('./mafia/table');
-const { PartyTable, GAMES: PARTY_GAMES, meta: partyMeta } = require('./party');
+const { PartyTable, GAMES: PARTY_GAMES, meta: partyMeta, decks: partyDecks } = require('./party');
+const PARTY_DECKS = partyDecks();
 const { NardyTable } = require('./nardy/table');
 const { createVoice } = require('./voice');
 const { BotDriver, makeBots, isBot, LEVELS: BOT_LEVELS, LEVEL_NAMES } = require('./bots');
@@ -224,6 +225,8 @@ function createServer({
 
   /** Things every table of any game needs from the server. */
   function decorate(t, cfg) {
+    // the creation settings, so a player's own table can be rebuilt after a restart
+    try { t._cfg = JSON.parse(JSON.stringify(cfg)); } catch (e) { t._cfg = null; }
     t.avatarOf = (uid) => {
       if (isBot(uid)) return t.bots ? t.bots.avatarOf(uid) : null;
       const u = store.get(uid);
@@ -836,7 +839,7 @@ function createServer({
     setImmediate(() => { if (!humansAt(t)) dropPractice(t); });
   }
   /** A table for one player against bots: no chips, no stats. */
-  function createPractice(uid, name, { game, level, bots, variant, clock }) {
+  function createPractice(uid, name, { game, level, bots, variant, clock, options }) {
     level = BOT_LEVELS.includes(level) ? level : 'normal';
     // one practice table per player and game
     for (const t of allTables()) if (t.practice && t.createdBy === uid && KIND_OF(t) === game) dropPractice(t);
@@ -882,7 +885,7 @@ function createServer({
       const m = G.meta;
       const n = Math.min(m.max - 1, Math.max(m.min - 1, Math.floor(Number(bots)) || Math.min(m.max - 1, 4)));
       const list = makeBots(n, crypto.randomInt(10));
-      const t = PT.make({ level, game: variant, name: `${m.title} · тренировка`, stake: 0, maxPlayers: n + 1, createdBy: uid, private: true, practice: true, options: { goal: variant === 'dungeon' ? 6 : variant === 'dark' ? 5 : undefined } });
+      const t = PT.make({ level, game: variant, name: `${m.title} · тренировка`, stake: 0, maxPlayers: n + 1, createdBy: uid, private: true, practice: true, options: { goal: variant === 'dark' ? 5 : undefined, mat: options && options.mat } });
       t.bots = new BotDriver(t, 'pt', list, level, botOpts);
       t.sit(uid, name, 0);
       list.forEach((b, k) => t.sit(b.userId, b.name, k + 1));
@@ -990,7 +993,7 @@ function createServer({
       cap: CAP.list(), myCap: [...CAP.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), capStakes: CAP_STAKES, capTimes: CAP_TIMES,
       bg: BG.list(), myBg: [...BG.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), bgStakes: BG_STAKES, bgTimes: BG_TIMES,
       mf: MF.list(), myMf: [...MF.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), mfStakes: MF_STAKES,
-      pt: PT.list(), myPt: [...PT.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), ptStakes: PT_STAKES, ptGames: partyMeta(),
+      pt: PT.list(), myPt: [...PT.map.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id), ptStakes: PT_STAKES, ptGames: partyMeta(), ptDecks: PARTY_DECKS,
       ckClocks: CK_CLOCKS,
       reactions: REACTIONS,
       botLevels: BOT_LEVELS.map((k) => ({ id: k, name: LEVEL_NAMES[k] })),
@@ -1864,21 +1867,112 @@ function createServer({
       const seated = allTables().filter((t) => t.seatOf(userId) !== -1);
       if (!seated.length) return;
       seated.forEach((t) => t.setConnected(userId, false));
-      disconnectTimers.set(userId, setTimeout(() => {
-        disconnectTimers.delete(userId);
-        for (const t of tables.values()) {
-          // tournament seats stay: the player is auto-folded until back
-          if (t.seatOf(userId) !== -1 && !t.tournament) t.standUp(userId);
-        }
-        for (const t of durakTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
-        for (const t of bjTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
-        for (const t of extraTables()) if (t.seatOf(userId) !== -1) t.leave(userId);
-        for (const t of allTables()) if (t.practice && !humansAt(t)) dropPractice(t);
-      }, RECONNECT_GRACE));
+      dropLater(userId, RECONNECT_GRACE);
     });
   });
 
+  /** A player who stays away this long loses the seats. */
+  function dropLater(userId, ms) {
+    clearTimeout(disconnectTimers.get(userId));
+    disconnectTimers.set(userId, setTimeout(() => {
+      disconnectTimers.delete(userId);
+      for (const t of tables.values()) {
+        // tournament seats stay: the player is auto-folded until back
+        if (t.seatOf(userId) !== -1 && !t.tournament) t.standUp(userId);
+      }
+      for (const t of durakTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
+      for (const t of bjTables.values()) if (t.seatOf(userId) !== -1) t.leave(userId);
+      for (const t of extraTables()) if (t.seatOf(userId) !== -1) t.leave(userId);
+      for (const t of allTables()) if (t.practice && !humansAt(t)) dropPractice(t);
+    }, ms));
+  }
+
+  // ---------- tables survive a deploy ----------
+  // Every couple of seconds the list of player-made tables, who sits where, the chips on poker tables
+  // and the state of a running board game go to the database. A new server picks it all up on start.
+  const SNAP_MAX_AGE = 6 * 3600 * 1000;
+  const RESTORE_GRACE = Number(process.env.RESTORE_GRACE_MS) || 180000;
+  let snapFrozen = false;
+  let lastSnap = '';
+  function tableSnapshot() {
+    const list = [];
+    for (const t of allTables()) {
+      if (t.practice || t.tournament) continue;
+      const kind = KIND_OF(t);
+      const own = t._cfg && !t._cfg.permanent ? t._cfg : null;
+      const seats = (t.seats || []).map((x, i) => {
+        if (!x || isBot(x.userId)) return null;
+        const u = store.get(x.userId);
+        return { seat: i, userId: x.userId, name: x.name, chips: kind === 'poker' && u ? (u.inPlay || {})[t.id] || 0 : 0 };
+      }).filter(Boolean);
+      const party = kind === 'pt' ? t.snapshot() : null;
+      if (!seats.length && !own) continue;
+      list.push({ kind, id: t.id, cfg: own, seats, prefs: party ? Object.fromEntries(party.seats.map((x) => [x.seat, x.pref || {}])) : null, game: party && party.game ? party.game : null });
+    }
+    return list;
+  }
+  function saveTables(force = false) {
+    if (snapFrozen && !force) return;
+    let list;
+    try { list = tableSnapshot(); } catch (e) { console.error('[tables] снимок не удался:', e.message); return; }
+    const json = JSON.stringify(list);
+    if (json === lastSnap) return;
+    lastSnap = json;
+    store.data.tables = { at: Date.now(), list };
+    store.save();
+  }
+  const snapTimer = setInterval(saveTables, 2000);
+  if (snapTimer.unref) snapTimer.unref();
+
+  function restoreTables() {
+    const snap = store.data.tables;
+    if (!snap || !Array.isArray(snap.list) || Date.now() - (snap.at || 0) > SNAP_MAX_AGE) return;
+    const makers = { poker: (c) => makeTable(c), durak: makeDurak, bj: makeBj };
+    const back = new Set();
+    let n = 0;
+    for (const e of snap.list) {
+      try {
+        let t = findTable(e.kind === 'poker' ? 'table' : e.kind, e.id);
+        if (!t && e.cfg) {
+          const mk = makers[e.kind] || (extra[e.kind] && extra[e.kind].make);
+          if (!mk) continue;
+          t = mk({ ...e.cfg, id: e.id });
+        }
+        if (!t) continue;
+        n += 1;
+        for (const x of e.seats || []) {
+          const u = store.get(x.userId);
+          if (!u || u.banned || t.seats[x.seat] || t.seatOf(x.userId) !== -1) continue;
+          if (e.kind === 'poker') {
+            const stack = Math.min(x.chips || 0, u.balance);
+            if (stack < 1) continue;
+            store.withdraw(x.userId, stack);
+            t.seatDirect(x.userId, x.name, x.seat, stack);
+            store.setInPlay(x.userId, t.id, stack);
+          } else {
+            t.sit(x.userId, x.name, x.seat);
+            if (e.prefs && e.prefs[x.seat] && t.seats[x.seat]) t.seats[x.seat].pref = e.prefs[x.seat];
+          }
+          t.setConnected(x.userId, false);
+          back.add(x.userId);
+        }
+        if (e.kind === 'pt' && e.game) {
+          t.restoreGame(e.game, (uid, a) => { try { store.withdraw(uid, a); pushProfile(uid); return true; } catch (err) { return false; } });
+        }
+        if (e.kind === 'poker') { if (t._maybeStart) t._maybeStart(); t.onUpdate(t); }
+      } catch (err) { console.error(`[tables] не удалось восстановить стол ${e.id}:`, err.message); }
+    }
+    for (const uid of back) dropLater(uid, RESTORE_GRACE);
+    if (n) console.log(`Восстановлено столов: ${n}, игроков за ними: ${back.size}`);
+    lastSnap = '';
+  }
+  restoreTables();
+
   function shutdown() {
+    // the last picture of the tables, before they are closed and the chips go back to balances
+    saveTables(true);
+    snapFrozen = true;
+    clearInterval(snapTimer);
     clearInterval(cleanup);
     voice.stop();
     for (const t of allTables()) if (t.bots) t.bots.stop();
