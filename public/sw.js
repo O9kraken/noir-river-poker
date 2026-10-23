@@ -1,6 +1,6 @@
 /* NOIR RIVER service worker: an app shell that opens offline, cached art and fonts,
    and notification clicks that bring the club to the front. Game traffic is never cached. */
-const VERSION = 'nr-v21';
+const VERSION = 'nr-v24';
 const SHELL = ['/play', '/play.css', '/play.js', '/fonts/fonts.css', '/brand/mark.svg', '/brand/icon-192.png', '/favicon.svg'];
 
 self.addEventListener('install', (e) => {

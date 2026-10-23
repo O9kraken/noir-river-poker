@@ -644,7 +644,19 @@ function createServer({
     for (const r of results) if (r.userId) store.recordGame(r.userId, 'nardy', { table: tt.name, net: r.net, win: r.win, mars });
     rate('nardy', results.map((r) => ({ userId: r.userId, score: r.win ? 1 : r.draw ? 0.5 : 0 })));
   });
-  const PT = registerKind('pt', PartyTable, 'Настолки', { games: PARTY_GAMES, ...ptOpts }, (tt, results) => {
+  // «Без тормозов»: cards the players write are kept in a shared pool and dealt in later games
+  const darkHooks = {
+    darkPool: (o) => store.darkPool(o),
+    darkAdd: (text, { userId, name, mat }) => {
+      if (!userId || String(userId).startsWith('bot:')) return null;
+      const u = store.data.users[userId];
+      if (!u || u.muted || u.banned) return null;
+      return store.addDarkCard(text, { userId, name, mat });
+    },
+    darkWin: (id) => store.darkWin(id),
+    darkFlag: (id, userId) => store.flagDarkCard(id, userId),
+  };
+  const PT = registerKind('pt', PartyTable, 'Настолки', { games: PARTY_GAMES, ...ptOpts, hooks: { ...darkHooks, ...(ptOpts.hooks || {}) } }, (tt, results) => {
     for (const r of results) if (r.userId) store.recordGame(r.userId, 'party', { table: tt.name, net: r.net, win: r.win, game: tt.game, title: tt.meta.title, friendly: !tt.stake });
   });
   [
@@ -1552,6 +1564,7 @@ function createServer({
       return {
         me: userId,
         reports: store.reports().slice(0, 200),
+        darkCards: store.darkCards().slice(0, 1000),
         stats: {
           online: online.size,
           users: users.length,
@@ -1646,6 +1659,12 @@ function createServer({
     });
 
     admin('admin:reports', () => ({ reports: store.reports() }));
+    admin('admin:darkCards', () => ({ darkCards: store.darkCards() }));
+    admin('admin:darkCard', ({ id, action }) => {
+      const c = store.darkCardAdmin(String(id), String(action));
+      audit(`Карта игроков «${c.t}»: ${({ delete: 'удалена', hide: 'скрыта', show: 'возвращена', mat: c.mat ? 'помечена как мат' : 'мат снят' })[action]}`);
+      return { darkCards: store.darkCards() };
+    });
     admin('admin:report', ({ id, action }) => {
       if (action === 'resolve') store.resolveReport(String(id));
       return { reports: store.reports() };

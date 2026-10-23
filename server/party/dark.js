@@ -3,12 +3,15 @@
  * «Без тормозов» — a black-humour party game for 3–10 adults.
  * Each round one player is the host: they read a prompt with a gap, the others secretly put in their
  * funniest (or worst) answer, and the host picks the winner without knowing whose it is.
- * Every player also has one blank card to write anything they like.
+ * Every round a player may also write their own answer instead of playing a card. Written cards go
+ * into the club's shared pool and turn up in later games (host hook 'darkAdd' / 'darkPool').
  */
 const { GameError, shuffle } = require('./base');
 const { PROMPTS, ANSWERS, PROMPTS_MAT, ANSWERS_MAT, gaps } = require('./dark-cards');
 
 const HAND = 10;
+/** Up to this share (of the printed deck's size) of a new deck comes from the players' pool. */
+const CUSTOM_SHARE = 0.4;
 
 class DarkGame {
   static get meta() { return { id: 'dark', title: 'Без тормозов', min: 3, max: 10 }; }
@@ -25,16 +28,28 @@ class DarkGame {
     this.order = players.map((p) => p.seat);
     this.score = new Map(this.order.map((s) => [s, 0]));
     let id = 0;
-    this.answers = shuffle((this.mat ? ANSWERS.concat(ANSWERS_MAT) : ANSWERS).map((t) => ({ id: ++id, t })), this.rng);
+    const base = (this.mat ? ANSWERS.concat(ANSWERS_MAT) : ANSWERS).map((t) => ({ id: ++id, t }));
+    // the players' own cards: a random share of the pool, so the printed deck still dominates
+    const pool = shuffle((host.hook && host.hook('darkPool', { mat: this.mat })) || [], this.rng);
+    const seen = new Set(base.map((c) => c.t.toLowerCase()));
+    const custom = [];
+    for (const c of pool) {
+      if (custom.length >= Math.round(base.length * CUSTOM_SHARE)) break;
+      if (!c || !c.t || seen.has(c.t.toLowerCase())) continue;
+      seen.add(c.t.toLowerCase());
+      custom.push({ id: ++id, t: c.t, cid: c.id, by: c.byName || null });
+    }
+    this.nextId = id;
+    this.customIn = custom.length;
+    this.answers = shuffle(base.concat(custom), this.rng);
     this.used = [];
     this.prompts = shuffle(this.allPrompts.slice(), this.rng);
     this.hands = new Map(this.order.map((s) => [s, []]));
-    this.blank = new Map(this.order.map((s) => [s, 1]));
     for (const s of this.order) this._refill(s);
     this.judge = this.order[Math.floor(this.rng() * this.order.length)];
     this.round = 0;
     this.history = [];
-    host.sys(`Играем до ${this.goal} очков. У каждого есть одна пустая карта — впишите что угодно. 18+${this.mat ? ', без цензуры' : ''}.`);
+    host.sys(`Играем до ${this.goal} очков. Свою карту можно вписать в любом раунде — она останется в колоде клуба${this.customIn ? ` (сейчас в колоде ${this.customIn} карт от игроков)` : ''}. 18+${this.mat ? ', без цензуры' : ''}.`);
     this._newRound();
   }
 
@@ -72,6 +87,7 @@ class DarkGame {
     if (type === 'take') return this._take(seat);
     if (type === 'choose') return this._choose(seat, Number(p.i));
     if (type === 'swap') return this._swap(seat);
+    if (type === 'flag') return this._flag(seat, Number(p.id));
     throw new GameError('Неизвестный ход');
   }
 
@@ -96,9 +112,16 @@ class DarkGame {
         out.push(c);
       }
     }
-    if (blanks > 1 || blanks > this.blank.get(seat)) throw new GameError('Пустая карта у вас одна');
+    if (blanks > 1) throw new GameError('Своя карта — одна на ответ');
     for (const c of out) if (!c.blank) h.splice(h.indexOf(c), 1);
-    if (blanks) this.blank.set(seat, this.blank.get(seat) - 1);
+    for (const c of out) {
+      if (!c.blank) continue;
+      const u = this.host.userOf ? this.host.userOf(seat) : null;
+      const saved = u && this.host.hook ? this.host.hook('darkAdd', c.t, { userId: u.userId, name: u.name, mat: this.mat }) : null;
+      if (saved && saved.id) c.cid = saved.id;
+      c.by = u ? u.name : null;
+      this.written = (this.written || 0) + 1;
+    }
     this.subs.set(seat, out);
     this._event('answered', seat, null);
     if (this._players().every((s) => this.subs.has(s))) this._toJudge();
@@ -131,7 +154,8 @@ class DarkGame {
     this.history.unshift({ prompt: this.prompt, filled, seat: r.seat, name: this._n(r.seat), judge: this.judge });
     if (this.history.length > 8) this.history.length = 8;
     this._event('won', r.seat, `${auto ? 'Ведущий задумался — выбрано наугад. ' : ''}Очко получает ${this._n(r.seat)}: «${filled}»`, { i });
-    for (const [s, cards] of this.subs) for (const c of cards) if (!c.blank) this.used.push(c);
+    for (const c of r.cards) if (c.cid && this.host.hook) this.host.hook('darkWin', c.cid);
+    this._recycle();
     if (sc >= this.goal) {
       this.phase = 'over';
       this.host.finish({ winners: [r.seat], text: `${this._n(r.seat)} набирает ${sc} очков и побеждает. Стыдно должно быть всем.`, scores: Object.fromEntries(this.score) });
@@ -161,6 +185,31 @@ class DarkGame {
   }
   _take() { throw new GameError('Неизвестный ход'); }
 
+  /** Played cards go to the discard; written ones become ordinary cards of this game's deck too. */
+  _recycle() {
+    if (this.recycled === this.round) return;
+    this.recycled = this.round;
+    for (const [, cards] of this.subs || []) for (const c of cards) {
+      if (!c.blank) { this.used.push(c); continue; }
+      this.nextId = (this.nextId || 1000) + 1;
+      this.used.push({ id: this.nextId, t: c.t, cid: c.cid || null, by: c.by || null });
+    }
+  }
+
+  /** Complain about a players' card in your hand: it leaves the hand, and after a few complaints the pool. */
+  _flag(seat, id) {
+    const h = this.hands.get(seat);
+    const i = h ? h.findIndex((c) => c.id === id) : -1;
+    if (i === -1) throw new GameError('Нет такой карты');
+    const c = h[i];
+    if (!c.cid) throw new GameError('Это карта из основной колоды');
+    const u = this.host.userOf ? this.host.userOf(seat) : null;
+    if (u && this.host.hook) this.host.hook('darkFlag', c.cid, u.userId);
+    h.splice(i, 1);
+    this._refill(seat);
+    this.host.sys('Карта игроков убрана из руки — спасибо, модераторы посмотрят');
+  }
+
   fill(prompt, texts) {
     let k = 0;
     const lc = (t, first) => (first ? t : t.charAt(0).toLowerCase() + t.slice(1));
@@ -180,7 +229,7 @@ class DarkGame {
     }
     if (seat === this.judge) {
       this.host.sys('Ведущий сбежал — раунд переигрываем');
-      for (const [, cards] of this.subs || []) for (const c of cards) if (!c.blank) this.used.push(c);
+      this._recycle();
       this.host.clear('answer'); this.host.clear('show'); this.host.stopTurn();
       this.judge = this.order[0];
       this._newRound();
@@ -199,8 +248,9 @@ class DarkGame {
       order: this.order, judge: this.judge,
       players: this.order.map((s) => ({ seat: s, name: this._n(s), score: this.score.get(s), answered: this.subs.has(s) })),
       prompt: this.prompt, pick: this.pick,
-      hand: seat >= 0 && this.hands.has(seat) ? this.hands.get(seat).map((c) => ({ id: c.id, t: c.t })) : null,
-      blank: seat >= 0 ? this.blank.get(seat) || 0 : 0,
+      hand: seat >= 0 && this.hands.has(seat) ? this.hands.get(seat).map((c) => ({ id: c.id, t: c.t, custom: !!(c.cid || c.by), by: c.by || null })) : null,
+      blank: seat >= 0 && this.hands.has(seat) ? 1 : 0,
+      written: this.written || 0,
       mine: seat >= 0 && this.subs.has(seat) ? this.subs.get(seat).map((c) => c.t) : null,
       reveal: this.reveal ? this.reveal.map((r) => ({ texts: r.cards.map((c) => c.t), blank: r.cards.some((c) => c.blank), seat: showNames ? r.seat : null })) : null,
       winner: showNames ? this.winner : null,

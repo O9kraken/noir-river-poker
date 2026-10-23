@@ -98,7 +98,7 @@
 
   function currentTable() {
     // every game screen: poker, durak, blackjack, roulette, checkers, chess, «Капитал», mafia
-    const m = location.hash.match(/^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg)\/([\w-]+)/);
+    const m = location.hash.match(/^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg|pt)\/([\w-]+)/);
     if (!m) return null;
     const NAME_EL = { table: '#t-name', durak: '#dk-name' };
     const el = $(NAME_EL[m[1]] || `#${m[1]}-name`);

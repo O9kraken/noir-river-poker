@@ -21,6 +21,11 @@ const BONUS_INTERVAL = 24 * 60 * 60 * 1000;
 const TOKEN_TTL = 30 * 24 * 60 * 60 * 1000;
 const NAME_RE = /^[A-Za-zА-Яа-яЁё0-9_\- ]{3,16}$/;
 
+const DARK_POOL_MAX = 5000;
+const DARK_FLAGS_HIDE = 3;
+const MAT_RE = /ху[йеёяию]|пизд|бляд|(^|[^а-яё])(бля|сук[аи]|муда|залуп|манд[ауо]|г[ао]ндон|пидор|пидар|(за|на|у|вы|до|от|по|раз|съ|об|под|при|про|въ|из)?[её]б(а|л|у|н|и|ё|о))/i;
+function normDarkCard(text) { return String(text || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80); }
+
 class StoreError extends Error {}
 
 const AVATAR_SYMBOLS = ['', 's', 'h', 'd', 'c', 'crown', 'star', 'bolt', 'moon', 'flame'];
@@ -111,6 +116,7 @@ class Store {
     if (!this.data.dms || typeof this.data.dms !== 'object') this.data.dms = {};
     if (!Array.isArray(this.data.seasonHistory)) this.data.seasonHistory = [];
     if (!Array.isArray(this.data.reports)) this.data.reports = [];
+    if (!Array.isArray(this.data.darkCards)) this.data.darkCards = [];
     if (!this.data.season || typeof this.data.season !== 'object') this.data.season = newSeason();
     for (const u of Object.values(this.data.users)) this._upgrade(u);
     // Chips left on tables when the server stopped go back to balances.
@@ -659,6 +665,7 @@ class Store {
     for (const k of Object.keys(this.data.dms || {})) if (k.split('|').includes(userId)) delete this.data.dms[k];
     if (this.data.season && this.data.season.scores) delete this.data.season.scores[userId];
     this.data.reports = (this.data.reports || []).filter((r) => r.targetId !== userId && r.fromId !== userId);
+    for (const c of this.data.darkCards || []) if (c.by === userId) { c.by = null; c.byName = null; }
     this.save();
     return u.name;
   }
@@ -689,6 +696,69 @@ class Store {
 
   reports() { return (this.data.reports || []).map((r) => ({ ...r, reasonText: REPORT_REASONS[r.reason] || r.reason, exists: !!this.data.users[r.targetId] })); }
   resolveReport(id) { const r = (this.data.reports || []).find((x) => x.id === id); if (r) { r.done = true; this.save(); } }
+
+  // ---------- «Без тормозов»: the players' own answer cards ----------
+  /**
+   * Save a card a player wrote into the shared pool. Returns the card (existing one for duplicates)
+   * or null when it is not worth keeping. Cards with мат (by a word list; admins can correct it)
+   * are dealt only at tables with swearing on.
+   */
+  addDarkCard(text, { userId = null, name = null, mat = false } = {}) {
+    const t = normDarkCard(text);
+    if (t.length < 2) return null;
+    const list = this.data.darkCards || (this.data.darkCards = []);
+    const key = t.toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, '');
+    if (!key) return null;
+    const same = list.find((c) => c.key === key);
+    if (same) { same.uses = (same.uses || 0) + 1; this.save(); return same; }
+    if (userId) {
+      const hour = list.filter((c) => c.by === userId && Date.now() - c.at < 3600 * 1000).length;
+      if (hour >= 40) return null;
+    }
+    const card = { id: crypto.randomUUID().slice(0, 12), t, key, by: userId, byName: name, at: Date.now(), mat: MAT_RE.test(t), uses: 1, wins: 0, flags: [], hidden: false };
+    list.unshift(card);
+    if (list.length > DARK_POOL_MAX) {
+      // drop the least liked old cards first
+      const drop = list.slice(500).sort((a, b) => (a.wins - b.wins) || (a.at - b.at))[0];
+      list.splice(list.indexOf(drop), 1);
+    }
+    this.save();
+    return card;
+  }
+
+  /** Cards that can go into a new game's deck. */
+  darkPool({ mat = false } = {}) {
+    return (this.data.darkCards || []).filter((c) => !c.hidden && (mat || !c.mat)).map((c) => ({ id: c.id, t: c.t, byName: c.byName }));
+  }
+
+  darkWin(id) { const c = (this.data.darkCards || []).find((x) => x.id === id); if (c) { c.wins = (c.wins || 0) + 1; this.save(); } }
+
+  /** A player flags a pool card; three flags hide it until an admin looks. */
+  flagDarkCard(id, userId) {
+    const c = (this.data.darkCards || []).find((x) => x.id === id);
+    if (!c) throw new StoreError('Карта не найдена');
+    c.flags ||= [];
+    if (c.flags.includes(userId)) throw new StoreError('Вы уже пожаловались на эту карту');
+    c.flags.push(userId);
+    if (c.flags.length >= DARK_FLAGS_HIDE) c.hidden = true;
+    this.save();
+    return c;
+  }
+
+  darkCards() { return (this.data.darkCards || []).map(({ key, flags, ...c }) => ({ ...c, flagCount: (flags || []).length })); }
+  darkCardAdmin(id, action) {
+    const list = this.data.darkCards || [];
+    const i = list.findIndex((x) => x.id === id);
+    if (i === -1) throw new StoreError('Карта не найдена');
+    const c = list[i];
+    if (action === 'delete') list.splice(i, 1);
+    else if (action === 'hide') c.hidden = true;
+    else if (action === 'show') { c.hidden = false; c.flags = []; }
+    else if (action === 'mat') c.mat = !c.mat;
+    else throw new StoreError('Неизвестное действие');
+    this.save();
+    return c;
+  }
 
   // ---------- shop ----------
   shopView(userId) {
@@ -997,6 +1067,7 @@ class Store {
     if (!this.data.dms || typeof this.data.dms !== 'object') this.data.dms = {};
     if (!Array.isArray(this.data.seasonHistory)) this.data.seasonHistory = [];
     if (!Array.isArray(this.data.reports)) this.data.reports = [];
+    if (!Array.isArray(this.data.darkCards)) this.data.darkCards = [];
     if (!this.data.season || typeof this.data.season !== 'object') this.data.season = newSeason();
     for (const u of Object.values(this.data.users)) {
       this._upgrade(u);

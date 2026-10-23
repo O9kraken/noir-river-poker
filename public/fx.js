@@ -8,7 +8,7 @@
 
   /** The room of the table on screen, as the server names it. */
   function currentRoom() {
-    const m = location.hash.match(/^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg)\/([\w-]+)/);
+    const m = location.hash.match(/^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg|pt)\/([\w-]+)/);
     return m ? `${m[1]}:${m[2]}` : null;
   }
   const SEAT_SEL = {
@@ -21,6 +21,7 @@
     bg: (i) => `#bg-view [data-seat="${i}"]`,
     cap: (i) => `#cap-players .cap-pl[data-seat="${i}"]`,
     mf: (i) => `#mf-ring [data-seat="${i}"]`,
+    pt: (i) => `#pt-stage .pt-pl[data-seat="${i}"], #pt-stage .pt-seat[data-seat="${i}"]`,
   };
   function seatEl(room, seat) {
     const kind = room.split(':')[0];

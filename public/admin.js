@@ -97,7 +97,10 @@
     const open = (d.reports || []).filter((r) => !r.done).length;
     const badge = $('#adm-rep-count');
     badge.hidden = !open; badge.textContent = open;
-    const view = { overview, users, tables, sng, durak, bj, extra, announce, reports }[A.tab];
+    const flagged = (d.darkCards || []).filter((c) => c.flagCount > 0).length;
+    const cb = $('#adm-card-count');
+    if (cb) { cb.hidden = !flagged; cb.textContent = flagged; }
+    const view = { overview, users, tables, sng, durak, bj, extra, announce, reports, cards }[A.tab];
     main.replaceChildren(...[view(d)].flat().filter(Boolean));
   }
 
@@ -250,6 +253,35 @@
             ] : h('span', { class: 'muted small' }, 'аккаунт удалён'),
             r.done ? null : h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => run('admin:report', { id: r.id, action: 'resolve' }, 'Отмечено') }, 'Решено')));
       })];
+  }
+
+  // ---------- «Без тормозов»: cards written by players ----------
+  function cards(d) {
+    const all = d.darkCards || [];
+    A.cardFilter ||= 'flagged';
+    const q = (A.cardQuery || '').toLowerCase();
+    const pass = { all: () => true, flagged: (c) => c.flagCount > 0, hidden: (c) => c.hidden, mat: (c) => c.mat, top: (c) => c.wins > 0 }[A.cardFilter] || (() => true);
+    let list = all.filter((c) => pass(c) && (!q || c.t.toLowerCase().includes(q) || (c.byName || '').toLowerCase().includes(q)));
+    if (A.cardFilter === 'top') list = list.slice().sort((a, b) => b.wins - a.wins);
+    const tabs = [['flagged', 'С жалобами'], ['all', 'Все'], ['hidden', 'Скрытые'], ['mat', 'С матом'], ['top', 'Лучшие']];
+    const head = h('div', { class: 'adm-form' },
+      ...tabs.map(([k, t]) => h('button', { type: 'button', class: 'btn btn-sm ' + (A.cardFilter === k ? 'btn-gold' : 'btn-dark'), onclick: () => { A.cardFilter = k; render(); } }, t)),
+      h('input', { class: 'adm-input', placeholder: 'Поиск по тексту или автору', value: A.cardQuery || '', 'aria-label': 'Поиск карт', oninput: (e) => { A.cardQuery = e.target.value; clearTimeout(A.cardT); A.cardT = setTimeout(() => { render(); const i = document.querySelector('#adm-main .adm-input'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); } }));
+    const act = (c, action, text, ask) => h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => { if (!ask || confirm(ask)) run('admin:darkCard', { id: c.id, action }, text); } }, text);
+    return [h('p', { class: 'muted small' }, `Ответы, которые игроки вписали в «Без тормозов». Они попадают в колоду новых партий. Всего ${all.length}, скрыто ${all.filter((c) => c.hidden).length}. После трёх жалоб карта скрывается сама.`),
+      head,
+      list.length ? null : h('div', { class: 'empty' }, 'Карт нет.'),
+      ...list.slice(0, 300).map((c) => h('article', { class: 'adm-report' + (c.hidden ? ' done' : '') },
+        h('div', { class: 'rp-head' },
+          c.flagCount ? h('span', { class: 'rp-reason' }, `жалоб: ${c.flagCount}`) : null,
+          h('b', null, c.t),
+          h('span', { class: 'muted small' }, `${c.byName || 'аккаунт удалён'} · ${new Date(c.at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })} · сыграна ${c.uses}, побед ${c.wins}${c.mat ? ' · мат' : ''}`),
+          c.hidden ? h('span', { class: 'status finished' }, 'скрыта') : null),
+        h('div', { class: 'rp-acts' },
+          c.hidden ? act(c, 'show', 'Вернуть в колоду') : act(c, 'hide', 'Скрыть'),
+          act(c, 'mat', c.mat ? 'Снять пометку «мат»' : 'Пометить как мат'),
+          act(c, 'delete', 'Удалить', `Удалить карту «${c.t}» навсегда?`)))),
+      list.length > 300 ? h('p', { class: 'muted small' }, `Показаны первые 300 из ${list.length}. Уточните поиск.`) : null];
   }
 
   function select(name, options, value, label) {

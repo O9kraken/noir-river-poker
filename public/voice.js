@@ -4,7 +4,7 @@
   'use strict';
   const NR = window.NR;
   const { $, $$, h, toast, call, S } = NR;
-  const HASH = /^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg)\/([\w-]+)/;
+  const HASH = /^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg|pt)\/([\w-]+)/;
   const MIC = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
   const MIC_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 9.3V6a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 5 2.2M5 11a7 7 0 0 0 11.5 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>';
   const HANG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 15.5c5-4.7 13-4.7 18 0l-2.3 2.6-3.6-1.4.2-2.5a12 12 0 0 0-6.6 0l.2 2.5-3.6 1.4z"/></svg>';

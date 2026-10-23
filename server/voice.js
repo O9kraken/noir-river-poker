@@ -4,7 +4,7 @@
  * the sound itself goes directly between browsers. Only seated players may join a table's voice.
  * Games with secrets (mafia) also get a policy: who may speak now and whom each player hears.
  */
-const KINDS = /^(table|durak|bj|rl|ck|ch|cap|mf|bg)$/;
+const KINDS = /^(table|durak|bj|rl|ck|ch|cap|mf|bg|pt)$/;
 const MAX_PEERS = 10;
 
 const STUN = { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] };

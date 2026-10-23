@@ -263,9 +263,19 @@ ${cat(48, 86, 0.74, { fur: '#16181B', belly: '#2A2C30', eye: '#9FE0BC', extra: `
     cache.set(key, svg);
     return svg;
   }
+  // 3D renders of every card (public/art/cards); the SVG drawings above stay as a fallback
+  const img = (file, k) => `<img class="pt-art-img" src="/art/cards/${file}.webp" alt="" width="480" height="400" loading="lazy" decoding="async" draggable="false" data-k="${k}">`;
   window.PartyArt = {
-    bomb: (k) => render(BOMB, 'b-', k),
-    dungeon: (k) => render(DUN, 'd-', k),
+    bomb: (k) => (BOMB[k] ? img('b-' + k, k) : ''),
+    dungeon: (k) => (DUN[k] ? img('d-' + k, k) : ''),
+    svg: { bomb: (k) => render(BOMB, 'b-', k), dungeon: (k) => render(DUN, 'd-', k) },
     has: (game, k) => !!(game === 'bomb' ? BOMB : DUN)[k],
   };
+  // a render that failed to load is swapped for the drawing
+  document.addEventListener('error', (e) => {
+    const el = e.target;
+    if (!el || !el.classList || !el.classList.contains('pt-art-img')) return;
+    const k = el.dataset.k; const bomb = el.src.includes('/b-');
+    const holder = el.parentNode; if (holder) holder.innerHTML = bomb ? render(BOMB, 'b-', k) : render(DUN, 'd-', k);
+  }, true);
 })();

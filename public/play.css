@@ -2542,6 +2542,13 @@ button.dt-wcard:focus-visible { outline: 2px solid var(--gold-2); outline-offset
 .dt-wcard.blank { display: flex; flex-direction: column; gap: 8px; background: repeating-linear-gradient(-45deg, #EDE6D6 0 10px, #E2D9C4 10px 20px); width: 170px; }
 .dt-blank-btn { all: unset; cursor: pointer; font-weight: 800; color: #6A4A15; }
 .dt-wcard.blank input { width: 100%; box-sizing: border-box; border: 1px solid #C9BCA0; border-radius: 8px; padding: 7px 8px; font: inherit; font-weight: 700; font-size: 12.5px; background: #fff; color: #111; }
+.dt-blank-note { font-size: 10.5px; line-height: 1.3; color: #6A5A3A; font-weight: 600; }
+.dt-wcard.custom { padding-bottom: 28px; background: #F2EBDA; }
+.dt-by { position: absolute; left: 11px; right: 30px; bottom: 9px; font-size: 10.5px; font-weight: 700; color: #8A6A3A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt-wwrap { position: relative; flex: none; display: flex; }
+.dt-flag { all: unset; position: absolute; right: 6px; bottom: 6px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; cursor: pointer; color: #8A6A3A; font-size: 12px; z-index: 2; }
+.dt-flag:hover, .dt-flag:focus-visible { background: #B0242F; color: #fff; }
+.dt-wwrap:has(.dt-wcard.sel) .dt-flag { transform: translateY(-14px); }
 .dt-hist { font-size: 13px; color: var(--muted); }
 .dt-hist summary { cursor: pointer; color: var(--ivory); }
 .dt-hist li { margin: 4px 0; } .dt-hist b { color: var(--gold-2); }
@@ -2626,3 +2633,7 @@ button.dt-wcard:focus-visible { outline: 2px solid var(--gold-2); outline-offset
 .bk-hand .bk-card { --w: 150px; }
 @media (max-width: 640px) { .bk-hand .bk-card { --w: 112px; } .dg-hand .dg-card { width: 124px; } }
 @media (max-width: 860px) { .pt-wait { grid-template-columns: 1fr; } }
+/* 3D card renders */
+.pt-art-img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; user-select: none; }
+.bk-card .bk-art, .dg-card .dg-art { background: #0b0807; }
+.dg-pl-gear span .pt-art-img { object-fit: cover; }

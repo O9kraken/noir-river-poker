@@ -1,0 +1,41 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
+const { io: connect } = require('socket.io-client');
+const { createServer } = require('../server');
+
+test('настолки: приглашение другу, голосовой чат и реакции работают', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({ dataFile: path.join(dir, 'u.json'), adminNames: [] });
+  await new Promise((r) => srv.server.listen(0, r));
+  const cl = [];
+  t.after(() => { cl.forEach((c) => c.close()); srv.shutdown(); });
+  const base = `http://localhost:${srv.server.address().port}`;
+  const reg = (name) => fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1', agree: true }) }).then((r) => r.json());
+  const [ua, ub] = [await reg('Хозяйка'), await reg('Гостья')];
+  const conn = (token) => new Promise((res) => { const c = connect(base, { auth: { token }, reconnection: false }); cl.push(c); c.on('connect', () => res(c)); });
+  const [a, b] = [await conn(ua.token), await conn(ub.token)];
+  const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
+  await call(a, 'friends:add', { name: 'Гостья' });
+  await call(b, 'friends:accept', { id: ua.user.id });
+  const id = (await call(a, 'pt:create', { game: 'spy', name: 'Шпионы', stake: 0, maxPlayers: 6 })).tableId;
+  const got = new Promise((r) => b.once('invite', r));
+  assert.deepEqual(await call(a, 'friends:invite', { id: ub.user.id, href: `#/pt/${id}` }), { ok: true });
+  const inv = await got;
+  assert.equal(inv.game, 'Шпионы');
+  assert.equal(inv.href, `#/pt/${id}`);
+  // voice: only for those at the table
+  assert.ok((await call(a, 'voice:join', { kind: 'pt', id })).error);
+  await call(a, 'pt:sit', { tableId: id });
+  await call(b, 'pt:sit', { tableId: id });
+  const va = await call(a, 'voice:join', { kind: 'pt', id });
+  assert.ok(va.ok, JSON.stringify(va));
+  const joined = new Promise((r) => a.once('voice:joined', r));
+  const vb = await call(b, 'voice:join', { kind: 'pt', id });
+  assert.ok(vb.ok && vb.peers.length === 1);
+  assert.equal((await joined).name, 'Гостья');
+  assert.ok((await call(a, 'react', { room: `pt:${id}`, emoji: (await call(a, 'hello', {})).reactions[0] })).ok);
+});

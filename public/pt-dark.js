@@ -19,6 +19,9 @@
     return out;
   }
 
+  /** Footer of a players' card: who wrote it. */
+  function byLine(c) { return c.custom ? h('small', { class: 'dt-by' }, c.by ? `✎ ${c.by}` : '✎ колода игроков') : null; }
+
   function render(board, dock, ctx) {
     const { g, st, seat, ui, send } = ctx;
     const amJudge = seat === g.judge;
@@ -61,7 +64,7 @@
       ui.pick = [];
       dock.replaceChildren(h('div', { class: 'dt-dock' },
         g.mine ? h('p', { class: 'bk-hint' }, 'Ваш ответ: ', h('b', null, g.mine.join(' / '))) : null,
-        h('div', { class: 'dt-hand dim' }, ...(g.hand || []).map((c) => h('div', { class: 'dt-wcard' }, c.t)))));
+        h('div', { class: 'dt-hand dim' }, ...(g.hand || []).map((c) => h('div', { class: 'dt-wcard' + (c.custom ? ' custom' : '') }, c.t, byLine(c))))));
       return;
     }
     ui.pick ||= [];
@@ -74,8 +77,19 @@
     if (!ui.blankInput) ui.blankInput = h('input', { maxlength: '80', placeholder: 'Свой вариант…', 'aria-label': 'Своя карта', oninput: (e) => { ui.blankText = e.target.value; const p = document.querySelector('.dt-black .dk-gap'); if (p && ui.pick.includes('blank')) p.textContent = e.target.value || '…'; } });
     const blank = g.blank ? h('div', { class: 'dt-wcard blank' + (ui.pick.includes('blank') ? ' sel' : '') },
       h('button', { type: 'button', class: 'dt-blank-btn', 'aria-pressed': ui.pick.includes('blank'), onclick: () => toggle('blank') }, ui.pick.includes('blank') ? '✓ Своя карта' : '✎ Своя карта'),
-      ui.blankInput) : null;
-    const cards = (g.hand || []).map((c) => h('button', { type: 'button', class: 'dt-wcard' + (ui.pick.includes(c.id) ? ' sel' : ''), 'aria-pressed': ui.pick.includes(c.id), onclick: () => toggle(c.id) }, ui.pick.includes(c.id) && g.pick > 1 ? h('i', null, `${ui.pick.indexOf(c.id) + 1}`) : null, c.t));
+      ui.blankInput,
+      h('small', { class: 'dt-blank-note' }, 'Можно в каждом раунде. Карта останется в колоде клуба.')) : null;
+    const cards = (g.hand || []).map((c) => {
+      const card = h('button', { type: 'button', class: 'dt-wcard' + (c.custom ? ' custom' : '') + (ui.pick.includes(c.id) ? ' sel' : ''), 'aria-pressed': ui.pick.includes(c.id), onclick: () => toggle(c.id) }, ui.pick.includes(c.id) && g.pick > 1 ? h('i', null, `${ui.pick.indexOf(c.id) + 1}`) : null, c.t, byLine(c));
+      if (!c.custom) return card;
+      const flag = h('button', { type: 'button', class: 'dt-flag', title: 'Пожаловаться на карту', 'aria-label': 'Пожаловаться на карту игроков', onclick: async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Убрать карту «${c.t}» и пожаловаться на неё?`)) return;
+        ui.pick = ui.pick.filter((x) => x !== c.id);
+        await send('flag', { id: c.id });
+      } }, '⚑');
+      return h('span', { class: 'dt-wwrap' }, card, flag);
+    });
     const ready = ui.pick.length === g.pick && (!ui.pick.includes('blank') || (ui.blankText || '').trim());
     dock.replaceChildren(h('div', { class: 'dt-dock' },
       h('div', { class: 'dt-acts' },

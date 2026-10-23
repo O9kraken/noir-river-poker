@@ -38,6 +38,7 @@ class PartyTable {
     this.minPlayers = Math.max(this.meta.min, opts.minPlayers || 0);
     this.permanent = !!cfg.permanent;
     this.deps = deps;
+    this.hooks = opts.hooks || {};
     this.opts = opts;
     this.timers = opts.timers || { set: setTimeout, clear: clearTimeout };
     this.now = opts.now || Date.now;
@@ -172,6 +173,9 @@ class PartyTable {
   }
 
   // ---------- callbacks for the game ----------
+  /** Optional services from the server (card pools and the like); a missing hook returns undefined. */
+  hook(name, ...args) { const f = this.hooks[name]; if (!f) return undefined; try { return f(...args); } catch (e) { return undefined; } }
+  userOf(seat) { const p = this.players.find((x) => x.seat === seat) || this.seats[seat]; return p ? { userId: p.userId, name: p.name } : null; }
   update() { this._update(); }
   addLog(text) { this.log.push({ t: this.now(), text }); if (this.log.length > 120) this.log.shift(); }
   sys(text) { this.chat.push({ t: this.now(), sys: true, text }); if (this.chat.length > 120) this.chat.shift(); }
