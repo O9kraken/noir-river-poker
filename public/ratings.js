@@ -1,11 +1,11 @@
-/* Ratings page: the weekly season (by game) and Elo ratings for checkers and durak. */
+/* Ratings page: the weekly season (by game) and Elo ratings for chess, nardy, checkers and durak. */
 (() => {
   'use strict';
   const NR = window.NR;
   const { $, $$, h, fmt, call, S } = NR;
   const GAMES = [
     ['total', 'Все игры'], ['poker', 'Покер'], ['sng', 'Турниры'], ['durak', 'Дурак'],
-    ['bj', 'Блэкджек'], ['roulette', 'Рулетка'], ['checkers', 'Шашки'], ['chess', 'Шахматы'], ['capital', 'Капитал'], ['mafia', 'Мафия'],
+    ['bj', 'Блэкджек'], ['roulette', 'Рулетка'], ['checkers', 'Шашки'], ['chess', 'Шахматы'], ['nardy', 'Нарды'], ['capital', 'Капитал'], ['mafia', 'Мафия'],
   ];
   const R = { tab: 'season', game: 'total', elo: 'checkers', timer: null, season: null, gotAt: 0 };
 
@@ -32,7 +32,7 @@
     $('#rt-season').hidden = R.tab !== 'season';
     $('#rt-elo').hidden = R.tab !== 'elo';
     $('#rt-games').replaceChildren(...GAMES.map(([id, name]) => h('button', { type: 'button', class: 'pill' + (R.game === id ? ' is-active' : ''), onclick: () => { R.game = id; renderShell(); load(); } }, name)));
-    $('#rt-elo-games').replaceChildren(...[['chess', 'Шахматы'], ['checkers', 'Шашки'], ['durak', 'Дурак']].map(([id, name]) => h('button', { type: 'button', class: 'pill' + (R.elo === id ? ' is-active' : ''), onclick: () => { R.elo = id; renderShell(); load(); } }, name)));
+    $('#rt-elo-games').replaceChildren(...[['chess', 'Шахматы'], ['nardy', 'Нарды'], ['checkers', 'Шашки'], ['durak', 'Дурак']].map(([id, name]) => h('button', { type: 'button', class: 'pill' + (R.elo === id ? ' is-active' : ''), onclick: () => { R.elo = id; renderShell(); load(); } }, name)));
   }
 
   async function load() {
@@ -90,7 +90,7 @@
   function bind(socket) {
     if (bind.done === socket) return;
     bind.done = socket;
-    socket.on('rating', (e) => NR.toast(`Рейтинг (${({ durak: 'дурак', chess: 'шахматы', checkers: 'шашки' })[e.kind] || e.kind}): ${e.rating} (${e.delta >= 0 ? '+' : '−'}${Math.abs(e.delta)})`));
+    socket.on('rating', (e) => NR.toast(`Рейтинг (${({ durak: 'дурак', chess: 'шахматы', checkers: 'шашки', nardy: 'нарды' })[e.kind] || e.kind}): ${e.rating} (${e.delta >= 0 ? '+' : '−'}${Math.abs(e.delta)})`));
     socket.on('season:closed', () => { if (!$('#ratings-view').hidden) load(); });
   }
   if (S.socket) bind(S.socket);

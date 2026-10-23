@@ -356,6 +356,7 @@
     ch: [], myCh: new Set(), chStakes: [], chClocks: [],
     cap: [], myCap: new Set(), capStakes: [], capTimes: [],
     mf: [], myMf: new Set(), mfStakes: [],
+    bg: [], myBg: new Set(), bgStakes: [], bgTimes: [],
     private: [],
     bjLimits: [],
     durakStakes: [],
@@ -489,6 +490,7 @@
       S.ch = res.ch || []; S.myCh = new Set(res.myCh || []); S.chStakes = res.chStakes || []; S.chClocks = res.chClocks || [];
       S.cap = res.cap || []; S.myCap = new Set(res.myCap || []); S.capStakes = res.capStakes || []; S.capTimes = res.capTimes || [];
       S.mf = res.mf || []; S.myMf = new Set(res.myMf || []); S.mfStakes = res.mfStakes || [];
+      S.bg = res.bg || []; S.myBg = new Set(res.myBg || []); S.bgStakes = res.bgStakes || []; S.bgTimes = res.bgTimes || [];
       fillExtraForms();
       S.durakStakes = res.durakStakes || [];
       setAnnouncement(res.announcement);
@@ -531,9 +533,11 @@
     socket.on('lobby:ch', (list) => { S.ch = list; renderLobby(); });
     socket.on('lobby:cap', (list) => { S.cap = list; renderLobby(); });
     socket.on('lobby:mf', (list) => { S.mf = list; renderLobby(); });
+    socket.on('lobby:bg', (list) => { S.bg = list; renderLobby(); });
     socket.on('ch:state', (st) => { if (window.ChessUI) window.ChessUI.onState(st); });
     socket.on('cap:state', (st) => { if (window.CapitalUI) window.CapitalUI.onState(st); });
     socket.on('mf:state', (st) => { if (window.MafiaUI) window.MafiaUI.onState(st); });
+    socket.on('bg:state', (st) => { if (window.NardyUI) window.NardyUI.onState(st); });
     socket.on('lobby:private', (list) => { S.private = list; renderLobby(); });
     if (window.SocialUI) window.SocialUI.bind(socket);
     socket.on('bj:state', (st) => { if (window.BjUI) window.BjUI.onState(st); });
@@ -548,7 +552,7 @@
   // ================= routing =================
   window.addEventListener('hashchange', route);
 
-  const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI, ch: () => window.ChessUI, cap: () => window.CapitalUI, mf: () => window.MafiaUI };
+  const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI, ch: () => window.ChessUI, cap: () => window.CapitalUI, mf: () => window.MafiaUI, bg: () => window.NardyUI };
   async function route() {
     if (!S.socket) return;
     const gm = location.hash === '#/games';
@@ -568,7 +572,7 @@
       window.scrollTo(0, 0);
       return;
     }
-    const xm = location.hash.match(/^#\/(rl|ck|ch|cap|mf)\/([\w-]+)/);
+    const xm = location.hash.match(/^#\/(rl|ck|ch|cap|mf|bg)\/([\w-]+)/);
     for (const [k, ui] of Object.entries(EXTRA_VIEWS)) if (ui() && (!xm || xm[1] !== k)) { ui().close(); $(`#${k}-view`).hidden = true; }
     if (xm) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
@@ -735,9 +739,9 @@
     $('#bj-list').hidden = tab !== 'bj';
     $('#rl-list').hidden = tab !== 'rl';
     $('#ck-list').hidden = tab !== 'ck';
-    for (const k of ['ch', 'cap', 'mf']) $(`#${k}-list`).hidden = tab !== k;
+    for (const k of ['ch', 'cap', 'mf', 'bg']) $(`#${k}-list`).hidden = tab !== k;
     $('#create-btn-label').textContent = tab === 'sng' ? 'Создать турнир' : 'Создать стол';
-    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки на фишки', ch: 'Шахматы на фишки', cap: 'Капитал', mf: 'Мафия' }[tab];
+    $('#lobby-title').textContent = { cash: 'Выберите стол', sng: 'Турниры Sit & Go', durak: 'Дурак на фишки', bj: 'Блэкджек', rl: 'Рулетка', ck: 'Шашки на фишки', ch: 'Шахматы на фишки', cap: 'Капитал', mf: 'Мафия', bg: 'Нарды на фишки' }[tab];
     if (tab === 'cash') renderCashList();
     else if (tab === 'sng') renderSngList();
     else if (tab === 'durak') renderDurakList();
@@ -746,8 +750,9 @@
     else if (tab === 'ch') renderChList();
     else if (tab === 'cap') renderCapList();
     else if (tab === 'mf') renderMfList();
+    else if (tab === 'bg') renderBgList();
     else renderBjList();
-    const PRACTICE_LIST = { cash: ['#table-list', 'poker'], durak: ['#durak-list', 'durak'], ck: ['#ck-list', 'ck'], ch: ['#ch-list', 'ch'], cap: ['#cap-list', 'cap'], mf: ['#mf-list', 'mf'] };
+    const PRACTICE_LIST = { cash: ['#table-list', 'poker'], durak: ['#durak-list', 'durak'], ck: ['#ck-list', 'ck'], ch: ['#ch-list', 'ch'], cap: ['#cap-list', 'cap'], mf: ['#mf-list', 'mf'], bg: ['#bg-list', 'bg'] };
     if (PRACTICE_LIST[tab]) $(PRACTICE_LIST[tab][0]).prepend(practiceCard(PRACTICE_LIST[tab][1]));
     renderMyTables();
     const seatedCash = S.tables.reduce((a, t) => a + t.players, 0);
@@ -763,11 +768,12 @@
     setCnt('ch', `${S.ch.filter((t) => t.status === 'playing').length} партий идёт`);
     setCnt('cap', `${S.cap.reduce((a, t) => a + t.players, 0)} за столами`);
     setCnt('mf', `${S.mf.reduce((a, t) => a + t.players, 0)} в городе`);
+    setCnt('bg', `${S.bg.filter((t) => t.status === 'playing').length} партий идёт`);
     if (S.me) {
       const tod = timeOfDay();
       $('#lobby-greet').textContent = `${tod.greet}, ${S.me.name}`;
       const sum = (list) => (list || []).reduce((acc, t) => acc + (t.players || 0), 0);
-      const busy = seatedCash + durakPlayers + sum(S.bj) + sum(S.rl) + sum(S.cap) + sum(S.mf) + sum(S.ck) + sum(S.ch);
+      const busy = seatedCash + durakPlayers + sum(S.bj) + sum(S.rl) + sum(S.cap) + sum(S.mf) + sum(S.ck) + sum(S.ch) + sum(S.bg);
       const mood = $('#lobby-mood');
       if (mood) mood.textContent = `${tod.line} ${busy ? `За столами сейчас ${busy} ${plural(busy, 'игрок', 'игрока', 'игроков')}.` : 'Столы свободны — самое время занять лучший.'}`;
     }
@@ -885,6 +891,24 @@
       }));
     }
   }
+  function renderBgList() {
+    const list = $('#bg-list');
+    list.replaceChildren();
+    const rows = S.bg.concat(S.private.filter((x) => x.kind === 'bg' && !x.practice)).sort((a, b) => (b.private - a.private) || a.stake - b.stake);
+    if (!rows.length) { list.append(h('div', { class: 'empty' }, 'Столов нет — создайте свой.')); return; }
+    for (const t of rows) {
+      const mine = S.myBg.has(t.id);
+      list.append(tcard({
+        mine, priv: t.private ? t.owner : null, badge: '⚀', badgeCls: 'dk-badge ck-badge bg-badge',
+        kind: `Длинные нарды · ${t.turnSec} с на ход`,
+        status: { cls: t.status === 'playing' ? 'running' : 'registering', text: CK_STATUS[t.status] },
+        title: t.name,
+        stats: [['Ставка', fmt(t.stake)], ['Банк', fmt(t.stake * 2)]],
+        fill: { n: t.players, max: 2, label: t.players === 2 ? 'оба игрока на месте' : t.players ? 'ждём соперника' : 'доска свободна' },
+        action: h('a', { class: 'btn btn-block ' + (mine ? 'btn-gold' : 'btn-dark'), href: `#/bg/${t.id}` }, mine ? 'Вернуться' : t.players < 2 ? 'Сесть за доску' : 'Смотреть'),
+      }));
+    }
+  }
   const MANY_STATUS = { waiting: 'Ждут игроков', countdown: 'Старт…', playing: 'Идёт партия', result: 'Итоги' };
   function renderCapList() {
     const list = $('#cap-list');
@@ -928,6 +952,8 @@
     opt('#ch-clock', S.chClocks.map((x) => [x, `${x} минут на партию + 2 с за ход`]), S.chClocks.includes(10) ? 10 : S.chClocks[0]);
     opt('#cap-stake', S.capStakes.map((x) => [x, `${fmt(x)} с каждого`]), S.capStakes.includes(200) ? 200 : S.capStakes[0]);
     opt('#cap-time', S.capTimes.map((x) => [x, x ? `${x} минут, затем побеждает самый богатый` : 'Без лимита — до последнего банкрота']), S.capTimes.includes(45) ? 45 : S.capTimes[0]);
+    opt('#bg-stake', S.bgStakes.map((x) => [x, `${fmt(x)} с каждого · банк ${fmt(x * 2)}`]), S.bgStakes.includes(100) ? 100 : S.bgStakes[0]);
+    opt('#bg-turn', S.bgTimes.map((x) => [x, `${x} секунд на ход`]), S.bgTimes.includes(45) ? 45 : S.bgTimes[0]);
     opt('#mf-stake', S.mfStakes.map((x) => [x, `${fmt(x)} с каждого`]), S.mfStakes.includes(100) ? 100 : S.mfStakes[0]);
     const a = $('#rl-limits');
     a.replaceChildren(...S.rlLimits.map(([x, y], i) => h('option', { value: i }, `фишка от ${fmt(x)}, за спин до ${fmt(y)}`)));
@@ -959,6 +985,7 @@
   });
   createForm('#ch-create-form', 'ch:create', 'ch', (f) => ({ stake: Number(f.stake.value), clock: Number(f.clock.value) }));
   createForm('#cap-create-form', 'cap:create', 'cap', (f) => ({ stake: Number(f.stake.value), maxPlayers: Number(f.players.value), time: Number(f.time.value) }));
+  createForm('#bg-create-form', 'bg:create', 'bg', (f) => ({ stake: Number(f.stake.value), turn: Number(f.turn.value) }));
   createForm('#mf-create-form', 'mf:create', 'mf', (f) => ({ stake: Number(f.stake.value), maxPlayers: Number(f.players.value) }));
   $('#ck-create-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1138,7 +1165,7 @@
     const bjs = S.bj.filter((t) => S.myBj.has(t.id)).map((t) => ({ id: t.id, href: `#/bj/${t.id}`, name: t.name, meta: `Блэкджек · ${fmt(t.minBet)}+` }));
     const rls = S.rl.filter((t) => S.myRl.has(t.id)).map((t) => ({ id: t.id, href: `#/rl/${t.id}`, name: t.name, meta: `Рулетка · ${fmt(t.minBet)}+` }));
     const cks = S.ck.filter((t) => S.myCk.has(t.id)).map((t) => ({ id: t.id, href: `#/ck/${t.id}`, name: t.name, meta: `Шашки · ${fmt(t.stake)}` }));
-    const many = [['ch', 'Шахматы'], ['cap', 'Капитал'], ['mf', 'Мафия']].flatMap(([k, label]) => S[k].filter((t) => S['my' + k[0].toUpperCase() + k.slice(1)].has(t.id)).map((t) => ({ id: t.id, href: `#/${k}/${t.id}`, name: t.name, meta: `${label} · ${fmt(t.stake)}` })));
+    const many = [['ch', 'Шахматы'], ['bg', 'Нарды'], ['cap', 'Капитал'], ['mf', 'Мафия']].flatMap(([k, label]) => S[k].filter((t) => S['my' + k[0].toUpperCase() + k.slice(1)].has(t.id)).map((t) => ({ id: t.id, href: `#/${k}/${t.id}`, name: t.name, meta: `${label} · ${fmt(t.stake)}` })));
     const pr = S.private.filter((t) => t.practice).map((t) => ({ id: t.id, href: t.href, name: t.name, meta: 'с компьютером' }));
     const all = cash.concat(sng).concat(dk).concat(bjs).concat(rls).concat(cks).concat(many).concat(pr);
     if (!all.length) mine.append(h('p', { class: 'muted' }, 'Вы пока не сидите за столом.'));
@@ -1165,6 +1192,7 @@
     ck: { title: 'Шашки с компьютером', variants: null, bots: null },
     ch: { title: 'Шахматы с компьютером', variants: null, bots: null, clock: true },
     cap: { title: 'Капитал с компьютером', variants: null, bots: [1, 2, 3, 4, 5], defBots: 2 },
+    bg: { title: 'Нарды с компьютером', variants: null, bots: null },
     mf: { title: 'Мафия с ботами', variants: null, bots: [4, 5, 6, 7, 8, 9], defBots: 6, botsLabel: (n) => `${n + 1} игроков: вы и ${n} ботов` },
   };
   const BOT_ICON = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3.5"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 15.5h5M2 12v3M22 12v3"/></svg>';
@@ -1229,7 +1257,7 @@
     if (S.lobbyTab === 'bj') { $('#modal-bj-create').showModal(); return; }
     if (S.lobbyTab === 'rl') { $('#modal-rl-create').showModal(); return; }
     if (S.lobbyTab === 'ck') { $('#modal-ck-create').showModal(); return; }
-    if (['ch', 'cap', 'mf'].includes(S.lobbyTab)) { $(`#modal-${S.lobbyTab}-create`).showModal(); return; }
+    if (['ch', 'cap', 'mf', 'bg'].includes(S.lobbyTab)) { $(`#modal-${S.lobbyTab}-create`).showModal(); return; }
     if (S.lobbyTab === 'sng') { openSngCreate(); return; }
     $('#create-error').textContent = '';
     $('#modal-create').showModal();

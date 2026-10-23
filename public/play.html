@@ -146,6 +146,13 @@
           <span class="mode-cnt" data-cnt="ch"></span>
         </span>
       </button>
+      <button type="button" class="mode" data-go-tab="bg">
+        <img class="mode-art" src="/art/nardy.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap">
+          <span class="mode-txt"><b>Нарды</b><small>Длинные нарды: голова, марс и&nbsp;кубики на&nbsp;удачу</small></span>
+          <span class="mode-cnt" data-cnt="bg"></span>
+        </span>
+      </button>
       <button type="button" class="mode" data-go-tab="cap">
         <img class="mode-art" src="/art/capital.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
         <span class="mode-cap">
@@ -232,6 +239,14 @@
             <span class="gnav-pop-cap"><b>Шахматы</b><small>Классика FIDE на ставку с шахматными часами</small><i data-cnt="ch"></i></span>
           </span>
         </button>
+        <button type="button" role="tab" class="gnav-item" data-lobby-tab="bg" aria-selected="false">
+          <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M12 4v16M5 4l1.5 6L8 4M9.5 4 11 10M16 20l1.5-6 1.5 6M13 20l1.5-6"/></svg></span>
+          <span class="gnav-txt"><b>Нарды</b><small data-cnt="bg"></small></span>
+          <span class="gnav-pop" aria-hidden="true">
+            <img src="/art/nardy.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+            <span class="gnav-pop-cap"><b>Нарды</b><small>Длинные нарды один на&nbsp;один на&nbsp;ставку</small><i data-cnt="bg"></i></span>
+          </span>
+        </button>
         <button type="button" role="tab" class="gnav-item" data-lobby-tab="cap" aria-selected="false">
           <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg></span>
           <span class="gnav-txt"><b>Капитал</b><small data-cnt="cap"></small></span>
@@ -274,6 +289,7 @@
       <div class="table-list" id="rl-list" hidden></div>
       <div class="table-list" id="ck-list" hidden></div>
       <div class="table-list" id="ch-list" hidden></div>
+      <div class="table-list" id="bg-list" hidden></div>
       <div class="table-list" id="cap-list" hidden></div>
       <div class="table-list" id="mf-list" hidden></div>
     </div>
@@ -649,6 +665,59 @@
           <p><b>Как ходить:</b> нажмите на свою фигуру — подсветятся поля, куда она может пойти, — и нажмите на нужное поле. Дойдя до последней горизонтали, пешка превращается в выбранную фигуру.</p>
           <p><b>Победа</b> — мат, время соперника вышло, он сдался или ушёл. <b>Ничья</b> — пат, по согласию, нехватка фигур для мата, 50 ходов без взятий и ходов пешкой, трёхкратное повторение позиции.</p>
           <p>У каждого шахматные часы с добавлением 2 секунд за ход. Ставка списывается с обоих, когда оба нажали «Готов». Победитель забирает банк, при ничьей ставки возвращаются. Цвет меняется каждую партию.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- NARDY -->
+  <main id="bg-view" class="table-view ck-view bg-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span class="btn-label">Лобби</span>
+        </a>
+        <div class="table-title"><b role="heading" aria-level="1" id="bg-name"></b><span id="bg-meta" class="muted"></span></div>
+        <span class="hand-no muted" id="bg-game"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
+      </div>
+      <div class="ck-stage bg-stage">
+        <div class="ck-player top" id="bg-top"></div>
+        <div class="bg-board-wrap">
+          <div class="bg-board" id="bg-board" role="group" aria-label="Доска для нард"></div>
+          <div class="ck-banner" id="bg-banner" hidden></div>
+        </div>
+        <div class="ck-player bottom" id="bg-bottom"></div>
+        <div class="dk-status ck-status" id="bg-status" role="status"></div>
+        <div class="ck-ctrl" id="bg-ctrl"></div>
+      </div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-bg-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-bg-tab="log" aria-selected="false">Ходы</button>
+        <button type="button" role="tab" class="tab" data-bg-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="bg-chat-pane" class="side-pane">
+          <ul class="chat" id="bg-chat" aria-live="polite"></ul>
+          <form id="bg-chat-form" class="chat-form">
+            <label class="sr-only" for="bg-chat-input">Сообщение</label>
+            <input id="bg-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение сопернику…">
+            <button class="icon-btn" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </form>
+        </div>
+        <div id="bg-log-pane" class="side-pane" hidden><ol class="log" id="bg-log"></ol></div>
+        <div id="bg-rules-pane" class="side-pane dk-rules" hidden>
+          <p><b>Длинные нарды.</b> У каждого 15 шашек на «голове» — своём 24-м пункте. Обе стороны ходят в одну сторону, против часовой стрелки, и ведут шашки в свой дом — пункты 1–6.</p>
+          <p><b>Ход:</b> бросьте кубики, нажмите на шашку и на подсвеченный пункт. Каждый кубик — отдельный ход, дубль играется четыре раза. Использовать нужно оба кубика, если это возможно; если можно только один — больший.</p>
+          <p><b>Правила:</b> бить нельзя — пункт с чужой шашкой закрыт. С головы за ход снимается одна шашка; только на первом броске 6-6, 4-4 или 3-3 — две. Нельзя строить заслон из шести пунктов подряд, если впереди него нет ни одной шашки соперника.</p>
+          <p><b>Выброс:</b> когда все 15 шашек дома, их выбрасывают с доски — точным числом или большим кубиком с самого дальнего пункта. Кто первым выбросил все — победил. Если у соперника не выброшено ни одной — это <b>марс</b>.</p>
+          <p>Последний ход можно отменить, пока ход не передан. На каждый ход отведено время; если не успеть, ход сделается сам, а после трёх таких ходов подряд партия проиграна.</p>
         </div>
       </div>
     </aside>
@@ -1030,6 +1099,17 @@
   </form>
 </dialog>
 
+<dialog id="modal-bg-create" class="modal">
+  <form method="dialog" class="form" id="bg-create-form">
+    <h2 class="h2">Новая доска: нарды</h2>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Шеш-беш у реки"></label>
+    <label class="field"><span>Ставка</span><select name="stake" id="bg-stake"></select></label>
+    <label class="field"><span>Время на ход</span><select name="turn" id="bg-turn"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватная доска</b><small>Не видна в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
+    <div class="modal-actions"><button type="button" class="btn btn-ghost" data-close>Отмена</button><button type="submit" class="btn btn-gold" value="ok">Создать</button></div>
+  </form>
+</dialog>
+
 <dialog id="modal-cap-create" class="modal">
   <form method="dialog" class="form" id="cap-create-form">
     <h2 class="h2">Новый стол: Капитал</h2>
@@ -1157,6 +1237,7 @@
 <script src="/checkers.js"></script>
 <script src="/dm.js"></script>
 <script src="/chess.js"></script>
+<script src="/nardy.js"></script>
 <script src="/capital-brands.js"></script>
 <script src="/capital.js"></script>
 <script src="/mafia.js"></script>

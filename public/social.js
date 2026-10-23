@@ -3,7 +3,7 @@
   const NR = window.NR;
   const { $, $$, h, fmt, toast, call, Sound, S } = NR;
 
-  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go', roulette: 'Рулетка', checkers: 'Шашки', chess: 'Шахматы', capital: 'Капитал', mafia: 'Мафия', wheel: 'Колесо', season: 'Сезон' };
+  const KIND = { poker: 'Покер', durak: 'Дурак', bj: 'Блэкджек', sng: 'Sit & Go', roulette: 'Рулетка', checkers: 'Шашки', chess: 'Шахматы', nardy: 'Нарды', capital: 'Капитал', mafia: 'Мафия', wheel: 'Колесо', season: 'Сезон' };
   const HAND_NAMES = ['Старшая карта', 'Пара', 'Две пары', 'Сет', 'Стрит', 'Флеш', 'Фулл-хаус', 'Каре', 'Стрит-флеш', 'Роял-флеш'];
   const SYMBOLS = ['', 's', 'h', 'd', 'c', 'crown', 'star', 'bolt', 'moon', 'flame'];
   const HUES = [0, 25, 45, 90, 150, 185, 210, 250, 285, 320];
@@ -98,7 +98,7 @@
 
   function currentTable() {
     // every game screen: poker, durak, blackjack, roulette, checkers, chess, «Капитал», mafia
-    const m = location.hash.match(/^#\/(table|durak|bj|rl|ck|ch|cap|mf)\/([\w-]+)/);
+    const m = location.hash.match(/^#\/(table|durak|bj|rl|ck|ch|cap|mf|bg)\/([\w-]+)/);
     if (!m) return null;
     const NAME_EL = { table: '#t-name', durak: '#dk-name' };
     const el = $(NAME_EL[m[1]] || `#${m[1]}-name`);
@@ -258,6 +258,14 @@
           stat('Ничьи', fmt(s.chess.draws)),
           stat('Итог', signed(s.chess.net)),
           elo('chess'))) : null,
+      s.nardy && s.nardy.games ? h('article', { class: 'pcard' },
+        h('h2', { class: 'h3' }, 'Нарды'),
+        h('div', { class: 'pstats' },
+          stat('Партий', fmt(s.nardy.games)),
+          stat('Победы', fmt(s.nardy.wins), pct(s.nardy.wins, s.nardy.games)),
+          stat('Марсы', fmt(s.nardy.mars)),
+          stat('Итог', signed(s.nardy.net)),
+          elo('nardy'))) : null,
       s.capital ? h('article', { class: 'pcard' },
         h('h2', { class: 'h3' }, 'Капитал'),
         h('div', { class: 'pstats' },
