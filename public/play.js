@@ -307,6 +307,8 @@
             break;
           case 'morning': [523, 659, 784, 1047].forEach((f, k) => this.tone(f, 0.9, 'sine', 0.035, delay + k * 0.12, { room: 1 })); this.tone(2793, 0.12, 'sine', 0.02, delay + 0.6, { slide: 3300 }); this.tone(3135, 0.1, 'sine', 0.018, delay + 0.75, { slide: 3700 }); break;
           case 'death': this.tone(98, 1.4, 'sine', 0.12, delay, { attack: 0.02, room: 1 }); this.noise(0.6, 0.1, 300, delay, 80, { shape: 1.5, room: 0.8 }); break;
+          case 'boom': this.noise(1.1, 0.5, 900, delay, 60, { shape: 1.1, room: 1 }); this.tone(55, 0.9, 'sine', 0.3, delay, { attack: 0.005, slide: 30, room: 1 }); this.noise(0.25, 0.3, 4000, delay, 500, { shape: 2 }); break;
+          case 'fuse': this.noise(0.5, 0.06, 6000, delay, 3000, { filter: 'highpass', shape: 1 }); break;
           case 'win': [523, 659, 784, 1047].forEach((f, k) => { this.tone(f, 0.7, 'sine', 0.05, delay + k * 0.09, { room: 1 }); this.tone(f * 2, 0.3, 'sine', 0.012, delay + k * 0.09); }); break;
           case 'bigwin':
             [523, 659, 784, 1047, 1319].forEach((f, k) => { this.tone(f, 0.9, 'triangle', 0.055, delay + k * 0.1, { room: 1 }); this.tone(f * 1.5, 0.5, 'sine', 0.015, delay + k * 0.1 + 0.02); });
@@ -360,6 +362,7 @@
     ch: [], myCh: new Set(), chStakes: [], chClocks: [],
     cap: [], myCap: new Set(), capStakes: [], capTimes: [],
     mf: [], myMf: new Set(), mfStakes: [],
+    pt: [], myPt: new Set(), ptStakes: [], ptGames: {},
     bg: [], myBg: new Set(), bgStakes: [], bgTimes: [],
     private: [],
     bjLimits: [],
@@ -551,6 +554,7 @@
       S.ch = res.ch || []; S.myCh = new Set(res.myCh || []); S.chStakes = res.chStakes || []; S.chClocks = res.chClocks || [];
       S.cap = res.cap || []; S.myCap = new Set(res.myCap || []); S.capStakes = res.capStakes || []; S.capTimes = res.capTimes || [];
       S.mf = res.mf || []; S.myMf = new Set(res.myMf || []); S.mfStakes = res.mfStakes || [];
+      S.pt = res.pt || []; S.myPt = new Set(res.myPt || []); S.ptStakes = res.ptStakes || [0]; S.ptGames = res.ptGames || {}; S.botLevels = res.botLevels || S.botLevels;
       S.bg = res.bg || []; S.myBg = new Set(res.myBg || []); S.bgStakes = res.bgStakes || []; S.bgTimes = res.bgTimes || [];
       fillExtraForms();
       S.durakStakes = res.durakStakes || [];
@@ -597,12 +601,14 @@
     socket.on('lobby:ch', (list) => { S.ch = list; renderLobby(); });
     socket.on('lobby:cap', (list) => { S.cap = list; renderLobby(); });
     socket.on('lobby:mf', (list) => { S.mf = list; renderLobby(); });
+    socket.on('lobby:pt', (list) => { S.pt = list; renderLobby(); if (window.PartyUI) window.PartyUI.hubRefresh(); });
+    socket.on('pt:state', (st) => { if (window.PartyUI) window.PartyUI.onState(st); });
     socket.on('lobby:bg', (list) => { S.bg = list; renderLobby(); });
     socket.on('ch:state', (st) => { if (window.ChessUI) window.ChessUI.onState(st); });
     socket.on('cap:state', (st) => { if (window.CapitalUI) window.CapitalUI.onState(st); });
     socket.on('mf:state', (st) => { if (window.MafiaUI) window.MafiaUI.onState(st); });
     socket.on('bg:state', (st) => { if (window.NardyUI) window.NardyUI.onState(st); });
-    socket.on('lobby:private', (list) => { S.private = list; renderLobby(); });
+    socket.on('lobby:private', (list) => { S.private = list; renderLobby(); if (window.PartyUI) window.PartyUI.hubRefresh(); });
     if (window.SocialUI) window.SocialUI.bind(socket);
     socket.on('bj:state', (st) => { if (window.BjUI) window.BjUI.onState(st); });
     socket.on('durak:state', (st) => { if (window.DurakUI) window.DurakUI.onState(st); });
@@ -616,29 +622,31 @@
   // ================= routing =================
   window.addEventListener('hashchange', route);
 
-  const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI, ch: () => window.ChessUI, cap: () => window.CapitalUI, mf: () => window.MafiaUI, bg: () => window.NardyUI };
+  const EXTRA_VIEWS = { rl: () => window.RouletteUI, ck: () => window.CheckersUI, ch: () => window.ChessUI, cap: () => window.CapitalUI, mf: () => window.MafiaUI, bg: () => window.NardyUI, pt: () => window.PartyUI };
   async function route() {
     if (!S.socket) return;
     const gm = location.hash === '#/games';
     const rt = location.hash === '#/ratings';
     const sh = location.hash === '#/shop';
+    const pa = location.hash === '#/party';
     $('#games-view').hidden = !gm;
+    $('#party-view').hidden = !pa;
     $('#ratings-view').hidden = !rt;
     $('#shop-view').hidden = !sh;
     if (!rt && window.RatingsUI) window.RatingsUI.close();
-    if (gm || rt || sh) {
+    if (gm || rt || sh || pa) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
       S.tableId = null;
       S.ts = null;
       for (const ui of [window.DurakUI, window.BjUI, window.RouletteUI, window.CheckersUI]) if (ui) ui.close();
       for (const [k, ui] of Object.entries(EXTRA_VIEWS)) { if (ui()) ui().close(); $(`#${k}-view`).hidden = true; }
       for (const v of ['#lobby', '#table-view', '#durak-view', '#bj-view', '#profile-view']) $(v).hidden = true;
-      document.title = gm ? 'Все игры — NOIR RIVER' : sh ? 'Лавка — NOIR RIVER' : 'Рейтинги — NOIR RIVER';
-      if (gm) renderLobby(); else if (sh) { if (window.ShopUI) window.ShopUI.open(); } else if (window.RatingsUI) window.RatingsUI.open();
+      document.title = gm ? 'Все игры — NOIR RIVER' : sh ? 'Лавка — NOIR RIVER' : pa ? 'Настолки — NOIR RIVER' : 'Рейтинги — NOIR RIVER';
+      if (pa) { if (window.PartyUI) window.PartyUI.hubOpen(); } else if (gm) renderLobby(); else if (sh) { if (window.ShopUI) window.ShopUI.open(); } else if (window.RatingsUI) window.RatingsUI.open();
       window.scrollTo(0, 0);
       return;
     }
-    const xm = location.hash.match(/^#\/(rl|ck|ch|cap|mf|bg)\/([\w-]+)/);
+    const xm = location.hash.match(/^#\/(rl|ck|ch|cap|mf|bg|pt)\/([\w-]+)/);
     for (const [k, ui] of Object.entries(EXTRA_VIEWS)) if (ui() && (!xm || xm[1] !== k)) { ui().close(); $(`#${k}-view`).hidden = true; }
     if (xm) {
       if (S.tableId) call('table:unwatch', { tableId: S.tableId }, true);
@@ -844,11 +852,14 @@
     setCnt('cap', `${S.cap.reduce((a, t) => a + t.players, 0)} за столами`);
     setCnt('mf', `${S.mf.reduce((a, t) => a + t.players, 0)} в городе`);
     setCnt('bg', `${S.bg.filter((t) => t.status === 'playing').length} партий идёт`);
+    const ptPlayers = S.pt.reduce((a, t) => a + t.players, 0);
+    setCnt('pt', ptPlayers ? `${ptPlayers} за столами` : 'для компании');
+    for (const k of ['bomb', 'spy', 'dungeon', 'dark']) { const n = S.pt.filter((t) => t.game === k).reduce((a, t) => a + t.players, 0); setCnt('pt-' + k, n ? `${n} за столами` : ''); }
     if (S.me) {
       const tod = timeOfDay();
       $('#lobby-greet').textContent = `${tod.greet}, ${S.me.name}`;
       const sum = (list) => (list || []).reduce((acc, t) => acc + (t.players || 0), 0);
-      const busy = seatedCash + durakPlayers + sum(S.bj) + sum(S.rl) + sum(S.cap) + sum(S.mf) + sum(S.ck) + sum(S.ch) + sum(S.bg);
+      const busy = seatedCash + durakPlayers + sum(S.bj) + sum(S.rl) + sum(S.cap) + sum(S.mf) + sum(S.ck) + sum(S.ch) + sum(S.bg) + sum(S.pt);
       const mood = $('#lobby-mood');
       if (mood) mood.textContent = `${tod.line} ${busy ? `За столами сейчас ${busy} ${plural(busy, 'игрок', 'игрока', 'игроков')}.` : 'Столы свободны — самое время занять лучший.'}`;
     }
@@ -1241,7 +1252,7 @@
     const bjs = S.bj.filter((t) => S.myBj.has(t.id)).map((t) => ({ id: t.id, href: `#/bj/${t.id}`, name: t.name, meta: `Блэкджек · ${fmt(t.minBet)}+` }));
     const rls = S.rl.filter((t) => S.myRl.has(t.id)).map((t) => ({ id: t.id, href: `#/rl/${t.id}`, name: t.name, meta: `Рулетка · ${fmt(t.minBet)}+` }));
     const cks = S.ck.filter((t) => S.myCk.has(t.id)).map((t) => ({ id: t.id, href: `#/ck/${t.id}`, name: t.name, meta: `Шашки · ${fmt(t.stake)}` }));
-    const many = [['ch', 'Шахматы'], ['bg', 'Нарды'], ['cap', 'Капитал'], ['mf', 'Мафия']].flatMap(([k, label]) => S[k].filter((t) => S['my' + k[0].toUpperCase() + k.slice(1)].has(t.id)).map((t) => ({ id: t.id, href: `#/${k}/${t.id}`, name: t.name, meta: `${label} · ${fmt(t.stake)}` })));
+    const many = [['ch', 'Шахматы'], ['bg', 'Нарды'], ['cap', 'Капитал'], ['mf', 'Мафия'], ['pt', 'Настолки']].flatMap(([k, label]) => S[k].filter((t) => S['my' + k[0].toUpperCase() + k.slice(1)].has(t.id)).map((t) => ({ id: t.id, href: `#/${k}/${t.id}`, name: t.name, meta: `${label} · ${fmt(t.stake)}` })));
     const pr = S.private.filter((t) => t.practice).map((t) => ({ id: t.id, href: t.href, name: t.name, meta: 'с компьютером' }));
     const all = cash.concat(sng).concat(dk).concat(bjs).concat(rls).concat(cks).concat(many).concat(pr);
     if (!all.length) mine.append(h('p', { class: 'muted' }, 'Вы пока не сидите за столом.'));
@@ -2249,7 +2260,7 @@
       } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cells[i].click(); }
     };
   }
-  window.NR = { netLag, applyLooks, boardKeys, $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
+  window.NR = { plural, netLag, applyLooks, boardKeys, $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
 
   // ================= boot =================
   if (S.token) startApp(); else showAuth();

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>NOIR RIVER — клуб: покер, шахматы, мафия, «Капитал»</title>
-<meta name="description" content="Лобби игрового клуба NOIR RIVER: садитесь за стол с друзьями или ботами — покер, шахматы, мафия, «Капитал», дурак, блэкджек, рулетка и шашки.">
+<meta name="description" content="Лобби игрового клуба NOIR RIVER: садитесь за стол с друзьями или ботами — покер, шахматы, мафия, «Капитал», дурак, блэкджек, рулетка, шашки и настолки для компании.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="NOIR RIVER">
 <meta property="og:title" content="Вас ждут за столом в NOIR RIVER">
@@ -172,6 +172,54 @@
         </span>
       </button>
     </div>
+    <div class="games-head games-sub">
+      <div>
+        <p class="eyebrow">Для компании от 2 до 10 человек</p>
+        <h2 class="h2">Настолки</h2>
+      </div>
+      <a href="#/party" class="btn btn-gold btn-sm">Весь раздел</a>
+    </div>
+    <div class="modes games-grid">
+      <a class="mode" href="#/party" data-party-go="bomb">
+        <img class="mode-art" src="/art/pt-bomb.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap"><span class="mode-txt"><b>Котобомба</b><small>Тяни карту и не взорвись · 2–10 игроков</small></span><span class="mode-cnt" data-cnt="pt-bomb"></span></span>
+      </a>
+      <a class="mode" href="#/party" data-party-go="spy">
+        <img class="mode-art" src="/art/pt-spy.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap"><span class="mode-txt"><b>Шпионы</b><small>Две команды, одно слово-подсказка · 4–10 игроков</small></span><span class="mode-cnt" data-cnt="pt-spy"></span></span>
+      </a>
+      <a class="mode" href="#/party" data-party-go="dungeon">
+        <img class="mode-art" src="/art/pt-dungeon.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap"><span class="mode-txt"><b>Подземелье</b><small>Монстры, шмот и подставы друзей · 3–6 игроков</small></span><span class="mode-cnt" data-cnt="pt-dungeon"></span></span>
+      </a>
+      <a class="mode" href="#/party" data-party-go="dark">
+        <img class="mode-art" src="/art/pt-dark.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
+        <span class="mode-cap"><span class="mode-txt"><b>Без тормозов</b><small>Чёрный юмор 18+ · 3–10 игроков</small></span><span class="mode-cnt" data-cnt="pt-dark"></span></span>
+      </a>
+    </div>
+  </main>
+
+  <!-- PARTY GAMES HUB -->
+  <main id="party-view" class="party-page" hidden>
+    <section class="pt-hero">
+      <a href="#/" class="btn btn-ghost btn-sm"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Лобби</a>
+      <p class="eyebrow">Настольные игры клуба</p>
+      <h1 class="h1">Настолки для компании</h1>
+      <p class="pt-hero-sub">От&nbsp;2 до&nbsp;10 человек за&nbsp;одним столом. Голосовой чат у&nbsp;каждого стола, можно играть из&nbsp;разных городов или с&nbsp;телефонов в&nbsp;одной комнате. На&nbsp;фишки&nbsp;— или просто на&nbsp;интерес.</p>
+      <ul class="pt-hero-points">
+        <li><b>4</b><span>игры с&nbsp;собственными колодами</span></li>
+        <li><b>2–10</b><span>игроков за&nbsp;столом</span></li>
+        <li><b>🎙</b><span>голос за&nbsp;каждым столом</span></li>
+      </ul>
+    </section>
+    <div class="pt-games" id="pt-games"></div>
+    <section class="pt-tables" id="pt-tables">
+      <div class="pt-tables-head">
+        <h2 class="h2">Открытые столы</h2>
+        <div class="pt-filter" id="pt-filter" role="group" aria-label="Фильтр по игре"></div>
+      </div>
+      <div class="pt-list" id="pt-list"></div>
+    </section>
   </main>
 
   <!-- LOBBY -->
@@ -188,6 +236,10 @@
       <a class="gnav-all gnav-rt gnav-shop" href="#/shop">
         <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16l-1.2 10.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8z"/><path d="M8.5 9V7a3.5 3.5 0 0 1 7 0v2"/></svg></span>
         <span class="gnav-txt"><b>Лавка</b><small>рамки, рубашки, сукно</small></span>
+      </a>
+      <a class="gnav-all gnav-rt gnav-party" href="#/party">
+        <span class="gnav-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="9" height="13" rx="2" transform="rotate(-8 7.5 12.5)"/><rect x="11" y="4" width="9" height="13" rx="2" transform="rotate(8 15.5 10.5)"/><circle cx="15.6" cy="10.4" r="1.6"/></svg></span>
+        <span class="gnav-txt"><b>Настолки</b><small data-cnt="pt">для компании</small></span>
       </a>
       <div class="gnav-list" role="tablist" aria-orientation="vertical" aria-label="Выбор игры">
         <button type="button" role="tab" class="gnav-item is-active" data-lobby-tab="cash" aria-selected="true">
@@ -801,6 +853,44 @@
   </main>
 
   <!-- MAFIA -->
+  <main id="pt-view" class="table-view pt-view" hidden>
+    <div class="table-stage">
+      <div class="table-top">
+        <a href="#/party" class="btn btn-ghost btn-sm">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+          <span class="btn-label">Настолки</span>
+        </a>
+        <div class="table-title"><b role="heading" aria-level="1" id="pt-name"></b><span id="pt-meta" class="muted"></span></div>
+        <span class="hand-no muted" id="pt-game"></span>
+        <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
+          <span class="btn-label">Пригласить</span>
+        </button>
+      </div>
+      <div class="pt-stage" id="pt-stage"></div>
+      <div class="pt-result" id="pt-result" hidden></div>
+    </div>
+    <aside class="table-side">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" class="tab is-active" data-pt-tab="chat" aria-selected="true">Чат</button>
+        <button type="button" role="tab" class="tab" data-pt-tab="log" aria-selected="false">Лог</button>
+        <button type="button" role="tab" class="tab" data-pt-tab="rules" aria-selected="false">Правила</button>
+      </div>
+      <div class="side-body">
+        <div id="pt-chat-pane" class="side-pane">
+          <ul class="chat" data-chat-where="Чат: Настолки" id="pt-chat" aria-live="polite"></ul>
+          <form id="pt-chat-form" class="chat-form">
+            <label class="sr-only" for="pt-chat-input">Сообщение</label>
+            <input id="pt-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
+            <button class="icon-btn" type="submit" aria-label="Отправить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </form>
+        </div>
+        <div id="pt-log-pane" class="side-pane" hidden><ul class="log" id="pt-log"></ul></div>
+        <div id="pt-rules-pane" class="side-pane dk-rules" hidden></div>
+      </div>
+    </aside>
+  </main>
+
   <main id="mf-view" class="table-view mf-view" hidden>
     <div class="table-stage">
       <div class="table-top">
@@ -1159,6 +1249,47 @@
   </form>
 </dialog>
 
+<dialog id="modal-pt-create" class="modal modal-mid">
+  <form method="dialog" class="form" id="pt-create-form">
+    <h2 class="h2">Новый стол</h2>
+    <input type="hidden" name="game" value="bomb">
+    <div class="seg seg-grid pt-game-seg" role="group" aria-label="Игра">
+      <button type="button" class="seg-btn" data-pt-game="bomb">Котобомба</button>
+      <button type="button" class="seg-btn" data-pt-game="spy">Шпионы</button>
+      <button type="button" class="seg-btn" data-pt-game="dungeon">Подземелье</button>
+      <button type="button" class="seg-btn" data-pt-game="dark">Без тормозов</button>
+    </div>
+    <p class="muted small" id="pt-create-desc"></p>
+    <label class="field"><span>Название</span><input name="name" maxlength="24" placeholder="Например, Пятничный стол"></label>
+    <div class="form-row">
+      <label class="field"><span>Игроков</span><select name="players"></select></label>
+      <label class="field"><span>Ставка</span><select name="stake"></select></label>
+    </div>
+    <label class="field" id="pt-opt"><span id="pt-opt-label">Параметр</span><select name="option"></select></label>
+    <label class="check priv-check"><input type="checkbox" name="private"> <span><b>Приватный стол</b><small>Не виден в общем лобби — только друзьям и&nbsp;по&nbsp;ссылке</small></span></label>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Отмена</button>
+      <button type="submit" class="btn btn-gold" value="ok">Создать</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="modal-pt-practice" class="modal">
+  <form method="dialog" class="form" id="pt-practice-form">
+    <h2 class="h2" id="pt-practice-title">С ботами</h2>
+    <input type="hidden" name="game" value="bomb">
+    <div class="form-row">
+      <label class="field"><span>Соперники</span><select name="bots"></select></label>
+      <label class="field"><span>Уровень ботов</span><select name="level"></select></label>
+    </div>
+    <p class="muted small" id="pt-practice-note"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-close>Отмена</button>
+      <button type="submit" class="btn btn-gold" value="ok">Играть</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="modal-mf-create" class="modal">
   <form method="dialog" class="form" id="mf-create-form">
     <h2 class="h2">Новый город: мафия</h2>
@@ -1284,5 +1415,10 @@
 <script src="/ratings.js"></script>
 <script src="/shop.js"></script>
 <script src="/report.js"></script>
+<script src="/party.js"></script>
+<script src="/pt-bomb.js"></script>
+<script src="/pt-spy.js"></script>
+<script src="/pt-dungeon.js"></script>
+<script src="/pt-dark.js"></script>
 </body>
 </html>
