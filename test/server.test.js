@@ -20,18 +20,18 @@ test('сервер: регистрация, посадка, игра живым�
   const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
 
   // регистрация и валидация
-  assert.equal((await post('/api/register', { name: 'ab', password: '123456' })).status, 400);
-  assert.equal((await post('/api/register', { name: 'Алиса', password: '123' })).status, 400);
+  assert.equal((await post('/api/register', { name: 'ab', password: '123456', agree: true })).status, 400);
+  assert.equal((await post('/api/register', { name: 'Алиса', password: '123', agree: true })).status, 400);
   const names = ['Алиса', 'Борис', 'Вера'];
   const tokens = [];
   for (const n of names) {
-    const r = await post('/api/register', { name: n, password: 'secret1' });
+    const r = await post('/api/register', { name: n, password: 'secret1', agree: true });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     tokens.push(r.body.token);
   }
-  assert.equal((await post('/api/register', { name: 'алиса', password: 'secret1' })).status, 400, 'ник уникален без учёта регистра');
+  assert.equal((await post('/api/register', { name: 'алиса', password: 'secret1', agree: true })).status, 400, 'ник уникален без учёта регистра');
   assert.equal((await post('/api/login', { name: 'Алиса', password: 'wrong!!' })).status, 400);
-  assert.equal((await post('/api/login', { name: 'Алиса', password: 'secret1' })).status, 200);
+  assert.equal((await post('/api/login', { name: 'Алиса', password: 'secret1', agree: true })).status, 200);
 
   // без токена соединение отклоняется
   const bad = connect(base, { auth: { token: 'nope' }, reconnection: false });
@@ -159,7 +159,7 @@ test('Sit & Go: регистрация, отмена, старт при запо
   const base = `http://localhost:${srv.server.address().port}`;
   const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
   const tokens = [];
-  for (const n of ['Игрок1', 'Игрок2', 'Игрок3']) tokens.push((await post('/api/register', { name: n, password: 'secret1' })).token);
+  for (const n of ['Игрок1', 'Игрок2', 'Игрок3']) tokens.push((await post('/api/register', { name: n, password: 'secret1', agree: true })).token);
   let clients = [];
   t.after(() => clients.forEach((c) => c.close()));
   clients = await Promise.all(tokens.map((token) => new Promise((resolve) => {
@@ -252,7 +252,7 @@ test('админка и дурак через сокеты', async (t) => {
   const base = `http://localhost:${srv.server.address().port}`;
   const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
   const reg = [];
-  for (const n of ['Босс', 'Игрок', 'Гость']) reg.push((await post('/api/register', { name: n, password: 'secret1' })).body);
+  for (const n of ['Босс', 'Игрок', 'Гость']) reg.push((await post('/api/register', { name: n, password: 'secret1', agree: true })).body);
   assert.equal(reg[0].user.role, 'admin', 'первый аккаунт — админ');
   assert.equal(reg[1].user.role, 'player');
   let clients = [];
@@ -334,7 +334,7 @@ test('админка и дурак через сокеты', async (t) => {
   const gone = new Promise((r) => pl.once('disconnect', r));
   assert.ok((await call(boss, 'admin:user', { userId: plId, action: 'ban' })).ok);
   await gone;
-  assert.equal((await post('/api/login', { name: 'Игрок', password: 'secret1' })).status, 400);
+  assert.equal((await post('/api/login', { name: 'Игрок', password: 'secret1', agree: true })).status, 400);
   assert.match((await call(boss, 'admin:user', { userId: reg[0].user.id, action: 'ban' })).error, /себя/);
   const log = (await call(boss, 'admin:overview', {})).log;
   assert.ok(log.length >= 8, 'действия админа в журнале');
@@ -350,8 +350,8 @@ test('блэкджек через сокеты: ставка, ходы, расч
   t.after(() => { try { srv.shutdown(); } catch (e) { /* closed */ } });
   const base = `http://localhost:${srv.server.address().port}`;
   const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
-  const a = await post('/api/register', { name: 'Крупье', password: 'secret1' });
-  const b = await post('/api/register', { name: 'Игрок', password: 'secret1' });
+  const a = await post('/api/register', { name: 'Крупье', password: 'secret1', agree: true });
+  const b = await post('/api/register', { name: 'Игрок', password: 'secret1', agree: true });
   let clients = [];
   t.after(() => clients.forEach((c) => c.close()));
   clients = await Promise.all([a, b].map(({ token }) => new Promise((resolve) => {
@@ -395,7 +395,7 @@ test('друзья, приглашения, приватные столы и п�
   const base = `http://localhost:${srv.server.address().port}`;
   const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
   const regs = [];
-  for (const n of ['Хозяин', 'Друг', 'Чужой']) regs.push(await post('/api/register', { name: n, password: 'secret1' }));
+  for (const n of ['Хозяин', 'Друг', 'Чужой']) regs.push(await post('/api/register', { name: n, password: 'secret1', agree: true }));
   let clients = [];
   t.after(() => clients.forEach((c) => c.close()));
   clients = await Promise.all(regs.map(({ token }) => new Promise((resolve) => {
@@ -475,7 +475,7 @@ test('конструктор турниров: фриролл с гаранти�
   const base = `http://localhost:${srv.server.address().port}`;
   const post = (url, body) => fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
   const regs = [];
-  for (const n of ['Админ', 'Игрок1', 'Игрок2']) regs.push(await post('/api/register', { name: n, password: 'secret1' }));
+  for (const n of ['Админ', 'Игрок1', 'Игрок2']) regs.push(await post('/api/register', { name: n, password: 'secret1', agree: true }));
   let clients = [];
   t.after(() => clients.forEach((c) => c.close()));
   clients = await Promise.all(regs.map(({ token }) => new Promise((resolve) => {
@@ -538,7 +538,7 @@ test('/api/me: аккаунт для шапки лендинга', async (t) => 
   const base = `http://localhost:${srv.server.address().port}`;
   assert.equal((await fetch(base + '/api/me')).status, 401);
   assert.equal((await fetch(base + '/api/me', { headers: { Authorization: 'Bearer nope' } })).status, 401);
-  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Лендинг', password: 'secret1' }) }).then((r) => r.json());
+  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Лендинг', password: 'secret1', agree: true }) }).then((r) => r.json());
   const me = await fetch(base + '/api/me', { headers: { Authorization: 'Bearer ' + reg.token } }).then((r) => r.json());
   assert.equal(me.name, 'Лендинг');
   assert.equal(me.balance, 10000);
@@ -552,7 +552,7 @@ test('задания дня, награды за достижения, своя 
   let c;
   t.after(() => { try { c && c.close(); srv.shutdown(); } catch (e) { /* closed */ } });
   const base = `http://localhost:${srv.server.address().port}`;
-  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Квестер', password: 'secret1' }) }).then((r) => r.json());
+  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Квестер', password: 'secret1', agree: true }) }).then((r) => r.json());
   const uid = reg.user.id;
   c = await new Promise((resolve) => { const s = connect(base, { auth: { token: reg.token }, reconnection: false }); s.on('connect', () => resolve(s)); });
   const call = (ev, p) => new Promise((r) => c.emit(ev, p, r));
@@ -620,7 +620,7 @@ test('игрок создаёт турнир за фишки: фонд орга�
   t.after(() => { cl.forEach((x) => x.close()); try { srv.shutdown(); } catch (e) { /* closed */ } });
   const base = `http://localhost:${srv.server.address().port}`;
   const regs = [];
-  for (const n of ['Организатор', 'Гость1']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1' }) }).then((r) => r.json()));
+  for (const n of ['Организатор', 'Гость1']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1', agree: true }) }).then((r) => r.json()));
   cl = await Promise.all(regs.map(({ token }) => new Promise((resolve) => { const s = connect(base, { auth: { token }, reconnection: false }); s.on('connect', () => resolve(s)); })));
   const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
   const [own, guest] = cl;
@@ -664,7 +664,7 @@ test('рулетка и шашки через сокеты: лобби, став
   t.after(() => { cl.forEach((x) => x.close()); try { srv.shutdown(); } catch (e) { /* closed */ } });
   const base = `http://localhost:${srv.server.address().port}`;
   const regs = [];
-  for (const n of ['Админ', 'Соня']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1' }) }).then((r) => r.json()));
+  for (const n of ['Админ', 'Соня']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1', agree: true }) }).then((r) => r.json()));
   cl = await Promise.all(regs.map(({ token }) => new Promise((resolve) => { const s = connect(base, { auth: { token }, reconnection: false }); s.on('connect', () => resolve(s)); })));
   const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
   const [a, b] = cl;
@@ -724,7 +724,7 @@ test('личные сообщения: только друзьям, непроч
   t.after(() => { cl.forEach((x) => x.close()); try { srv.shutdown(); } catch (e) { /* closed */ } });
   const base = `http://localhost:${srv.server.address().port}`;
   const regs = [];
-  for (const n of ['Лиза', 'Марк', 'Чужой']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1' }) }).then((r) => r.json()));
+  for (const n of ['Лиза', 'Марк', 'Чужой']) regs.push(await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, password: 'secret1', agree: true }) }).then((r) => r.json()));
   cl = await Promise.all(regs.map(({ token }) => new Promise((resolve) => { const s = connect(base, { auth: { token }, reconnection: false }); s.on('connect', () => resolve(s)); })));
   const call = (c, ev, p) => new Promise((r) => c.emit(ev, p, r));
   const [a, b, c] = cl;

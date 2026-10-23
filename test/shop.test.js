@@ -41,7 +41,7 @@ test('резервная копия: скачать и восстановить 
   await new Promise((r) => srv.server.listen(0, r));
   t.after(() => srv.shutdown());
   const base = `http://localhost:${srv.server.address().port}`;
-  const reg = (name) => fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1' }) }).then((r) => r.json());
+  const reg = (name) => fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1', agree: true }) }).then((r) => r.json());
   const admin = await reg('Хранитель');
   const player = await reg('Игрок');
   assert.equal((await fetch(base + '/api/admin/backup', { headers: { Authorization: `Bearer ${player.token}` } })).status, 403);

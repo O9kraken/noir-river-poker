@@ -42,7 +42,7 @@ test('голосовой чат: только для сидящих, обмен 
   t.after(() => { socks.forEach((s) => s.close()); srv.shutdown(); });
   const base = `http://localhost:${srv.server.address().port}`;
   async function user(name) {
-    const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1' }) }).then((r) => r.json());
+    const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1', agree: true }) }).then((r) => r.json());
     const s = await new Promise((resolve) => { const c = connect(base, { auth: { token: reg.token }, reconnection: false }); c.on('connect', () => resolve(c)); });
     socks.push(s);
     const call = (ev, p) => new Promise((r) => s.emit(ev, p, r));

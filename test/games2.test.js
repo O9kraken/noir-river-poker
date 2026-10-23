@@ -146,7 +146,7 @@ test('сервер: шахматы, Капитал и мафия — лобби,
   let cl = null;
   t.after(() => { if (cl) cl.close(); try { srv.shutdown(); } catch (e) { /* closed */ } });
   const base = `http://localhost:${srv.server.address().port}`;
-  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Гамбит', password: 'secret1' }) }).then((r) => r.json());
+  const reg = await fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Гамбит', password: 'secret1', agree: true }) }).then((r) => r.json());
   cl = await new Promise((resolve) => { const s = connect(base, { auth: { token: reg.token }, reconnection: false }); s.on('connect', () => resolve(s)); });
   const call = (ev, p) => new Promise((r) => cl.emit(ev, p, r));
   const hello = await call('hello', {});
