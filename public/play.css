@@ -1890,3 +1890,52 @@ button.cap-seat.free:hover { border-color: var(--gold); color: var(--gold-2); }
   @keyframes mfReveal { 0% { transform: perspective(800px) rotateY(180deg) scale(.85); opacity: 0; } 40% { opacity: 1; } 100% { transform: none; } }
   @keyframes mfIco { from { transform: scale(0) rotate(-30deg); } }
 }
+/* v12 «Биржа брендов»: company marks */
+.cap-mark { display: block; flex: none; line-height: 0; }
+.cap-mark svg { display: block; width: 100%; height: 100%; }
+.cap-cell .cap-mark { width: 3.1cqi; height: 3.1cqi; min-width: 14px; min-height: 14px; margin: 3% 0 1px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25)); }
+.cap-cell.side-l .cap-mark, .cap-cell.side-r .cap-mark { margin-top: 1px; }
+.cap-cell.mortgaged .cap-mark { filter: grayscale(1); opacity: .55; }
+.cap-mark.big { position: absolute; right: 40px; top: 50%; width: 42px; height: 42px; transform: translateY(-50%); filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .35)); }
+.cap-detail-head:has(.cap-mark.big) { padding-right: 92px; }
+.cap-tag { font-size: 12px; font-style: italic; opacity: .9; }
+.cap-own-chip { position: relative; width: 24px; height: 24px; display: inline-grid; place-items: center; background: transparent; box-shadow: 0 0 0 2px var(--g); border-radius: 6px; overflow: visible; }
+.cap-own-chip .cap-mark.chip { width: 100%; height: 100%; }
+.cap-own-chip .cap-mark.chip svg rect:first-child { rx: 6px; }
+.cap-own-chip em { position: absolute; right: -5px; bottom: -5px; min-width: 13px; height: 13px; padding: 0 2px; border-radius: 7px; background: #1D1A14; color: var(--gold-2); font-style: normal; font-size: 9px; line-height: 13px; }
+@media (max-width: 1100px) { .cap-cell .cap-mark { width: 4.4cqi; height: 4.4cqi; margin-top: 10%; } }
+.cap-own { gap: 8px; padding: 2px; }
+/* v12 sound panel */
+.snd-panel { position: fixed; z-index: 80; width: min(300px, calc(100vw - 20px)); padding: 14px 16px 16px; border-radius: 18px; background: rgba(14, 18, 16, .96); backdrop-filter: blur(16px); border: 1px solid var(--line-gold, rgba(217, 182, 94, .35)); box-shadow: 0 24px 60px rgba(0, 0, 0, .6); display: flex; flex-direction: column; gap: 14px; }
+@media (prefers-reduced-motion: no-preference) { .snd-panel:not([hidden]) { animation: sndIn .22s cubic-bezier(.3, 1.3, .5, 1); transform-origin: 85% 0; } @keyframes sndIn { from { opacity: 0; transform: translateY(-6px) scale(.96); } } }
+.snd-title { font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--muted-2, #8f948f); }
+.snd-row { display: flex; flex-direction: column; gap: 8px; }
+.snd-row small { font-size: 12px; }
+.snd-row input[type=range] { width: 100%; accent-color: var(--gold); }
+.snd-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 700; }
+.snd-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.snd-switch i { position: relative; flex: none; width: 38px; height: 22px; border-radius: 11px; background: rgba(239, 234, 224, .15); transition: background .2s; }
+.snd-switch i::after { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #EFEAE0; transition: transform .2s cubic-bezier(.3, 1.4, .5, 1); }
+.snd-switch input:checked + i { background: var(--gold); }
+.snd-switch input:checked + i::after { transform: translateX(16px); background: #1B1410; }
+.snd-switch input:focus-visible + i { outline: 2px solid var(--gold-2); outline-offset: 2px; }
+#sound-btn { position: relative; }
+#sound-btn.music-on::after { content: ''; position: absolute; right: 6px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold-2); box-shadow: 0 0 8px var(--gold-2); }
+@media (prefers-reduced-motion: no-preference) { #sound-btn.music-on::after { animation: sndBeat 1.58s ease-in-out infinite; } @keyframes sndBeat { 0%, 100% { transform: scale(.8); opacity: .7; } 12% { transform: scale(1.25); opacity: 1; } } }
+/* v12 time of day: the light in the club follows the clock */
+.lobby-mood { margin: 6px 0 0; font-size: 14px; max-width: 640px; }
+body { transition: background-color 2s; }
+body.tod-morning { background: radial-gradient(1100px 520px at 12% -8%, rgba(220, 190, 120, .16), transparent 70%), radial-gradient(900px 480px at 105% 0%, rgba(23, 97, 74, .22), transparent 70%), var(--bg); background-attachment: fixed; }
+body.tod-evening { background: radial-gradient(1000px 560px at 85% -10%, rgba(232, 145, 58, .16), transparent 70%), radial-gradient(1100px 520px at 10% -8%, rgba(23, 97, 74, .24), transparent 70%), radial-gradient(700px 400px at 50% 110%, rgba(200, 50, 60, .07), transparent 70%), var(--bg); background-attachment: fixed; }
+body.tod-night { background: radial-gradient(1100px 600px at 70% -10%, rgba(60, 80, 170, .2), transparent 70%), radial-gradient(900px 480px at 0% 0%, rgba(23, 97, 74, .16), transparent 70%), var(--bg); background-attachment: fixed; }
+body.tod-night::before { content: ''; position: fixed; inset: 0 0 55% 0; z-index: -1; pointer-events: none; opacity: .55;
+  background-image: radial-gradient(1.2px 1.2px at 12% 18%, #DDE6FF, transparent), radial-gradient(1px 1px at 27% 8%, #fff, transparent), radial-gradient(1.4px 1.4px at 44% 22%, #DDE6FF, transparent), radial-gradient(1px 1px at 61% 12%, #fff, transparent), radial-gradient(1.3px 1.3px at 78% 26%, #DDE6FF, transparent), radial-gradient(1px 1px at 90% 6%, #fff, transparent), radial-gradient(1px 1px at 6% 40%, #fff, transparent), radial-gradient(1.2px 1.2px at 35% 44%, #DDE6FF, transparent), radial-gradient(1px 1px at 70% 38%, #fff, transparent), radial-gradient(1.1px 1.1px at 95% 46%, #DDE6FF, transparent);
+  -webkit-mask-image: linear-gradient(#000, transparent); mask-image: linear-gradient(#000, transparent); }
+body.tod-evening::before { content: ''; position: fixed; right: -10vw; top: -20vh; width: 60vw; height: 60vh; z-index: -1; pointer-events: none; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 190, 110, .1), transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  body.tod-night::before { animation: todTwinkle 6s ease-in-out infinite; }
+  @keyframes todTwinkle { 50% { opacity: .3; } }
+  body.tod-evening::before { animation: todLamp 9s ease-in-out infinite; }
+  @keyframes todLamp { 50% { opacity: .65; transform: scale(1.04); } }
+}
+.ck-sq:focus-visible { outline: 3px solid var(--gold-2); outline-offset: -3px; z-index: 4; }

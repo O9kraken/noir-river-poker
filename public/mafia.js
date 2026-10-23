@@ -24,7 +24,7 @@
     if (!res) { location.hash = '#/'; return; }
     onState(res.state);
   }
-  function close() { if (C.id) call('mf:unwatch', { tableId: C.id }, true); C.id = null; C.st = null; }
+  function close() { if (C.id) call('mf:unwatch', { tableId: C.id }, true); C.id = null; C.st = null; if (window.Music) window.Music.setMood('lounge'); }
 
   function onState(st) {
     if (st.id !== C.id) return;
@@ -304,11 +304,16 @@
     const st = C.st; const prev = C.prev;
     if (!prev || !st.game) return;
     const ph = st.game.phase; const pph = prev.game && prev.game.phase;
+    if (window.Music) window.Music.setMood(ph === 'night' && st.status === 'playing' ? 'night' : 'lounge');
+    const fell = st.game.players.filter((p) => !p.alive && prev.game && prev.game.players.some((q) => q.seat === p.seat && q.alive));
+    if (fell.length) Sound.play('death', ph === 'morning' ? 1.2 : 0.3);
+    if (st.game.votes && prev.game && prev.game.votes && Object.keys(st.game.votes).length > Object.keys(prev.game.votes).length) Sound.play('check');
     if (ph !== pph && !REDUCE && st.status === 'playing' && !$('#mf-view').hidden) curtain(st.game);
     if (ph !== pph) {
       if (ph === 'intro') Sound.play('deal');
-      else if (ph === 'night') Sound.play('fold');
-      else if (ph === 'morning' || ph === 'verdict') Sound.play('check');
+      else if (ph === 'night') Sound.play('night');
+      else if (ph === 'morning') Sound.play('morning');
+      else if (ph === 'verdict') Sound.play('check');
       else if (ph === 'vote') Sound.play('turn');
       else if (ph === 'result' && st.me && st.result) Sound.play(st.result.winners.includes(st.me.seat) ? 'bigwin' : 'fold');
     }

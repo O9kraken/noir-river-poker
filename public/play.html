@@ -3,7 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NOIR RIVER — играть в покер</title>
+<title>NOIR RIVER — клуб: покер, шахматы, мафия, «Капитал»</title>
+<meta name="description" content="Лобби игрового клуба NOIR RIVER: садитесь за стол с друзьями или ботами — покер, шахматы, мафия, «Капитал», дурак, блэкджек, рулетка и шашки.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NOIR RIVER">
+<meta property="og:title" content="Вас ждут за столом в NOIR RIVER">
+<meta property="og:description" content="Покер, шахматы, мафия, «Капитал» и другие игры с друзьями — прямо в браузере, на игровые фишки.">
+<meta property="og:image" content="%ORIGIN%/brand/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="%ORIGIN%/brand/og.jpg">
 <meta name="theme-color" content="#0A0D0C">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -139,7 +149,7 @@
       <button type="button" class="mode" data-go-tab="cap">
         <img class="mode-art" src="/art/capital.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
         <span class="mode-cap">
-          <span class="mode-txt"><b>Капитал</b><small>Улицы, дома и отели: станьте главным магнатом</small></span>
+          <span class="mode-txt"><b>Капитал</b><small>Бренды, филиалы и флагманы: станьте главным магнатом</small></span>
           <span class="mode-cnt" data-cnt="cap"></span>
         </span>
       </button>
@@ -227,7 +237,7 @@
           <span class="gnav-txt"><b>Капитал</b><small data-cnt="cap"></small></span>
           <span class="gnav-pop" aria-hidden="true">
             <img src="/art/capital.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async">
-            <span class="gnav-pop-cap"><b>Капитал</b><small>Улицы, дома и отели: станьте главным магнатом</small><i data-cnt="cap"></i></span>
+            <span class="gnav-pop-cap"><b>Капитал</b><small>Бренды, филиалы и флагманы: станьте главным магнатом</small><i data-cnt="cap"></i></span>
           </span>
         </button>
         <button type="button" role="tab" class="gnav-item" data-lobby-tab="mf" aria-selected="false">
@@ -245,6 +255,7 @@
         <div>
           <p class="eyebrow" id="lobby-greet">Лобби</p>
           <h1 class="h1" id="lobby-title">Выберите стол</h1>
+          <p class="lobby-mood muted" id="lobby-mood"></p>
         </div>
         <button type="button" class="btn btn-gold" id="create-btn">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -488,7 +499,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
           <span class="btn-label">Лобби</span>
         </a>
-        <div class="table-title"><b id="rl-name"></b><span id="rl-meta" class="muted"></span></div>
+        <div class="table-title"><b role="heading" aria-level="1" id="rl-name"></b><span id="rl-meta" class="muted"></span></div>
         <span class="hand-no muted" id="rl-spin"></span>
         <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
@@ -545,7 +556,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
           <span class="btn-label">Лобби</span>
         </a>
-        <div class="table-title"><b id="ck-name"></b><span id="ck-meta" class="muted"></span></div>
+        <div class="table-title"><b role="heading" aria-level="1" id="ck-name"></b><span id="ck-meta" class="muted"></span></div>
         <span class="hand-no muted" id="ck-game"></span>
         <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
@@ -555,7 +566,7 @@
       <div class="ck-stage">
         <div class="ck-player top" id="ck-top"></div>
         <div class="ck-board-wrap">
-          <div class="ck-board" id="ck-board" role="grid" aria-label="Шашечная доска"></div>
+          <div class="ck-board" id="ck-board" role="group" aria-label="Шашечная доска. Стрелки — выбор клетки, Enter — ход"></div>
           <div class="ck-banner" id="ck-banner" hidden></div>
         </div>
         <div class="ck-player bottom" id="ck-bottom"></div>
@@ -598,7 +609,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
           <span class="btn-label">Лобби</span>
         </a>
-        <div class="table-title"><b id="ch-name"></b><span id="ch-meta" class="muted"></span></div>
+        <div class="table-title"><b role="heading" aria-level="1" id="ch-name"></b><span id="ch-meta" class="muted"></span></div>
         <span class="hand-no muted" id="ch-game"></span>
         <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
@@ -608,7 +619,7 @@
       <div class="ck-stage">
         <div class="ck-player top" id="ch-top"></div>
         <div class="ck-board-wrap">
-          <div class="ck-board ch-board" id="ch-board" role="grid" aria-label="Шахматная доска"></div>
+          <div class="ck-board ch-board" id="ch-board" role="group" aria-label="Шахматная доска. Стрелки — выбор клетки, Enter — ход"></div>
           <div class="ch-promo" id="ch-promo" hidden></div>
           <div class="ck-banner" id="ch-banner" hidden></div>
         </div>
@@ -651,7 +662,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
           <span class="btn-label">Лобби</span>
         </a>
-        <div class="table-title"><b id="cap-name"></b><span id="cap-meta" class="muted"></span></div>
+        <div class="table-title"><b role="heading" aria-level="1" id="cap-name"></b><span id="cap-meta" class="muted"></span></div>
         <span class="hand-no muted" id="cap-game"></span>
         <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
@@ -685,13 +696,13 @@
         </div>
         <div id="cap-log-pane" class="side-pane" hidden><ul class="log" id="cap-log"></ul></div>
         <div id="cap-rules-pane" class="side-pane dk-rules" hidden>
-          <p><b>«Капитал»</b> — игра о недвижимости для 2–6 игроков. У каждого 1&nbsp;500 игровых кредитов, они не связаны с&nbsp;фишками.</p>
-          <p><b>Ход:</b> бросьте кубики и пройдите по полю. Свободную улицу, пристань или станцию можно купить. На чужой собственности платите аренду владельцу. Дубль — ходите ещё раз, три дубля подряд — в Участок.</p>
-          <p><b>Кварталы.</b> Соберите все улицы одного цвета — аренда удвоится, и можно строить дома (до четырёх) и отель. Стройте равномерно.</p>
-          <p><b>Деньги.</b> За проход Старта — 200. Собственность можно заложить за половину цены, выкупить — за 55%. Если не хватает денег, дома продаются и улицы закладываются сами; не хватило и этого — банкротство.</p>
+          <p><b>«Капитал»</b> — «Биржа брендов» для 2–6 игроков: скупайте выдуманные компании и стройте бизнес-империю. У каждого 1&nbsp;500 игровых кредитов, они не связаны с&nbsp;фишками.</p>
+          <p><b>Ход:</b> бросьте кубики и пройдите по полю. Свободную компанию, транспорт или сервис можно купить. На чужой собственности платите аренду владельцу. Дубль — ходите ещё раз, три дубля подряд — в Участок.</p>
+          <p><b>Отрасли.</b> Соберите все компании одного цвета — аренда удвоится, и можно открывать филиалы (до четырёх) и флагман. Открывайте равномерно.</p>
+          <p><b>Деньги.</b> За проход Старта — 200. Собственность можно заложить за половину цены, выкупить — за 55%. Если не хватает денег, филиалы закрываются и компании закладываются сами; не хватило и этого — банкротство.</p>
           <p><b>Участок:</b> выйти можно за 50, по карточке или выбросив дубль; после трёх попыток залог платится сам.</p>
-          <p><b>Обмен:</b> в свой ход нажмите на соперника и предложите обмен улицами и деньгами.</p>
-          <p><b>Победа.</b> Последний небанкрот забирает банк фишек. Если у стола есть лимит времени, по его окончании побеждает самый богатый (деньги + собственность + дома).</p>
+          <p><b>Обмен:</b> в свой ход нажмите на соперника и предложите обмен компаниями и деньгами.</p>
+          <p><b>Победа.</b> Последний небанкрот забирает банк фишек. Если у стола есть лимит времени, по его окончании побеждает самый богатый (деньги + компании + филиалы).</p>
         </div>
       </div>
     </aside>
@@ -705,7 +716,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
           <span class="btn-label">Лобби</span>
         </a>
-        <div class="table-title"><b id="mf-name"></b><span id="mf-meta" class="muted"></span></div>
+        <div class="table-title"><b role="heading" aria-level="1" id="mf-name"></b><span id="mf-meta" class="muted"></span></div>
         <span class="hand-no muted" id="mf-game"></span>
         <button type="button" class="btn btn-ghost btn-sm invite-btn" data-invite>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"/></svg>
@@ -1135,6 +1146,7 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/play.js"></script>
+<script src="/music.js"></script>
 <script src="/durak.js"></script>
 <script src="/blackjack.js"></script>
 <script src="/social.js"></script>
@@ -1144,6 +1156,7 @@
 <script src="/checkers.js"></script>
 <script src="/dm.js"></script>
 <script src="/chess.js"></script>
+<script src="/capital-brands.js"></script>
 <script src="/capital.js"></script>
 <script src="/mafia.js"></script>
 <script src="/fx.js"></script>

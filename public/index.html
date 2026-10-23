@@ -3,8 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NOIR RIVER — покер, рулетка, шашки и дурак с друзьями</title>
-<meta name="description" content="Покер в пяти вариантах, турниры, дурак, блэкджек, рулетка и шашки на игровые фишки. Садитесь за стол с друзьями прямо в браузере.">
+<title>NOIR RIVER — покер, шахматы, мафия и «Капитал» с друзьями онлайн</title>
+<meta name="description" content="Игровой клуб в браузере: покер в пяти вариантах и турниры, шахматы, мафия, «Капитал», дурак, блэкджек, рулетка и шашки. Играйте с друзьями или ботами на игровые фишки — бесплатно, без скачивания.">
+<link rel="canonical" href="%ORIGIN%/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NOIR RIVER">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="%ORIGIN%/">
+<meta property="og:title" content="NOIR RIVER — игровой клуб в браузере">
+<meta property="og:description" content="Покер, шахматы, мафия, «Капитал», дурак и ещё четыре игры. Садитесь за стол с друзьями — на игровые фишки.">
+<meta property="og:image" content="%ORIGIN%/brand/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="NOIR RIVER: стол с картами и фишками, список игр клуба">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NOIR RIVER — игровой клуб в браузере">
+<meta name="twitter:description" content="Покер, шахматы, мафия, «Капитал» и другие игры с друзьями на игровые фишки.">
+<meta name="twitter:image" content="%ORIGIN%/brand/og.jpg">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{"@type":"WebSite","name":"NOIR RIVER","url":"%ORIGIN%/","inLanguage":"ru"},
+{"@type":"WebApplication","name":"NOIR RIVER","url":"%ORIGIN%/play","applicationCategory":"GameApplication","operatingSystem":"Любой браузер","inLanguage":"ru","offers":{"@type":"Offer","price":"0","priceCurrency":"RUB"},"description":"Онлайн-клуб настольных и карточных игр на игровые фишки: покер, шахматы, мафия, «Капитал», дурак, блэкджек, рулетка, шашки."}
+]}
+</script>
 <meta name="theme-color" content="#070A09">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -153,7 +174,7 @@
         </div>
 
         <div class="show-stage">
-          <article class="show-card is-active" role="tabpanel" data-panel="0">
+          <div class="show-card is-active" role="tabpanel" data-panel="0">
             <img src="/art/poker.webp" alt="Пара тузов, борд и фишки на зелёном сукне" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Больше, чем просто покер</h3>
@@ -161,8 +182,8 @@
               <ul><li><b>5</b>вариантов: холдем NL и&nbsp;Limit, шорт-дек, Омаха и&nbsp;Омаха-5</li><li><b>%</b>шансы на&nbsp;столе: эквити и&nbsp;вероятность каждой комбинации</li></ul>
               <a class="cta cta-sm" href="/play"><span>Сесть за&nbsp;стол</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="1" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="1" hidden>
             <img src="/art/tournament.webp" alt="Золотой кубок турнира и фишки" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Турниры по&nbsp;своим правилам</h3>
@@ -170,8 +191,8 @@
               <ul><li><b>★</b>бай-ин, гарантия, блайнды и&nbsp;выплаты&nbsp;— на&nbsp;ваш выбор</li><li><b>⏱</b>старт по&nbsp;расписанию, каждый день</li></ul>
               <a class="cta cta-sm" href="/play"><span>К&nbsp;турнирам</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="2" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="2" hidden>
             <img src="/art/durak.webp" alt="Колода с козырем, отбитые карты и веер в руке" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Дурак на&nbsp;фишки</h3>
@@ -179,8 +200,8 @@
               <ul><li><b>♣&#xFE0E;</b>подкидной и&nbsp;переводной</li><li><b>✓</b>честное «бито»: ход переходит, когда все подтвердили</li></ul>
               <a class="cta cta-sm" href="/play"><span>Сыграть в&nbsp;дурака</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="3" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="3" hidden>
             <img src="/art/blackjack.webp" alt="Туз и король на столе для блэкджека" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Блэкджек против дилера</h3>
@@ -188,8 +209,8 @@
               <ul><li><b>3:2</b>платит блэкджек, дилер стоит на&nbsp;всех 17</li><li><b>A</b>сплит и&nbsp;дабл, до&nbsp;четырёх рук, страховка</li></ul>
               <a class="cta cta-sm" href="/play"><span>Взять карту</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="4" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="4" hidden>
             <img src="/art/roulette.webp" alt="Колесо рулетки и фишки на поле для ставок" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Рулетка с&nbsp;одним зеро</h3>
@@ -197,8 +218,8 @@
               <ul><li><b>35</b>к&nbsp;одному платит число; дюжины и&nbsp;колонны&nbsp;— 2:1</li><li><b>×2</b>повторить и&nbsp;удвоить ставки в&nbsp;один клик</li></ul>
               <a class="cta cta-sm" href="/play"><span>К&nbsp;колесу</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="5" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="5" hidden>
             <img src="/art/checkers.webp" alt="Шашечная доска с партией в разгаре" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Шашки на&nbsp;ставку</h3>
@@ -206,8 +227,8 @@
               <ul><li><b>♛&#xFE0E;</b>летающие дамки, бить обязательно</li><li><b>3–10</b>минут на&nbsp;партию, шахматные часы</li></ul>
               <a class="cta cta-sm" href="/play"><span>Сесть за&nbsp;доску</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="6" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="6" hidden>
             <img src="/art/chess.webp" alt="Шахматная партия в разгаре на зелёно-кремовой доске" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Шахматы на&nbsp;ставку</h3>
@@ -215,17 +236,17 @@
               <ul><li><b>Эло</b>рейтинг меняется после каждой партии на&nbsp;фишки</li><li><b>3–15</b>минут на&nbsp;партию и&nbsp;2&nbsp;секунды за&nbsp;ход</li></ul>
               <a class="cta cta-sm" href="/play"><span>Сыграть партию</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="7" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="7" hidden>
             <img src="/art/capital.webp" alt="Угол игрового поля с домами, отелем и кубиками" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Капитал</h3>
-              <p>Игра о&nbsp;недвижимости для 2–6 игроков: скупайте улицы, стройте дома и&nbsp;отели, договаривайтесь об&nbsp;обменах.</p>
-              <ul><li><b>40</b>клеток города у&nbsp;реки: кварталы, пристани, станции</li><li><b>1</b>победитель забирает банк фишек</li></ul>
+              <p>Биржа брендов для 2–6 игроков: скупайте кофейни, киностудии и&nbsp;авиалинии, открывайте филиалы, договаривайтесь об&nbsp;обменах.</p>
+              <ul><li><b>28</b>выдуманных брендов со&nbsp;своими логотипами</li><li><b>1</b>победитель забирает банк фишек</li></ul>
               <a class="cta cta-sm" href="/play"><span>Бросить кубики</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
-          <article class="show-card" role="tabpanel" data-panel="8" hidden>
+          </div>
+          <div class="show-card" role="tabpanel" data-panel="8" hidden>
             <img src="/art/mafia.webp" alt="Карты ролей «Мафия» и «Комиссар» при свете свечи" width="1600" height="1000" loading="lazy">
             <div class="glass">
               <h3>Мафия</h3>
@@ -233,7 +254,7 @@
               <ul><li><b>4</b>роли: мафия и&nbsp;дон, комиссар, доктор, мирные</li><li><b>5–10</b>игроков; потренироваться можно с&nbsp;ботами</li></ul>
               <a class="cta cta-sm" href="/play"><span>Войти в&nbsp;город</span><i aria-hidden="true"></i></a>
             </div>
-          </article>
+          </div>
         </div>
       </div>
     </section>

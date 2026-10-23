@@ -6,24 +6,24 @@
 
   // the board (mirrors server/capital/board.js; only names, groups and prices are needed here)
   const GROUPS = {
-    brown: ['Слобода', '#8B5A3C', 50], sky: ['Сады', '#7EC8E3', 50], pink: ['Театральный квартал', '#D46A9F', 100], orange: ['Ремесленный квартал', '#E8913A', 100],
-    red: ['Центр', '#C8323C', 150], yellow: ['Купеческий квартал', '#E6C34A', 150], green: ['Деловой квартал', '#2E9E6A', 200], navy: ['Набережная', '#2F4FA8', 200],
+    brown: ['Уличная еда', '#8B5A3C', 50], sky: ['Кофейни', '#7EC8E3', 50], pink: ['Мода', '#D46A9F', 100], orange: ['Доставка', '#E8913A', 100],
+    red: ['Кино и сериалы', '#C8323C', 150], yellow: ['Гаджеты', '#E6C34A', 150], green: ['Финтех и маркет', '#2E9E6A', 200], navy: ['Премиум', '#2F4FA8', 200],
   };
   const st_ = (name, group, price) => ({ kind: 'street', name, group, price });
   const CELLS = [
-    { kind: 'start', name: 'Старт' }, st_('Рыбацкий переулок', 'brown', 60), { kind: 'fund', name: 'Фонд' }, st_('Сенная улица', 'brown', 60),
-    { kind: 'tax', name: 'Подоходный налог', amount: 200 }, { kind: 'pier', name: 'Северная пристань', price: 200 }, st_('Кленовая аллея', 'sky', 100),
-    { kind: 'luck', name: 'Удача' }, st_('Садовая улица', 'sky', 100), st_('Вишнёвый проезд', 'sky', 120), { kind: 'jail', name: 'Участок' },
-    st_('Театральная площадь', 'pink', 140), { kind: 'util', name: 'Электростанция', price: 150 }, st_('Бульвар Огней', 'pink', 140), st_('Оперный проезд', 'pink', 160),
-    { kind: 'pier', name: 'Восточная пристань', price: 200 }, st_('Мельничная улица', 'orange', 180), { kind: 'fund', name: 'Фонд' }, st_('Кузнечный мост', 'orange', 180),
-    st_('Часовая улица', 'orange', 200), { kind: 'rest', name: 'Набережная' }, st_('Улица Звёзд', 'red', 220), { kind: 'luck', name: 'Удача' },
-    st_('Соборная площадь', 'red', 220), st_('Площадь Фонтанов', 'red', 240), { kind: 'pier', name: 'Южная пристань', price: 200 }, st_('Янтарная улица', 'yellow', 260),
-    st_('Солнечный бульвар', 'yellow', 260), { kind: 'util', name: 'Водоканал', price: 150 }, st_('Купеческая улица', 'yellow', 280), { kind: 'arrest', name: 'Арест' },
-    st_('Изумрудная аллея', 'green', 300), st_('Банковская улица', 'green', 300), { kind: 'fund', name: 'Фонд' }, st_('Биржевая площадь', 'green', 320),
-    { kind: 'pier', name: 'Западная пристань', price: 200 }, { kind: 'luck', name: 'Удача' }, st_('Набережная Ривер', 'navy', 350),
-    { kind: 'tax', name: 'Налог на роскошь', amount: 100 }, st_('Холм Нуар', 'navy', 400),
+    { kind: 'start', name: 'Старт' }, st_('Шаурмастер', 'brown', 60), { kind: 'fund', name: 'Фонд' }, st_('Пончик-Ок', 'brown', 60),
+    { kind: 'tax', name: 'Подоходный налог', amount: 200 }, { kind: 'pier', name: 'Такси «Шашечка»', price: 200 }, st_('Бобы и Ко', 'sky', 100),
+    { kind: 'luck', name: 'Удача' }, st_('Кофекот', 'sky', 100), st_('Лунный латте', 'sky', 120), { kind: 'jail', name: 'Участок' },
+    st_('Нитка', 'pink', 140), { kind: 'util', name: 'Ток-Энерго', price: 150 }, st_('Кедики', 'pink', 140), st_('Бархат', 'pink', 160),
+    { kind: 'pier', name: 'Рельс-Экспресс', price: 200 }, st_('Авоська', 'orange', 180), { kind: 'fund', name: 'Фонд' }, st_('Свежак', 'orange', 180),
+    st_('Ланчбокс', 'orange', 200), { kind: 'rest', name: 'Перерыв' }, st_('Попкорн+', 'red', 220), { kind: 'luck', name: 'Удача' },
+    st_('Киноволна', 'red', 220), st_('Сериалити', 'red', 240), { kind: 'pier', name: 'Паром «Нуар»', price: 200 }, st_('Пиксельлаб', 'yellow', 260),
+    st_('Вольтаж', 'yellow', 260), { kind: 'util', name: 'Связь Плюс', price: 150 }, st_('Квантум', 'yellow', 280), { kind: 'arrest', name: 'Арест' },
+    st_('Полка', 'green', 300), st_('Оборот Банк', 'green', 300), { kind: 'fund', name: 'Фонд' }, st_('Базарчик', 'green', 320),
+    { kind: 'pier', name: 'Велопрокат «Педаль»', price: 200 }, { kind: 'luck', name: 'Удача' }, st_('Аэро Нуар', 'navy', 350),
+    { kind: 'tax', name: 'Налог на роскошь', amount: 100 }, st_('Ривер Люкс', 'navy', 400),
   ];
-  const ICON = { start: '➜', fund: '◆', luck: '?', tax: '%', pier: '⚓︎', util: '⚡︎', jail: '▦', rest: '☕︎', arrest: '⚑' };
+  const ICON = { start: '➜', fund: '◆', luck: '?', tax: '%', pier: '⇄', util: '⚡︎', jail: '▦', rest: '☕︎', arrest: '⚑' };
   const round10 = (x) => Math.max(10, Math.round(x / 10) * 10);
   const rentTable = (price) => { const b = Math.max(2, Math.round((price * 0.08) / 2) * 2); return [b, round10(b * 5), round10(b * 14), round10(b * 36), round10(b * 46), round10(b * 58)]; };
   const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
@@ -61,7 +61,9 @@
       const corner = [0, 10, 20, 30].includes(i);
       const el = h('button', { type: 'button', class: `cap-cell side-${p.side}${corner ? ' corner' : ''} k-${cell.kind}`, style: `grid-row:${p.r};grid-column:${p.c}`, 'data-cell': i, 'aria-label': cell.name, onclick: () => { C.detail = i; renderCenter(); } });
       if (cell.group) el.append(h('i', { class: 'cap-strip', style: `background:${GROUPS[cell.group][1]}` }));
-      else el.append(h('i', { class: 'cap-ico', 'aria-hidden': 'true' }, ICON[cell.kind] || ''));
+      const mark = window.CapitalBrands && window.CapitalBrands.logo(i);
+      if (mark) el.append(mark);
+      else if (!cell.group) el.append(h('i', { class: 'cap-ico', 'aria-hidden': 'true' }, ICON[cell.kind] || ''));
       el.append(h('span', { class: 'cap-cname' }, cell.name));
       if (cell.price) el.append(h('small', { class: 'cap-price' }, fmt(cell.price)));
       else if (cell.amount) el.append(h('small', { class: 'cap-price' }, `−${cell.amount}`));
@@ -194,25 +196,27 @@
     if (cell.kind === 'street') {
       const r = rentTable(cell.price);
       rows.push(h('table', { class: 'cap-rent' }, h('tbody', null,
-        ...['Аренда', 'С кварталом', '1 дом', '2 дома', '3 дома', '4 дома', 'Отель'].map((label, k) => {
+        ...['Аренда', 'Вся отрасль', '1 филиал', '2 филиала', '3 филиала', '4 филиала', 'Флагман'].map((label, k) => {
           const v = k === 0 ? r[0] : k === 1 ? r[0] * 2 : r[k - 1];
           return h('tr', { class: c && ((k >= 2 && c.houses === k - 1) || (k < 2 && !c.houses && owner)) ? 'on' : '' }, h('td', null, label), h('td', null, fmt(v)));
         }))));
-      rows.push(h('p', { class: 'muted small' }, `Дом — ${fmt(GROUPS[cell.group][2])}, залог — ${fmt(cell.price / 2)}`));
-    } else if (cell.kind === 'pier') rows.push(h('p', { class: 'muted small' }, 'Аренда: 25 / 50 / 100 / 200 — смотря сколько пристаней у владельца.'));
-    else if (cell.kind === 'util') rows.push(h('p', { class: 'muted small' }, 'Аренда: сумма кубиков ×4, при обеих станциях — ×10.'));
+      rows.push(h('p', { class: 'muted small' }, `Филиал — ${fmt(GROUPS[cell.group][2])}, залог — ${fmt(cell.price / 2)}`));
+    } else if (cell.kind === 'pier') rows.push(h('p', { class: 'muted small' }, 'Аренда: 25 / 50 / 100 / 200 — смотря сколько транспортных компаний у владельца.'));
+    else if (cell.kind === 'util') rows.push(h('p', { class: 'muted small' }, 'Аренда: сумма кубиков ×4, если у владельца оба сервиса — ×10.'));
     else if (cell.kind === 'tax') rows.push(h('p', { class: 'muted small' }, `Заплатите банку ${fmt(cell.amount)}.`));
     else rows.push(h('p', { class: 'muted small' }, { start: 'Каждый проход — +200.', fund: 'Возьмите карточку Фонда.', luck: 'Возьмите карточку Удачи.', jail: 'Если просто проходите — вы в гостях.', rest: 'Отдых: ничего не происходит.', arrest: 'Прямиком в Участок.' }[cell.kind] || ''));
     const btns = [];
     if (mine && st.status === 'playing') {
-      if (cell.kind === 'street' && myTurn) btns.push(h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => send('cap:build', { cell: i }) }, c.houses === 4 ? 'Отель' : 'Дом +'));
-      if (c.houses) btns.push(h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => send('cap:sell', { cell: i }) }, 'Продать дом'));
+      if (cell.kind === 'street' && myTurn) btns.push(h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => send('cap:build', { cell: i }) }, c.houses === 4 ? 'Флагман' : 'Филиал +'));
+      if (c.houses) btns.push(h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => send('cap:sell', { cell: i }) }, 'Закрыть филиал'));
       else btns.push(h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => send('cap:mortgage', { cell: i }) }, c.mortgaged ? `Выкупить · ${fmt(Math.ceil(cell.price * 0.55))}` : `Заложить · +${fmt(cell.price / 2)}`));
     }
     return h('div', { class: 'cap-detail' },
       h('div', { class: 'cap-detail-head', style: cell.group ? `--g:${GROUPS[cell.group][1]}` : '' },
-        h('small', null, cell.group ? GROUPS[cell.group][0] : { pier: 'Пристань', util: 'Станция' }[cell.kind] || ''),
+        h('small', null, cell.group ? GROUPS[cell.group][0] : { pier: 'Транспорт', util: 'Сервис' }[cell.kind] || ''),
         h('b', null, cell.name),
+        window.CapitalBrands && window.CapitalBrands.TAGS[i] ? h('em', { class: 'cap-tag' }, `«${window.CapitalBrands.TAGS[i]}»`) : null,
+        window.CapitalBrands ? window.CapitalBrands.logo(i, 'cap-mark big') : null,
         h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Закрыть', onclick: () => { C.detail = null; renderCenter(); render(); } }, '×')),
       cell.price ? h('p', { class: 'small' }, `Цена ${fmt(cell.price)} · `, owner ? h('span', { style: `color:${owner.color}` }, `владелец ${owner.name}${c.mortgaged ? ' (заложено)' : ''}`) : 'свободно') : null,
       ...rows,
@@ -224,7 +228,7 @@
     if (!st) return;
     const box = $('#cap-center');
     const g = st.game;
-    const parts = [h('div', { class: 'cap-logo', 'aria-hidden': 'true' }, h('b', null, 'КАПИТАЛ'), h('small', null, 'город у реки'))];
+    const parts = [h('div', { class: 'cap-logo', 'aria-hidden': 'true' }, h('b', null, 'КАПИТАЛ'), h('small', null, 'биржа брендов'))];
     if (C.detail != null) { box.replaceChildren(...parts, detailCard(C.detail)); return; }
 
     if (st.status === 'waiting' || st.status === 'countdown' || !g) {
@@ -281,7 +285,7 @@
       } else if (g.phase === 'end') act.push(h('button', { type: 'button', class: 'btn btn-gold', onclick: () => send('cap:end') }, 'Завершить ход'));
     }
     if (g.phase === 'buy' && g.pending && !myTurn) parts.push(h('p', { class: 'muted small' }, `${cur.name} думает, покупать ли «${CELLS[g.pending.cell].name}»`));
-    if (myTurn && !g.trade) parts.push(h('p', { class: 'muted small cap-hint' }, 'Нажмите на свою улицу, чтобы строить или заложить; на соперника справа — чтобы предложить обмен.'));
+    if (myTurn && !g.trade) parts.push(h('p', { class: 'muted small cap-hint' }, 'Нажмите на свою компанию, чтобы открыть филиал или заложить; на соперника справа — чтобы предложить обмен.'));
     parts.push(h('div', { class: 'cap-actions' }, ...act));
     box.replaceChildren(...parts);
   }
@@ -313,7 +317,7 @@
         own.length ? h('div', { class: 'cap-own' }, ...own.map(({ c, i }) => h('button', {
           type: 'button', class: 'cap-own-chip' + (c.mortgaged ? ' mort' : ''), title: CELLS[i].name, style: `--g:${CELLS[i].group ? GROUPS[CELLS[i].group][1] : '#9aa'}`,
           onclick: () => { C.detail = i; render(); },
-        }, c.houses ? (c.houses === 5 ? '★' : String(c.houses)) : ''))) : null,
+        }, window.CapitalBrands ? window.CapitalBrands.logo(i, 'cap-mark chip') : null, c.houses ? h('em', null, c.houses === 5 ? '★' : String(c.houses)) : null))) : null,
         canTrade && p.seat !== mine.seat && !p.out ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => openTrade(p) }, 'Предложить обмен') : null);
     }));
   }
@@ -414,10 +418,13 @@
     if (!prev || !st.game) return;
     const g = st.game; const pg = prev.game;
     if (!pg || prev.status !== 'playing') { if (st.status === 'playing') Sound.play('deal'); return; }
-    if (g.moveNo !== pg.moveNo) Sound.play('card');
+    if (g.moveNo !== pg.moveNo) Sound.play('dice');
     const mine = me();
     const was = pg.players.find((p) => mine && p.seat === mine.seat);
-    if (mine && was && mine.cash > was.cash) Sound.play('chips');
+    const late = Math.max(0, C.rollUntil - performance.now()) / 1000 + 0.4;
+    if (mine && was && mine.cash > was.cash) Sound.play('coin', late);
+    else if (mine && was && mine.cash < was.cash) Sound.play('pay', late);
+    if (g.cells.some((c, i) => c.houses > pg.cells[i].houses)) Sound.play('chips');
     if (mine && g.turn === mine.seat && pg.turn !== mine.seat) Sound.play('turn', 0.2);
     if (st.status === 'result' && prev.status === 'playing' && st.result) Sound.play(st.result.winner.seat === st.mySeat ? 'bigwin' : 'fold');
   }

@@ -149,102 +149,170 @@
   }
 
   // ================= sound (synthesised, no files) =================
+  // One audio graph for the whole club: effects and the music each have their own level,
+  // both go through a soft "room" (a short generated reverb) and a gentle compressor.
   const Sound = {
     ctx: null,
     muted: false,
+    vol: 0.8,
+    out: null, sfx: null, verb: null,
     init() {
-      try { this.muted = localStorage.getItem('nr_muted') === '1'; } catch (e) { /* ignore */ }
+      try {
+        this.muted = localStorage.getItem('nr_muted') === '1';
+        const v = parseFloat(localStorage.getItem('nr_vol'));
+        if (v >= 0 && v <= 1) this.vol = v;
+      } catch (e) { /* ignore */ }
       this.renderBtn();
-      const unlock = () => { this.ensure(); };
+      const unlock = () => { this.ensure(); window.dispatchEvent(new Event('nr:audio')); };
       window.addEventListener('pointerdown', unlock, { once: true });
       window.addEventListener('keydown', unlock, { once: true });
     },
     ensure() {
       try {
-        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!this.ctx) {
+          const c = new (window.AudioContext || window.webkitAudioContext)();
+          this.ctx = c;
+          const comp = c.createDynamicsCompressor();
+          comp.threshold.value = -18; comp.knee.value = 12; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.2;
+          comp.connect(c.destination);
+          this.out = c.createGain(); this.out.gain.value = 0.9; this.out.connect(comp);
+          this.sfx = c.createGain(); this.sfx.gain.value = this.muted ? 0 : this.vol; this.sfx.connect(this.out);
+          // a small warm room: decaying filtered noise as the impulse response
+          const len = Math.floor(c.sampleRate * 1.8);
+          const ir = c.createBuffer(2, len, c.sampleRate);
+          for (let ch = 0; ch < 2; ch++) {
+            const d = ir.getChannelData(ch); let lp = 0;
+            for (let i = 0; i < len; i++) { lp = lp * 0.55 + (Math.random() * 2 - 1) * 0.45; d[i] = lp * Math.pow(1 - i / len, 2.6); }
+          }
+          const conv = c.createConvolver(); conv.buffer = ir;
+          this.verb = c.createGain(); this.verb.gain.value = 0.32;
+          this.verb.connect(conv).connect(this.out);
+        }
         if (this.ctx.state === 'suspended') this.ctx.resume();
       } catch (e) { this.ctx = null; }
       return this.ctx;
     },
-    toggle() {
-      this.muted = !this.muted;
+    setVolume(v) {
+      this.vol = v;
+      try { localStorage.setItem('nr_vol', String(v)); } catch (e) { /* ignore */ }
+      if (this.sfx) this.sfx.gain.setTargetAtTime(this.muted ? 0 : v, this.ctx.currentTime, 0.05);
+    },
+    toggle(force) {
+      this.muted = typeof force === 'boolean' ? !force : !this.muted;
       try { localStorage.setItem('nr_muted', this.muted ? '1' : '0'); } catch (e) { /* ignore */ }
+      if (this.sfx) this.sfx.gain.setTargetAtTime(this.muted ? 0 : this.vol, this.ctx.currentTime, 0.05);
       this.renderBtn();
       if (!this.muted) this.play('chips');
     },
     renderBtn() {
       const b = $('#sound-btn');
-      b.setAttribute('aria-pressed', this.muted ? 'true' : 'false');
-      b.setAttribute('aria-label', this.muted ? 'Включить звук' : 'Выключить звук');
+      const music = window.Music && window.Music.on;
+      const silent = this.muted && !music;
+      b.setAttribute('aria-pressed', silent ? 'true' : 'false');
+      b.setAttribute('aria-label', 'Звук и музыка');
+      b.classList.toggle('music-on', !!music);
     },
-    tone(freq, dur, type, vol, when) {
+    /** A voice: oscillator → envelope → effects bus (+ a little room). */
+    tone(freq, dur, type, vol, when, opts = {}) {
       const c = this.ctx;
       const t0 = c.currentTime + when;
       const o = c.createOscillator();
       const g = c.createGain();
       o.type = type;
       o.frequency.setValueAtTime(freq, t0);
+      if (opts.slide) o.frequency.exponentialRampToValueAtTime(opts.slide, t0 + dur);
+      if (opts.detune) o.detune.value = opts.detune;
       g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + (opts.attack || 0.006));
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g).connect(c.destination);
+      o.connect(g);
+      g.connect(this.sfx);
+      if (opts.room !== 0) { const s = c.createGain(); s.gain.value = opts.room || 0.5; g.connect(s).connect(this.verb); }
       o.start(t0);
-      o.stop(t0 + dur + 0.02);
+      o.stop(t0 + dur + 0.05);
     },
-    noise(dur, vol, freq, when, sweepTo) {
+    noise(dur, vol, freq, when, sweepTo, opts = {}) {
       const c = this.ctx;
       const t0 = c.currentTime + when;
       const len = Math.max(1, Math.floor(c.sampleRate * dur));
       const buf = c.createBuffer(1, len, c.sampleRate);
       const d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const shape = opts.shape || 1;
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, shape);
       const src = c.createBufferSource();
       src.buffer = buf;
       const f = c.createBiquadFilter();
-      f.type = 'bandpass';
+      f.type = opts.filter || 'bandpass';
+      f.Q.value = opts.q || 1;
       f.frequency.setValueAtTime(freq, t0);
       if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t0 + dur);
       const g = c.createGain();
       g.gain.setValueAtTime(vol, t0);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(f).connect(g).connect(c.destination);
+      src.connect(f).connect(g).connect(this.sfx);
+      if (opts.room) { const s = c.createGain(); s.gain.value = opts.room; g.connect(s).connect(this.verb); }
       src.start(t0);
+    },
+    /** One clay chip touching another: a bright click plus two short resonances. */
+    clack(when, pitch = 1, vol = 1) {
+      this.noise(0.018, 0.5 * vol, 4200 * pitch, when, null, { filter: 'highpass', shape: 3 });
+      this.tone(2350 * pitch, 0.06, 'sine', 0.05 * vol, when, { room: 0.3 });
+      this.tone(3720 * pitch, 0.045, 'sine', 0.03 * vol, when, { room: 0.3 });
     },
     play(name, delay = 0) {
       if (this.muted || document.hidden) return;
       const c = this.ensure();
       if (!c) return;
+      const r = (a, b) => a + Math.random() * (b - a);
       try {
         switch (name) {
-          case 'card': this.noise(0.07, 0.35, 3800, delay); break;
-          case 'deal': for (let k = 0; k < 4; k++) this.noise(0.06, 0.3, 3600, delay + k * 0.08); break;
-          case 'chips':
-            this.tone(2600, 0.05, 'triangle', 0.05, delay);
-            this.tone(3300, 0.05, 'triangle', 0.04, delay + 0.05);
-            this.tone(2900, 0.07, 'triangle', 0.035, delay + 0.1);
+          case 'card': // a card sliding over felt and snapping down
+            this.noise(0.09, 0.32, r(2600, 3200), delay, 1400, { shape: 1.5, q: 0.8 });
+            this.noise(0.02, 0.25, 5200, delay + 0.07, null, { filter: 'highpass', shape: 4 });
             break;
-          case 'check':
-            this.tone(180, 0.09, 'sine', 0.22, delay);
-            this.tone(170, 0.09, 'sine', 0.18, delay + 0.13);
+          case 'deal': for (let k = 0; k < 4; k++) { this.noise(0.08, 0.28, r(2500, 3300), delay + k * 0.09, 1300, { shape: 1.5 }); this.noise(0.015, 0.2, 5000, delay + k * 0.09 + 0.06, null, { filter: 'highpass', shape: 4 }); } break;
+          case 'chips': { const n = 3 + Math.floor(Math.random() * 3); for (let k = 0; k < n; k++) this.clack(delay + k * r(0.035, 0.06), r(0.9, 1.12), 1 - k * 0.12); break; }
+          case 'check': // two knuckle knocks on wood
+            for (const k of [0, 0.14]) { this.tone(r(150, 175), 0.11, 'sine', 0.22, delay + k, { slide: 90, room: 0.6 }); this.noise(0.03, 0.18, 900, delay + k, null, { shape: 3 }); }
             break;
-          case 'fold': this.noise(0.25, 0.2, 2200, delay, 500); break;
-          case 'turn':
-            this.tone(660, 0.18, 'sine', 0.07, delay);
-            this.tone(990, 0.25, 'sine', 0.06, delay + 0.12);
+          case 'fold': this.noise(0.28, 0.18, 2400, delay, 450, { shape: 1.2, room: 0.4 }); break;
+          case 'turn': // a soft two-note bell
+            this.tone(784, 0.6, 'sine', 0.06, delay, { room: 1 }); this.tone(1568, 0.25, 'sine', 0.015, delay);
+            this.tone(1175, 0.8, 'sine', 0.05, delay + 0.13, { room: 1 }); this.tone(2350, 0.3, 'sine', 0.012, delay + 0.13);
             break;
           case 'ping':
-            this.tone(880, 0.16, 'sine', 0.06, delay);
-            this.tone(1320, 0.22, 'sine', 0.05, delay + 0.1);
+            this.tone(988, 0.4, 'sine', 0.06, delay, { room: 1 });
+            this.tone(1319, 0.55, 'sine', 0.05, delay + 0.1, { room: 1 });
             break;
-          case 'tick': this.tone(1400, 0.04, 'square', 0.025, delay); break;
-          case 'win': [523, 659, 784, 1047].forEach((f, k) => this.tone(f, 0.4, 'sine', 0.06, delay + k * 0.09)); break;
-          case 'bigwin': [523, 659, 784, 1047, 1319].forEach((f, k) => this.tone(f, 0.55, 'triangle', 0.07, delay + k * 0.1)); break;
+          case 'tick': this.noise(0.02, 0.22, 3000, delay, null, { shape: 3, q: 4 }); this.tone(1800, 0.03, 'sine', 0.02, delay, { room: 0 }); break;
+          case 'move': // a wooden piece set on the board
+            this.tone(r(220, 260), 0.12, 'triangle', 0.12, delay, { slide: 140, room: 0.5 });
+            this.noise(0.04, 0.3, 1400, delay, 600, { shape: 3 });
+            break;
+          case 'capture': this.play('move', delay); this.tone(r(330, 380), 0.1, 'triangle', 0.08, delay + 0.06, { slide: 200 }); this.noise(0.05, 0.25, 1800, delay + 0.06, 700, { shape: 3 }); break;
+          case 'dice': // two dice rattling and settling on the table
+            for (let k = 0; k < 7; k++) this.noise(0.03, 0.25 - k * 0.025, r(1800, 3200), delay + k * r(0.05, 0.085), null, { shape: 3, q: 2 });
+            this.tone(310, 0.08, 'triangle', 0.07, delay + 0.52, { slide: 180 });
+            break;
+          case 'coin': this.tone(1975, 0.35, 'sine', 0.05, delay, { room: 0.8 }); this.tone(2637, 0.45, 'sine', 0.04, delay + 0.07, { room: 0.8 }); break;
+          case 'pay': this.tone(660, 0.2, 'triangle', 0.05, delay, { slide: 440 }); break;
+          case 'whoosh': this.noise(0.45, 0.12, 400, delay, 3000, { shape: 0.6, q: 0.7, room: 0.5 }); break;
+          case 'night': // a low swell and a distant bell
+            this.tone(110, 2.2, 'sine', 0.08, delay, { attack: 0.8, room: 1 }); this.tone(165, 2.2, 'sine', 0.04, delay, { attack: 0.9, room: 1 });
+            this.tone(880, 1.6, 'sine', 0.025, delay + 0.9, { room: 1 });
+            break;
+          case 'morning': [523, 659, 784, 1047].forEach((f, k) => this.tone(f, 0.9, 'sine', 0.035, delay + k * 0.12, { room: 1 })); this.tone(2793, 0.12, 'sine', 0.02, delay + 0.6, { slide: 3300 }); this.tone(3135, 0.1, 'sine', 0.018, delay + 0.75, { slide: 3700 }); break;
+          case 'death': this.tone(98, 1.4, 'sine', 0.12, delay, { attack: 0.02, room: 1 }); this.noise(0.6, 0.1, 300, delay, 80, { shape: 1.5, room: 0.8 }); break;
+          case 'win': [523, 659, 784, 1047].forEach((f, k) => { this.tone(f, 0.7, 'sine', 0.05, delay + k * 0.09, { room: 1 }); this.tone(f * 2, 0.3, 'sine', 0.012, delay + k * 0.09); }); break;
+          case 'bigwin':
+            [523, 659, 784, 1047, 1319].forEach((f, k) => { this.tone(f, 0.9, 'triangle', 0.055, delay + k * 0.1, { room: 1 }); this.tone(f * 1.5, 0.5, 'sine', 0.015, delay + k * 0.1 + 0.02); });
+            for (let k = 0; k < 6; k++) this.clack(delay + 0.5 + k * 0.05, r(0.95, 1.15), 0.8);
+            break;
           default: break;
         }
       } catch (e) { /* audio unavailable */ }
     },
   };
-  $('#sound-btn').addEventListener('click', () => Sound.toggle());
   Sound.init();
 
   // four-colour deck (♣ green, ♦ blue): easier to tell suits apart at a glance
@@ -639,6 +707,24 @@
     return h('div', { class: 'seats-dots', 'aria-hidden': 'true' }, Array.from({ length: n }, (_, i) => h('i', { class: i < on ? 'on' : '' })));
   }
 
+  const plural = (n, one, few, many) => { const m10 = n % 10; const m100 = n % 100; return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many; };
+  /** The club changes with the hour: greeting, a line of atmosphere and the light in the room. */
+  function timeOfDay() {
+    const hr = new Date().getHours();
+    const day = Math.floor(Date.now() / 86400000);
+    const pick = (arr) => arr[day % arr.length];
+    if (hr < 5) return { key: 'night', greet: 'Доброй ночи', line: pick(['Город спит, а в клубе горит одна лампа над столом.', 'Ночная смена: самые смелые ставки делаются после полуночи.', 'За окном тихо, слышно только, как перемешивают колоду.']) };
+    if (hr < 12) return { key: 'morning', greet: 'Доброе утро', line: pick(['Кофе сварен, сукно расчёсано, фишки пересчитаны.', 'Утренняя партия бодрит лучше эспрессо.', 'Крупье только пришёл и уже раскладывает колоды.']) };
+    if (hr < 18) return { key: 'day', greet: 'Добрый день', line: pick(['Дневной свет, спокойные столы — хорошее время подучиться.', 'Обеденный перерыв? Одна раздача точно успеет.', 'Днём в клубе неспешно: можно сыграть с ботами и размяться.']) };
+    return { key: 'evening', greet: 'Добрый вечер', line: pick(['Вечер — главное время клуба: свет приглушён, играет джаз.', 'Друзья собираются, бармен протирает бокалы.', 'Самое время позвать компанию и сесть за большой стол.']) };
+  }
+  function applyTimeOfDay() {
+    const key = timeOfDay().key;
+    document.body.classList.remove('tod-night', 'tod-morning', 'tod-day', 'tod-evening');
+    document.body.classList.add('tod-' + key);
+  }
+  applyTimeOfDay();
+  setInterval(applyTimeOfDay, 10 * 60 * 1000);
   const setCnt = (k, text) => $$(`[data-cnt="${k}"]`).forEach((el) => { el.textContent = text; });
   function renderLobby() {
     const tab = S.lobbyTab;
@@ -678,9 +764,12 @@
     setCnt('cap', `${S.cap.reduce((a, t) => a + t.players, 0)} за столами`);
     setCnt('mf', `${S.mf.reduce((a, t) => a + t.players, 0)} в городе`);
     if (S.me) {
-      const hr = new Date().getHours();
-      const part = hr < 5 ? 'Доброй ночи' : hr < 12 ? 'Доброе утро' : hr < 18 ? 'Добрый день' : 'Добрый вечер';
-      $('#lobby-greet').textContent = `${part}, ${S.me.name}`;
+      const tod = timeOfDay();
+      $('#lobby-greet').textContent = `${tod.greet}, ${S.me.name}`;
+      const sum = (list) => (list || []).reduce((acc, t) => acc + (t.players || 0), 0);
+      const busy = seatedCash + durakPlayers + sum(S.bj) + sum(S.rl) + sum(S.cap) + sum(S.mf) + sum(S.ck) + sum(S.ch);
+      const mood = $('#lobby-mood');
+      if (mood) mood.textContent = `${tod.line} ${busy ? `За столами сейчас ${busy} ${plural(busy, 'игрок', 'игрока', 'игроков')}.` : 'Столы свободны — самое время занять лучший.'}`;
     }
   }
 
@@ -949,7 +1038,7 @@
         h('span', { class: 'tcard-badge' + (o.badgeCls ? ' ' + o.badgeCls : '') }, o.badge),
         h('span', { class: 'tcard-kind' }, o.kind),
         o.status ? h('span', { class: 'status ' + o.status.cls }, o.status.text) : null),
-      h('h3', { class: 'tcard-title' }, o.title),
+      h('h2', { class: 'tcard-title' }, o.title),
       o.sub ? h('p', { class: 'tcard-sub' }, o.sub) : null,
       h('dl', { class: 'tcard-stats' }, o.stats.map(([k, v, title]) => h('div', title ? { title } : null, h('dt', null, k), h('dd', null, v)))),
       o.fill ? h('div', { class: 'tcard-fill' }, dotsEl, h('span', null, o.fill.label)) : null,
@@ -2036,7 +2125,22 @@
   requestAnimationFrame(tick);
 
   // shared helpers for durak.js
-  window.NR = { $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
+  /** Keyboard play on an 8×8 board: arrows move between squares, Enter or Space presses one. */
+  function boardKeys(board, cells) {
+    cells.forEach((c, i) => { c.tabIndex = i === 0 ? 0 : -1; });
+    board.onkeydown = (e) => {
+      const i = cells.indexOf(document.activeElement);
+      if (i < 0) return;
+      const d = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -8, ArrowDown: 8, Home: -(i % 8), End: 7 - (i % 8) }[e.key];
+      if (d != null) {
+        const j = i + d;
+        if (j < 0 || j > 63 || (Math.abs(d) === 1 && Math.floor(j / 8) !== Math.floor(i / 8))) return;
+        e.preventDefault();
+        cells[i].tabIndex = -1; cells[j].tabIndex = 0; cells[j].focus();
+      } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cells[i].click(); }
+    };
+  }
+  window.NR = { boardKeys, $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
 
   // ================= boot =================
   if (S.token) startApp(); else showAuth();

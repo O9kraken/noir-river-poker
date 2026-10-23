@@ -1,8 +1,10 @@
 'use strict';
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
+const compression = require('compression');
 const { Server } = require('socket.io');
 const { Table, GameError } = require('./engine/table');
 const { GAMES, gameOf } = require('./engine/games');
@@ -56,14 +58,40 @@ function createServer({
   app.set('trust proxy', tp === 'true' ? true : tp && !Number.isNaN(Number(tp)) ? Number(tp) : 'loopback');
   let avatarChangedHook = null;
   app.use(express.json({ limit: '10kb' }));
+  app.use(compression({ threshold: 1024 }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
-    res.set('Referrer-Policy', 'same-origin');
+    res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.set('X-Frame-Options', 'SAMEORIGIN');
+    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
     next();
   });
   const pub = path.join(__dirname, '..', 'public');
-  app.use(express.static(pub, { extensions: ['html'] }));
-  app.get('/play', (req, res) => res.sendFile(path.join(pub, 'play.html')));
+  // the site's public address for share previews and the sitemap: PUBLIC_URL, or whatever host the visitor used
+  const origin = (req) => (process.env.PUBLIC_URL || `${String(req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim()}://${req.get('host')}`).replace(/\/+$/, '');
+  // pages with share previews carry %ORIGIN% placeholders, filled in per request
+  const page = (file) => {
+    const html = fs.readFileSync(path.join(pub, file), 'utf8');
+    return (req, res) => { res.set('Cache-Control', 'no-cache'); res.type('html').send(html.replaceAll('%ORIGIN%', origin(req))); };
+  };
+  app.get(['/', '/index.html'], page('index.html'));
+  app.get(['/play', '/play.html'], page('play.html'));
+  app.get('/robots.txt', (req, res) => res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /avatar/\n\nSitemap: ${origin(req)}/sitemap.xml\n`));
+  app.get('/sitemap.xml', (req, res) => {
+    const day = new Date(STARTED_AT).toISOString().slice(0, 10);
+    const urls = [['/', '1.0'], ['/play', '0.8']].map(([u, pr]) => `  <url><loc>${origin(req)}${u}</loc><lastmod>${day}</lastmod><priority>${pr}</priority></url>`).join('\n');
+    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+  });
+  // art, fonts and icons rarely change: cache them for a month; pages, scripts and styles revalidate every time
+  app.use(express.static(pub, {
+    extensions: ['html'],
+    index: false,
+    setHeaders: (res, file) => {
+      const rel = path.relative(pub, file).replace(/\\/g, '/');
+      if (/^(art|fonts|brand)\//.test(rel) || /\.(ico|png|webp|woff2)$/.test(rel)) res.set('Cache-Control', 'public, max-age=2592000');
+      else res.set('Cache-Control', 'no-cache');
+    },
+  }));
   app.get('/admin', (req, res) => res.sendFile(path.join(pub, 'admin.html')));
 
   // --- simple per-IP rate limit for auth endpoints ---
@@ -125,6 +153,11 @@ function createServer({
     if (!u) return res.status(401).json({ error: 'unauthorized' });
     const p = store.profile(u.id);
     res.json({ name: p.name, balance: p.balance, inPlay: p.inPlay, avatar: p.avatar, role: p.role });
+  });
+  // everything else: a friendly 404 page (JSON for the API)
+  app.use((req, res) => {
+    if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'not found' });
+    res.status(404).sendFile(path.join(pub, '404.html'));
   });
   function authError(res, e) {
     if (e instanceof StoreError) return res.status(400).json({ error: e.message });

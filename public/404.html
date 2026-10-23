@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Страница не найдена — NOIR RIVER</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#070A09">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/fonts/landing-fonts.css">
+<style>
+  :root { --bg: #070A09; --ivory: #EFEAE0; --muted: #A8A99F; --gold: #D9B65E; --gold-2: #F0D48A; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; color: var(--ivory); font-family: 'Manrope', system-ui, sans-serif;
+    background: radial-gradient(900px 500px at 50% 0%, rgba(23, 97, 74, .35), transparent 70%), var(--bg); }
+  main { text-align: center; max-width: 520px; }
+  .cards { position: relative; height: 170px; margin: 0 auto 26px; width: 260px; }
+  .card { position: absolute; left: 50%; top: 10px; width: 104px; height: 146px; margin-left: -52px; border-radius: 12px; background: #FBF6EA; color: #1D1A14;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .5); display: grid; place-items: center; font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: 40px; }
+  .card small { position: absolute; left: 9px; top: 7px; font-size: 14px; line-height: 1; }
+  .card.r { color: #B0242F; }
+  .c1 { transform: translateX(-70px) rotate(-14deg); }
+  .c2 { transform: translateY(-8px); z-index: 1; }
+  .c3 { transform: translateX(70px) rotate(14deg); }
+  .script { font-family: 'Great Vibes', cursive; font-size: 34px; color: var(--gold-2); margin: 0; }
+  h1 { font-family: 'Unbounded', sans-serif; font-size: clamp(26px, 6vw, 40px); margin: 4px 0 10px; letter-spacing: -.01em; }
+  p { color: var(--muted); line-height: 1.6; margin: 0 0 24px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  a.btn { display: inline-flex; align-items: center; min-height: 48px; padding: 0 22px; border-radius: 999px; font-weight: 800; text-decoration: none; }
+  .gold { background: linear-gradient(180deg, var(--gold-2), var(--gold)); color: #1B1410; }
+  .ghost { border: 1px solid rgba(239, 234, 224, .25); color: var(--ivory); }
+  a.btn:focus-visible { outline: 2px solid var(--gold-2); outline-offset: 3px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .c1 { animation: f1 4s ease-in-out infinite; } .c3 { animation: f3 4s ease-in-out infinite; } .c2 { animation: f2 4s ease-in-out infinite; }
+    @keyframes f1 { 50% { transform: translateX(-76px) rotate(-18deg); } }
+    @keyframes f3 { 50% { transform: translateX(76px) rotate(18deg); } }
+    @keyframes f2 { 50% { transform: translateY(-14px); } }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="cards" aria-hidden="true">
+    <div class="card c1"><small>4♠</small>4</div>
+    <div class="card r c2"><small>0♥</small>0</div>
+    <div class="card c3"><small>4♣</small>4</div>
+  </div>
+  <p class="script">Неудачная раздача</p>
+  <h1>Такой страницы нет</h1>
+  <p>Похоже, эта карта выпала из колоды. Ссылка устарела или в адресе опечатка — но столы клуба на месте.</p>
+  <div class="row">
+    <a class="btn gold" href="/play">В лобби клуба</a>
+    <a class="btn ghost" href="/">На главную</a>
+  </div>
+</main>
+</body>
+</html>

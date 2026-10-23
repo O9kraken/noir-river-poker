@@ -91,7 +91,7 @@ test('Капитал: боты доигрывают партию, банк ух�
   g.turn = g.players.indexOf(A);
   g.cells[1].owner = 0;
   assert.equal(t.rentOf(1), 4);
-  assert.throws(() => t.build('a', 1), /весь квартал/);
+  assert.throws(() => t.build('a', 1), /всю отрасль/);
   g.cells[3].owner = 0;
   assert.equal(t.rentOf(1), 8);
   t.build('a', 1);
@@ -101,7 +101,7 @@ test('Капитал: боты доигрывают партию, банк ух�
   assert.equal(t.rentOf(1), 20);
   // a trade swaps streets and money
   g.cells[39].owner = 1;
-  assert.throws(() => t.offerTrade('a', { to: 1, give: { cells: [1] }, get: { cells: [39] } }), /продайте дома/);
+  assert.throws(() => t.offerTrade('a', { to: 1, give: { cells: [1] }, get: { cells: [39] } }), /закройте филиалы/);
   t.sell('a', 1); t.sell('a', 3);
   t.offerTrade('a', { to: 1, give: { cells: [1], cash: 100 }, get: { cells: [39] } });
   t.answerTrade('b', true);

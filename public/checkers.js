@@ -54,7 +54,7 @@
     for (let i = 0; i < 64; i++) {
       const sq = C.flipped ? 63 - i : i;
       const dark = (Math.floor(sq / 8) + (sq % 8)) % 2 === 1;
-      const cell = h('div', { class: 'ck-sq ' + (dark ? 'dark' : 'light'), 'data-sq': sq, role: 'gridcell', 'aria-label': sqName(sq) });
+      const cell = h('div', { class: 'ck-sq ' + (dark ? 'dark' : 'light'), 'data-sq': sq, role: 'button', 'aria-label': sqName(sq) });
       if (dark) cell.addEventListener('click', () => clickSquare(sq));
       const r = Math.floor(i / 8); const c = i % 8;
       if (c === 0) cell.append(h('span', { class: 'ck-coord row' }, 8 - Math.floor(sq / 8)));
@@ -63,6 +63,7 @@
       cells.push(cell);
     }
     board.replaceChildren(...cells, h('div', { class: 'ck-layer', id: 'ck-layer' }));
+    NR.boardKeys(board, cells);
   }
 
   const candidates = () => (C.st ? C.st.legal.filter((p) => C.sel.every((x, i) => p[i] === x)) : []);
@@ -254,7 +255,7 @@
   function effects() {
     const st = C.st; const prev = C.prev;
     if (!prev) return;
-    if (st.moves.length > prev.moves.length && st.lastMove) Sound.play(st.lastMove.captures.length ? 'chips' : 'card');
+    if (st.moves.length > prev.moves.length && st.lastMove) Sound.play(st.lastMove.captures.length ? 'capture' : 'move');
     if (prev.status !== 'playing' && st.status === 'playing') Sound.play('deal');
     if (st.myColor && st.turn === st.myColor && prev.turn !== st.myColor && st.status === 'playing') Sound.play('turn', 0.15);
     if (prev.status === 'playing' && st.status === 'result' && st.result && st.myColor) Sound.play(st.result.winner === st.myColor ? 'bigwin' : st.result.winner ? 'fold' : 'check', 0.1);

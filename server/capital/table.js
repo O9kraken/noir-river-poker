@@ -411,17 +411,17 @@ class CapitalTable {
     const cell = CELLS[cellIdx];
     if (!cell || cell.kind !== 'street') throw new GameError('Здесь строить нельзя');
     const st = g.cells[cellIdx];
-    if (st.owner !== p.seat) throw new GameError('Это не ваша улица');
-    if (!this._hasSet(p.seat, cell.group)) throw new GameError('Сначала соберите весь квартал');
+    if (st.owner !== p.seat) throw new GameError('Это не ваша компания');
+    if (!this._hasSet(p.seat, cell.group)) throw new GameError('Сначала соберите всю отрасль');
     const group = this._groupCells(cell.group);
-    if (group.some((i) => g.cells[i].mortgaged)) throw new GameError('В квартале есть заложенные улицы');
-    if (st.houses >= 5) throw new GameError('Здесь уже отель');
-    if (group.some((i) => g.cells[i].houses < st.houses)) throw new GameError('Стройте равномерно по всему кварталу');
+    if (group.some((i) => g.cells[i].mortgaged)) throw new GameError('В отрасли есть заложенные компании');
+    if (st.houses >= 5) throw new GameError('Здесь уже флагман');
+    if (group.some((i) => g.cells[i].houses < st.houses)) throw new GameError('Открывайте филиалы равномерно по всей отрасли');
     const cost = GROUPS[cell.group].house;
     if (p.cash < cost) throw new GameError('Не хватает денег');
     p.cash -= cost;
     st.houses += 1;
-    this._log(`${p.name} строит ${st.houses === 5 ? 'отель' : 'дом'} на «${cell.name}»`);
+    this._log(`${p.name} открывает ${st.houses === 5 ? 'флагман' : 'филиал'} в «${cell.name}»`);
     this._update();
   }
 
@@ -435,7 +435,7 @@ class CapitalTable {
     if (group.some((i) => g.cells[i].houses > st.houses)) throw new GameError('Продавайте равномерно');
     st.houses -= 1;
     p.cash += GROUPS[cell.group].house / 2;
-    this._log(`${p.name} продаёт дом на «${cell.name}»`);
+    this._log(`${p.name} закрывает филиал в «${cell.name}»`);
     this._update();
   }
 
@@ -452,7 +452,7 @@ class CapitalTable {
       st.mortgaged = false;
       this._log(`${p.name} выкупает «${cell.name}» за ${cost}`);
     } else {
-      if (cell.group && this._groupCells(cell.group).some((i) => g.cells[i].houses)) throw new GameError('Сначала продайте дома в квартале');
+      if (cell.group && this._groupCells(cell.group).some((i) => g.cells[i].houses)) throw new GameError('Сначала закройте филиалы в отрасли');
       st.mortgaged = true;
       p.cash += cell.price / 2;
       this._log(`${p.name} закладывает «${cell.name}» и получает ${cell.price / 2}`);
@@ -498,7 +498,7 @@ class CapitalTable {
       for (const i of cells) {
         if (g.cells[i].owner !== owner.seat) throw new GameError('Можно обменивать только свою собственность');
         const c = CELLS[i];
-        if (c.group && this._groupCells(c.group).some((j) => g.cells[j].houses)) throw new GameError(`Сначала продайте дома в квартале «${GROUPS[c.group].name}»`);
+        if (c.group && this._groupCells(c.group).some((j) => g.cells[j].houses)) throw new GameError(`Сначала закройте филиалы в отрасли «${GROUPS[c.group].name}»`);
       }
       const cash = Math.max(0, Math.floor(Number(side && side.cash) || 0));
       if (cash > owner.cash) throw new GameError(`У ${owner === p ? 'вас' : owner.name} нет ${cash}`);
@@ -506,7 +506,7 @@ class CapitalTable {
     };
     const give = clean(offer.give, p);
     const get = clean(offer.get, to);
-    if (!give.cells.length && !get.cells.length) throw new GameError('В обмене должна быть хотя бы одна улица');
+    if (!give.cells.length && !get.cells.length) throw new GameError('В обмене должна быть хотя бы одна компания');
     g.trade = { from: p.seat, to: to.seat, give, get };
     this._log(`${p.name} предлагает обмен игроку ${to.name}`);
     this._arm();
