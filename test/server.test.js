@@ -570,6 +570,9 @@ test('задания дня, награды за достижения, своя 
   srv.store.recordGame(uid, 'sng', { table: 's', place: 1, total: 2, prize: 100, buyIn: 50 });
   for (let i = 0; i < 10; i++) srv.store.recordGame(uid, 'roulette', { table: 'r', net: 10, number: 5 });
   srv.store.recordGame(uid, 'checkers', { table: 'c', net: 100, win: true });
+  srv.store.recordGame(uid, 'chess', { table: 'ch', net: 100, win: true });
+  srv.store.recordGame(uid, 'capital', { table: 'cap', net: 100, win: true });
+  srv.store.recordGame(uid, 'mafia', { table: 'mf', net: 100, win: true });
   pr = await call('progress:get', {});
   assert.ok(pr.quests.every((q) => q.done));
   const before = srv.store.get(uid).balance;
