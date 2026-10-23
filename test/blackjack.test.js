@@ -154,3 +154,38 @@ test('стол блэкджека: ставки, лимиты, видимост�
   }
   assert.equal(st.seats[1].hands[0].cards.length, 2);
 });
+
+test('блэкджек на плохой связи: часы идут с момента, когда раздача на экране; обрыв связи — пауза, а не «хватит»', () => {
+  let now = 1000;
+  const pending = new Map(); let id = 0;
+  const timers = { set(fn, ms) { const k = ++id; pending.set(k, { fn, at: now + ms }); return k; }, clear(k) { pending.delete(k); } };
+  let seed = 11;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const advance = (ms) => { now += ms; for (const [k, e] of [...pending]) if (e.at <= now && pending.has(k)) { pending.delete(k); e.fn(); } };
+  const t = new BlackjackTable({ id: 'b', name: 'B', minBet: 10, maxBet: 1000 }, {}, { timers, now: () => now, actionTime: 20000, seenGrace: 8000, pauseMs: 45000, bettingTime: 1000, resultPause: 1000, randomInt: (n) => Math.floor(rnd() * n) });
+  t.sit('a', 'A', 0);
+  // deal until the player has a decision to make (a natural or a dealer blackjack ends the round at once)
+  for (let k = 0; k < 20 && !(t.status === 'playing' && t.publicState('a').you.turn); k++) {
+    if (t.status === 'betting' && !t._bet) t.bet('a', 50);
+    advance(1000);
+  }
+  assert.equal(t.status, 'playing', 'раздача идёт');
+  const key = t.publicState('a').you.turn.key;
+  assert.ok(key);
+  assert.equal(t.publicState('a').deadlineIn, 20000, 'до подтверждения показываем полное время');
+  // the deal reaches the player 6 s late: they still get the full 20 s from then
+  advance(6000);
+  t.seen('a', key);
+  advance(19000);
+  assert.equal(t.status, 'playing', 'время не съедено задержкой');
+  // the connection drops on their turn: the table waits instead of standing at once
+  t.setConnected('a', false);
+  advance(30000);
+  assert.equal(t.status, 'playing', 'пауза ждёт игрока');
+  assert.ok(t.publicState('a').waiting);
+  t.setConnected('a', true);
+  assert.equal(t.publicState('a').waiting, null);
+  advance(29000); // the full time again plus the delivery grace, then the timeout stands
+  assert.notEqual(t.status, 'playing');
+  t.destroy();
+});

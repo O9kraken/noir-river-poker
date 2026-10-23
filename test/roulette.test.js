@@ -40,7 +40,7 @@ test('рулетка: колесо европейское, выплаты по �
 test('рулетка: таймер со первой фишки, спин, выплаты, повтор ставок', () => {
   const ft = fakeTimers(); const w = wallet();
   const ends = [];
-  const t = new RouletteTable({ id: 'r', name: 'R', minBet: 10, maxBet: 1000 }, { ...w.deps, onRoundEnd: (tt, r) => ends.push(r) }, { timers: ft.timers, now: ft.now, randomInt: () => 17, bettingTime: 10000, spinTime: 5000, resultPause: 3000 });
+  const t = new RouletteTable({ id: 'r', name: 'R', minBet: 10, maxBet: 1000 }, { ...w.deps, onRoundEnd: (tt, r) => ends.push(r) }, { timers: ft.timers, now: ft.now, randomInt: () => 17, bettingTime: 10000, lateMs: 0, spinTime: 5000, resultPause: 3000 });
   t.sit('a', 'Аня', 0); t.sit('b', 'Боря', 1);
   assert.equal(t.publicState('a').bettingIn, 0, 'без ставок таймер не идёт');
   assert.throws(() => t.bet('a', 'n17', 5), /Минимальная/);

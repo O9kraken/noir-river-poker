@@ -33,3 +33,28 @@ test('лавка: покупка, надевание, рамка видна на
   assert.throws(() => store.buy(id, 'title-legend'), /Не хватает/);
   assert.throws(() => store.buy(id, 'nope'), /нет/);
 });
+
+test('резервная копия: скачать и восстановить через админку; не админу нельзя', async (t) => {
+  const { createServer } = require('../server');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nr-'));
+  const srv = createServer({ dataFile: path.join(dir, 'u.json'), adminNames: ['Хранитель'] });
+  await new Promise((r) => srv.server.listen(0, r));
+  t.after(() => srv.shutdown());
+  const base = `http://localhost:${srv.server.address().port}`;
+  const reg = (name) => fetch(base + '/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, password: 'secret1' }) }).then((r) => r.json());
+  const admin = await reg('Хранитель');
+  const player = await reg('Игрок');
+  assert.equal((await fetch(base + '/api/admin/backup', { headers: { Authorization: `Bearer ${player.token}` } })).status, 403);
+  const copy = await fetch(base + '/api/admin/backup', { headers: { Authorization: `Bearer ${admin.token}` } }).then((r) => r.json());
+  assert.equal(copy.format, 'noir-river-backup');
+  assert.equal(Object.keys(copy.data.users).length, 2);
+  assert.equal(copy.data.sessions, undefined, 'сессий в копии нет');
+  // the player wins chips after the backup; the restore puts the old balance back
+  srv.store.deposit(player.user.id, 777);
+  const res = await fetch(base + '/api/admin/restore', { method: 'POST', headers: { Authorization: `Bearer ${admin.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(copy) }).then((r) => r.json());
+  assert.equal(res.users, 2);
+  assert.equal(srv.store.get(player.user.id).balance, copy.data.users[player.user.id].balance);
+  assert.ok(srv.store.userByToken(admin.token), 'сессия админа осталась');
+  const bad = await fetch(base + '/api/admin/restore', { method: 'POST', headers: { Authorization: `Bearer ${admin.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ hello: 1 }) });
+  assert.equal(bad.status, 400);
+});
