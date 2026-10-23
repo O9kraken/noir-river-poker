@@ -17,6 +17,7 @@ const { CheckersTable } = require('./checkers/table');
 const { ChessTable } = require('./chess/table');
 const { CapitalTable } = require('./capital/table');
 const { MafiaTable } = require('./mafia/table');
+const { createVoice } = require('./voice');
 const { BotDriver, makeBots, isBot, LEVELS: BOT_LEVELS, LEVEL_NAMES } = require('./bots');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -63,7 +64,7 @@ function createServer({
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.set('X-Frame-Options', 'SAMEORIGIN');
-    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    res.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(), payment=()');
     next();
   });
   const pub = path.join(__dirname, '..', 'public');
@@ -651,6 +652,12 @@ function createServer({
   const KIND_OF = (t) => (t.kind === 'durak' || t.kind === 'bj' || extra[t.kind] ? t.kind : 'poker');
   const HREF_OF = (t) => (KIND_OF(t) === 'poker' ? `#/table/${t.id}` : `#/${t.kind}/${t.id}`);
   const allTables = () => [...tables.values(), ...durakTables.values(), ...bjTables.values(), ...extraTables()];
+  const findTable = (kind, id) => (kind === 'table' ? tables.get(id) : kind === 'durak' ? durakTables.get(id) : kind === 'bj' ? bjTables.get(id) : extra[kind] ? extra[kind].map.get(id) : null) || null;
+  const voice = createVoice(io, {
+    findTable,
+    nameOf: (uid) => (store.brief(uid) || { name: '?' }).name,
+    avatarOf: (uid) => (store.brief(uid) || {}).avatar || null,
+  });
 
   /** Private tables a player may see in the lobby: own, friends', or where they sit. */
   function privateList(uid) {
@@ -861,6 +868,8 @@ function createServer({
         }
       });
     };
+
+    voice.attach(socket, on, GameError);
 
     on('hello', () => ({
       me: store.profile(userId),
@@ -1699,6 +1708,7 @@ function createServer({
 
   function shutdown() {
     clearInterval(cleanup);
+    voice.stop();
     for (const t of allTables()) if (t.bots) t.bots.stop();
     for (const x of sngs.values()) x.shutdown();
     for (const t of tables.values()) t.destroy();

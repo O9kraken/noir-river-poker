@@ -36,7 +36,12 @@
       document.addEventListener('visibilitychange', () => (document.hidden ? this.stop() : this.start()));
       Sound.renderBtn();
     },
-    level() { return this.vol * 1.1; },
+    level() { return this.vol * 1.1 * (this.ducked ? 0.3 : 1); },
+    /** Quieter while people talk in the voice chat. */
+    duck(on) {
+      this.ducked = !!on;
+      if (this.bus && this.playing) this.bus.gain.setTargetAtTime(this.level(), Sound.ctx.currentTime, 0.5);
+    },
     start(first) {
       if (!this.on || this.playing || document.hidden) return;
       if (!first && !Sound.ctx) return; // wait for the first tap: browsers block sound before it

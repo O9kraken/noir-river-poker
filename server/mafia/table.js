@@ -56,6 +56,26 @@ class MafiaTable {
   }
 
   seatOf(userId) { return this.seats.findIndex((s) => s && s.userId === userId); }
+
+  /**
+   * Who may speak and whom one may hear in the voice chat, by the rules of the game:
+   * at night only the mafia talk among themselves; by day the living talk and the fallen only listen.
+   * hear: null = everyone, otherwise the list of userIds whose voice is played.
+   */
+  voicePolicy(userId) {
+    const g = this.g;
+    if (!g || this.status !== 'playing') return { speak: true, hear: null, note: '' };
+    const p = g.players.find((x) => x.userId === userId);
+    const alive = g.players.filter((x) => x.alive);
+    if (g.phase === 'night') {
+      const fam = alive.filter((x) => MAFIA.has(x.role)).map((x) => x.userId);
+      if (p && p.alive && MAFIA.has(p.role)) return { speak: true, hear: fam, note: 'Ночь: вас слышит только мафия' };
+      return { speak: false, hear: [], note: 'Ночь: город спит, голос выключен' };
+    }
+    const living = alive.map((x) => x.userId);
+    if (!p || !p.alive) return { speak: false, hear: living, note: 'Вы выбыли: только слушаете' };
+    return { speak: true, hear: living, note: '' };
+  }
   playerCount() { return this.seats.filter(Boolean).length; }
   freeSeat() { return this.seats.findIndex((s) => !s); }
   _update() { this.lastActivity = this.now(); (this.deps.onUpdate || (() => {}))(this); }
