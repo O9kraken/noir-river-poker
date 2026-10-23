@@ -1,0 +1,223 @@
+'use strict';
+/**
+ * «Без тормозов» — a black-humour party game for 3–10 adults.
+ * Each round one player is the host: they read a prompt with a gap, the others secretly put in their
+ * funniest (or worst) answer, and the host picks the winner without knowing whose it is.
+ * Every player also has one blank card to write anything they like.
+ */
+const { GameError, shuffle } = require('./base');
+const { PROMPTS, ANSWERS, gaps } = require('./dark-cards');
+
+const HAND = 10;
+
+class DarkGame {
+  static get meta() { return { id: 'dark', title: 'Без тормозов', min: 3, max: 10 }; }
+  static options(o) { return { goal: [5, 7, 10].includes(Number(o.goal)) ? Number(o.goal) : 7 }; }
+
+  constructor(host, players, options) {
+    this.host = host;
+    this.rng = host.rng;
+    this.goal = options.goal;
+    this.seq = 0;
+    this.ev = null;
+    this.order = players.map((p) => p.seat);
+    this.score = new Map(this.order.map((s) => [s, 0]));
+    let id = 0;
+    this.answers = shuffle(ANSWERS.map((t) => ({ id: ++id, t })), this.rng);
+    this.used = [];
+    this.prompts = shuffle(PROMPTS.slice(), this.rng);
+    this.hands = new Map(this.order.map((s) => [s, []]));
+    this.blank = new Map(this.order.map((s) => [s, 1]));
+    for (const s of this.order) this._refill(s);
+    this.judge = this.order[Math.floor(this.rng() * this.order.length)];
+    this.round = 0;
+    this.history = [];
+    host.sys(`Играем до ${this.goal} очков. У каждого есть одна пустая карта — впишите что угодно. 18+.`);
+    this._newRound();
+  }
+
+  _event(type, by, text, extra = {}) { this.seq += 1; this.ev = { seq: this.seq, type, by, text, ...extra }; if (text) this.host.addLog(text); }
+  _n(s) { return this.host.nameOf(s); }
+  _draw() {
+    if (!this.answers.length) { this.answers = shuffle(this.used, this.rng); this.used = []; }
+    return this.answers.shift() || null;
+  }
+  _refill(seat) { const h = this.hands.get(seat); while (h.length < HAND) { const c = this._draw(); if (!c) break; h.push(c); } }
+
+  _newRound() {
+    this.round += 1;
+    if (!this.prompts.length) this.prompts = shuffle(PROMPTS.slice(), this.rng);
+    this.prompt = this.prompts.shift();
+    this.pick = Math.max(1, gaps(this.prompt));
+    this.subs = new Map(); // seat -> [{ id, t, blank }]
+    this.reveal = null;
+    this.phase = 'answer';
+    this.host.stopTurn();
+    this.host.timer('answer', 75000, () => this._toJudge());
+    this._event('round', this.judge, `Раунд ${this.round}. Ведущий — ${this._n(this.judge)}`);
+  }
+
+  _players() { return this.order.filter((s) => s !== this.judge); }
+
+  act(seat, type, p) {
+    if (type === 'answer') return this._answer(seat, p);
+    if (type === 'take') return this._take(seat);
+    if (type === 'choose') return this._choose(seat, Number(p.i));
+    if (type === 'swap') return this._swap(seat);
+    throw new GameError('Неизвестный ход');
+  }
+
+  _answer(seat, p) {
+    if (this.phase !== 'answer') throw new GameError('Ответы уже собраны');
+    if (seat === this.judge) throw new GameError('Ведущий не отвечает');
+    if (this.subs.has(seat)) throw new GameError('Вы уже ответили');
+    const ids = Array.isArray(p.cards) ? p.cards : [];
+    if (ids.length !== this.pick) throw new GameError(this.pick === 2 ? 'Нужно два ответа — по порядку' : 'Выберите ответ');
+    const h = this.hands.get(seat);
+    const out = [];
+    let blanks = 0;
+    for (const x of ids) {
+      if (x === 'blank') {
+        const text = String((p.text || '')).replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (!text) throw new GameError('Напишите свой ответ');
+        blanks += 1;
+        out.push({ id: 0, t: text, blank: true });
+      } else {
+        const c = h.find((y) => y.id === Number(x));
+        if (!c || out.includes(c)) throw new GameError('Нет такой карты');
+        out.push(c);
+      }
+    }
+    if (blanks > 1 || blanks > this.blank.get(seat)) throw new GameError('Пустая карта у вас одна');
+    for (const c of out) if (!c.blank) h.splice(h.indexOf(c), 1);
+    if (blanks) this.blank.set(seat, this.blank.get(seat) - 1);
+    this.subs.set(seat, out);
+    this._event('answered', seat, null);
+    if (this._players().every((s) => this.subs.has(s))) this._toJudge();
+  }
+
+  _toJudge() {
+    this.host.clear('answer');
+    if (!this.subs.size) {
+      this.host.sys('Никто не ответил — следующий раунд');
+      this._nextJudge();
+      return;
+    }
+    this.phase = 'judge';
+    this.reveal = shuffle([...this.subs.entries()].map(([seat, cards]) => ({ seat, cards })), this.rng);
+    this.host.turn(this.judge, 60000, () => this._choose(this.judge, Math.floor(this.rng() * this.reveal.length), true));
+    this._event('judge', this.judge, `${this._n(this.judge)} читает ответы…`);
+  }
+
+  _choose(seat, i, auto = false) {
+    if (this.phase !== 'judge') throw new GameError('Ещё рано выбирать');
+    if (seat !== this.judge) throw new GameError('Выбирает ведущий');
+    const r = this.reveal[i];
+    if (!r) throw new GameError('Нет такого ответа');
+    this.host.stopTurn();
+    const sc = this.score.get(r.seat) + 1;
+    this.score.set(r.seat, sc);
+    this.winner = r.seat;
+    this.phase = 'show';
+    const filled = this.fill(this.prompt, r.cards.map((c) => c.t));
+    this.history.unshift({ prompt: this.prompt, filled, seat: r.seat, name: this._n(r.seat), judge: this.judge });
+    if (this.history.length > 8) this.history.length = 8;
+    this._event('won', r.seat, `${auto ? 'Ведущий задумался — выбрано наугад. ' : ''}Очко получает ${this._n(r.seat)}: «${filled}»`, { i });
+    for (const [s, cards] of this.subs) for (const c of cards) if (!c.blank) this.used.push(c);
+    if (sc >= this.goal) {
+      this.phase = 'over';
+      this.host.finish({ winners: [r.seat], text: `${this._n(r.seat)} набирает ${sc} очков и побеждает. Стыдно должно быть всем.`, scores: Object.fromEntries(this.score) });
+      return;
+    }
+    this.host.timer('show', 7000, () => this._nextJudge());
+  }
+
+  _nextJudge() {
+    for (const s of this.order) this._refill(s);
+    const i = this.order.indexOf(this.judge);
+    this.judge = this.order[(i + 1) % this.order.length];
+    this._newRound();
+  }
+
+  /** Swap the whole hand for a fresh one, once per game, at the cost of a point. */
+  _swap(seat) {
+    if (this.phase !== 'answer' || seat === this.judge || this.subs.has(seat)) throw new GameError('Сейчас нельзя');
+    if (this.swapped && this.swapped.has(seat)) throw new GameError('Карты меняют один раз за партию');
+    if (this.score.get(seat) < 1) throw new GameError('Нужно хотя бы одно очко');
+    (this.swapped ||= new Set()).add(seat);
+    this.score.set(seat, this.score.get(seat) - 1);
+    const h = this.hands.get(seat);
+    this.used.push(...h.splice(0));
+    this._refill(seat);
+    this._event('swap', seat, `${this._n(seat)} меняет все карты за одно очко`);
+  }
+  _take() { throw new GameError('Неизвестный ход'); }
+
+  fill(prompt, texts) {
+    let k = 0;
+    const lc = (t, first) => (first ? t : t.charAt(0).toLowerCase() + t.slice(1));
+    let out = prompt.replace(/____/g, (m, off) => { const t = texts[k++] || '…'; return lc(t, off === 0 || /[.?!]\s*$/.test(prompt.slice(0, off))); });
+    out = out.replace(/\.\.$/, '.');
+    return out;
+  }
+
+  leave(seat) {
+    this.order = this.order.filter((s) => s !== seat);
+    this.subs && this.subs.delete(seat);
+    if (this.order.length < 2) {
+      const [w] = this.order;
+      this.phase = 'over';
+      this.host.finish({ winners: w != null ? [w] : [], text: 'Все разбежались от стыда', scores: Object.fromEntries(this.score) });
+      return;
+    }
+    if (seat === this.judge) {
+      this.host.sys('Ведущий сбежал — раунд переигрываем');
+      for (const [, cards] of this.subs || []) for (const c of cards) if (!c.blank) this.used.push(c);
+      this.host.clear('answer'); this.host.clear('show'); this.host.stopTurn();
+      this.judge = this.order[0];
+      this._newRound();
+      return;
+    }
+    if (this.phase === 'judge') this.reveal = this.reveal.filter((r) => r.seat !== seat);
+    if (this.phase === 'judge' && !this.reveal.length) { this._nextJudge(); return; }
+    if (this.phase === 'answer' && this._players().every((s) => this.subs.has(s))) this._toJudge();
+  }
+
+  view(seat, over) {
+    const showNames = this.phase === 'show' || this.phase === 'over' || over;
+    return {
+      type: 'dark',
+      goal: this.goal, round: this.round, phase: this.phase,
+      order: this.order, judge: this.judge,
+      players: this.order.map((s) => ({ seat: s, name: this._n(s), score: this.score.get(s), answered: this.subs.has(s) })),
+      prompt: this.prompt, pick: this.pick,
+      hand: seat >= 0 && this.hands.has(seat) ? this.hands.get(seat).map((c) => ({ id: c.id, t: c.t })) : null,
+      blank: seat >= 0 ? this.blank.get(seat) || 0 : 0,
+      mine: seat >= 0 && this.subs.has(seat) ? this.subs.get(seat).map((c) => c.t) : null,
+      reveal: this.reveal ? this.reveal.map((r) => ({ texts: r.cards.map((c) => c.t), blank: r.cards.some((c) => c.blank), seat: showNames ? r.seat : null })) : null,
+      winner: showNames ? this.winner : null,
+      answerLeft: this.host.timerLeft('answer'),
+      canSwap: seat >= 0 && !(this.swapped && this.swapped.has(seat)) && (this.score.get(seat) || 0) >= 1,
+      history: this.history,
+      ev: this.ev,
+    };
+  }
+
+  // ---------- computer players ----------
+  botDelay(seat) {
+    if (this.phase === 'answer' && seat !== this.judge && !this.subs.has(seat)) return 1500 + (seat % 4) * 400;
+    if (this.phase === 'judge' && seat === this.judge) return 3500;
+    return null;
+  }
+  botAct(seat, level, rng) {
+    if (this.phase === 'answer') {
+      const h = this.hands.get(seat);
+      const pick = shuffle(h.slice(), () => rng()).slice(0, this.pick).map((c) => c.id);
+      this._answer(seat, { cards: pick });
+      return;
+    }
+    if (this.phase === 'judge') this._choose(seat, Math.floor(rng() * this.reveal.length));
+  }
+}
+
+module.exports = { DarkGame };

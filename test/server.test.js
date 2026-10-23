@@ -574,6 +574,7 @@ test('задания дня, награды за достижения, своя 
   srv.store.recordGame(uid, 'capital', { table: 'cap', net: 100, win: true });
   srv.store.recordGame(uid, 'mafia', { table: 'mf', net: 100, win: true });
   srv.store.recordGame(uid, 'nardy', { table: 'bg', net: 100, win: true });
+  srv.store.recordGame(uid, 'party', { table: 'pt', net: 100, win: true, game: 'bomb', title: 'Котобомба' });
   pr = await call('progress:get', {});
   assert.ok(pr.quests.every((q) => q.done));
   const before = srv.store.get(uid).balance;

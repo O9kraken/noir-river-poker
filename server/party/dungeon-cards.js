@@ -1,0 +1,110 @@
+'use strict';
+/**
+ * The deck of «Подземелье»: everything here is made up for NOIR RIVER.
+ * Doors: monsters, curses, classes, monster boosts, a wandering monster.
+ * Treasures: gear, one-shot tricks, levels.
+ *
+ * bad: what a lost fight costs — lvl1 | lvl2 | lvl3 | head | body | feet | hand | item | cards2 | death
+ */
+const MONSTERS = [
+  ['m1', 1, 'Таракан-долгожитель', 'Пережил три ремонта и одну дезинсекцию.', 'cards2', 1, 1],
+  ['m2', 1, 'Плесень в кружке', 'Ты сам её вырастил. Она тебя помнит.', 'lvl1', 1, 1],
+  ['m3', 2, 'Сосед с перфоратором', 'Суббота, 8:00. Он готов.', 'head', 1, 1],
+  ['m4', 2, 'Голубь-рецидивист', 'Отбирает шаурму и самооценку.', 'cards2', 1, 1],
+  ['m5', 3, 'Бабка у подъезда', 'Знает о тебе всё. Даже то, чего ты ещё не сделал.', 'lvl1', 1, 1],
+  ['m6', 3, 'Курьер, который «уже подъезжает»', 'Подъезжает с прошлого вторника.', 'feet', 1, 1],
+  ['m7', 4, 'Скелет из шкафа', 'Твой. Ты думал, никто не узнает.', 'body', 2, 1, 'undead'],
+  ['m8', 4, 'Кредитный менеджер', 'Звонит с незнакомых номеров. Всегда.', 'item', 2, 1],
+  ['m9', 5, 'Зомби-офисник', 'Умер на планёрке в 2019-м. Ходит на работу до сих пор.', 'lvl1', 2, 1, 'undead'],
+  ['m10', 5, 'Чат родительского комитета', '348 непрочитанных. Скинуться надо до вечера.', 'cards2', 2, 1],
+  ['m11', 6, 'Призрак бывшей', 'Лайкает фото трёхлетней давности. Ночью.', 'head', 2, 1, 'undead'],
+  ['m12', 6, 'Вахтёр Подземелья', '«Не положено». Аргументы не принимаются.', 'lvl2', 2, 1],
+  ['m13', 7, 'Тёща-некромант', 'Поднимает мёртвых и старые обиды.', 'lvl2', 2, 1, 'undead'],
+  ['m14', 7, 'Гопник в спортивках', '«Есть чё?» — и у тебя уже ничего нет.', 'hand', 2, 1],
+  ['m15', 8, 'Коллектор Безысходности', 'Знает, где ты живёшь, и где жил раньше.', 'item', 2, 1],
+  ['m16', 8, 'Вампир-энергетик', 'Пьёт не кровь, а силы. Говорит про криптовалюту.', 'lvl2', 2, 1, 'undead'],
+  ['m17', 9, 'Мимик-ипотека', 'Притворялся сундуком. Теперь ты должен ему 30 лет.', 'body', 3, 1],
+  ['m18', 9, 'Гробовщик-оптимист', 'Снимает мерку заранее. На всякий случай.', 'lvl2', 3, 1, 'undead'],
+  ['m19', 10, 'Начальник в пятницу вечером', '«Есть одна маленькая задачка».', 'lvl2', 3, 1],
+  ['m20', 10, 'Лич из бухгалтерии', 'Бессмертен, пока не закрыт квартал.', 'lvl3', 3, 1, 'undead'],
+  ['m21', 11, 'Маршрутка-оборотень', 'В полнолуние едет без остановок до конечной.', 'feet', 3, 1],
+  ['m22', 12, 'Налоговый голем', 'Собран из твоих неподанных деклараций.', 'lvl3', 3, 1],
+  ['m23', 12, 'Мумия пенсионного фонда', 'Ждёт тебя. Терпеливо. Лет сорок.', 'item', 3, 1, 'undead'],
+  ['m24', 13, 'Кот, сбросивший всё со стола', 'Смотрит тебе в глаза. Твой ноутбук — следующий.', 'hand', 3, 1],
+  ['m25', 14, 'Древний сисадмин', 'Перезагружает реальность. Без сохранения.', 'death', 4, 2],
+  ['m26', 14, 'Хтонь из-под ванны', 'Растёт с тех пор, как ты перестал смотреть.', 'lvl3', 4, 2],
+  ['m27', 16, 'Комиссия по проверке', 'Пятеро в одинаковых пиджаках. Документы не в порядке.', 'death', 4, 2],
+  ['m28', 16, 'Повелитель Пробок', 'Ты опоздал. Навсегда.', 'death', 4, 2],
+  ['m29', 18, 'Главбух Тьмы', 'Сводит дебет с кредитом и тебя — в могилу.', 'death', 5, 2, 'undead'],
+  ['m30', 20, 'Дракон в ипотеке', 'Злой, как всякий, кто платит 40% от дохода.', 'death', 5, 2],
+].map(([k, level, name, text, bad, treasures, levels, tag]) => ({ k, type: 'monster', deck: 'door', level, name, text, bad, treasures, levels, undead: tag === 'undead' }));
+
+const DOORS = [
+  ...MONSTERS,
+  { k: 'cls-brute', type: 'class', deck: 'door', cls: 'brute', name: 'Громила', text: '+1 в любом бою. Разговаривает кулаками.', copies: 2 },
+  { k: 'cls-thief', type: 'class', deck: 'door', cls: 'thief', name: 'Ловкач', text: '+1 к побегу. Ловко уходит от ответственности.', copies: 2 },
+  { k: 'cls-mage', type: 'class', deck: 'door', cls: 'mage', name: 'Колдун', text: 'В своём бою сбросьте до 3 карт с руки: +1 за каждую.', copies: 2 },
+  { k: 'cls-healer', type: 'class', deck: 'door', cls: 'healer', name: 'Знахарь', text: '+3 против нежити. Лечит подорожником и заговорами.', copies: 2 },
+  { k: 'mod-big', type: 'mod', deck: 'door', name: 'Матёрый', text: 'Монстр +5. Сокровищ на 1 больше.', mod: 5, tr: 1, copies: 2 },
+  { k: 'mod-hungry', type: 'mod', deck: 'door', name: 'Голодный и злой', text: 'Монстр +10. Сокровищ на 2 больше.', mod: 10, tr: 2, copies: 1 },
+  { k: 'mod-baby', type: 'mod', deck: 'door', name: 'Детёныш', text: 'Монстр −5 (но не ниже 1). Сокровищ на 1 меньше.', mod: -5, tr: -1, copies: 2 },
+  { k: 'mod-sleepy', type: 'mod', deck: 'door', name: 'После корпоратива', text: 'Монстр −3. Ему и так плохо.', mod: -3, tr: 0, copies: 1 },
+  { k: 'wander', type: 'wander', deck: 'door', name: 'Бродячая тварь', text: 'Сыграйте вместе с монстром с руки — он вваливается в чужой бой.', copies: 2 },
+  { k: 'cu-tax', type: 'curse', deck: 'door', name: 'Проклятие: пени', text: 'Жертва теряет уровень.', effect: 'lvl1', copies: 2 },
+  { k: 'cu-ex', type: 'curse', deck: 'door', name: 'Порча от бывшей', text: 'Жертва теряет головной убор.', effect: 'head', copies: 1 },
+  { k: 'cu-crisis', type: 'curse', deck: 'door', name: 'Финансовый кризис', text: 'Жертва теряет самую дорогую вещь.', effect: 'item', copies: 1 },
+  { k: 'cu-flood', type: 'curse', deck: 'door', name: 'Залили соседи', text: 'Жертва сбрасывает 2 карты с руки.', effect: 'cards2', copies: 1 },
+  { k: 'cu-shoes', type: 'curse', deck: 'door', name: 'Украли тапки в бане', text: 'Жертва теряет обувь.', effect: 'feet', copies: 1 },
+  { k: 'cu-hangover', type: 'curse', deck: 'door', name: 'Похмелье проклятых', text: 'Жертва теряет броню.', effect: 'body', copies: 1 },
+];
+
+const TREASURES = [
+  // gear: slot head | body | feet | hand | two | misc
+  { k: 'g-helmet', slot: 'head', name: 'Каска с заброшенной стройки', bonus: 1, gold: 200 },
+  { k: 'g-foil', slot: 'head', name: 'Шапочка из фольги', bonus: 2, gold: 400, text: 'Защищает от мыслей. Своих тоже.' },
+  { k: 'g-crown', slot: 'head', name: 'Бумажная корона из бургерной', bonus: 3, gold: 600 },
+  { k: 'g-jacket', slot: 'body', name: 'Пуховик с рынка', bonus: 1, gold: 200 },
+  { k: 'g-vest', slot: 'body', name: 'Бронежилет из гаража', bonus: 3, gold: 600 },
+  { k: 'g-robe', slot: 'body', name: 'Халат «Я у мамы колдун»', bonus: 2, gold: 400, only: 'mage', text: 'Только для Колдуна.' },
+  { k: 'g-tracksuit', slot: 'body', name: 'Олимпийка с тремя полосками', bonus: 2, gold: 400 },
+  { k: 'g-valenki', slot: 'feet', name: 'Валенки-скороходы', bonus: 1, gold: 300, escape: 1, text: '+1 к побегу.' },
+  { k: 'g-boots', slot: 'feet', name: 'Кирзачи деда', bonus: 2, gold: 400 },
+  { k: 'g-slippers', slot: 'feet', name: 'Тапки с помпонами', bonus: 1, gold: 200, escape: 1, text: '+1 к побегу. Бесшумные.' },
+  { k: 'g-pan', slot: 'hand', name: 'Чугунная сковородка', bonus: 2, gold: 300 },
+  { k: 'g-rebar', slot: 'hand', name: 'Арматура', bonus: 2, gold: 300 },
+  { k: 'g-stool', slot: 'hand', name: 'Табуретка', bonus: 1, gold: 200 },
+  { k: 'g-taser', slot: 'hand', name: 'Шокер «Аргумент»', bonus: 3, gold: 500 },
+  { k: 'g-abacus', slot: 'hand', name: 'Счёты главбуха', bonus: 3, gold: 400, only: 'mage', text: 'Только для Колдуна.' },
+  { k: 'g-plantain', slot: 'hand', name: 'Боевой подорожник', bonus: 1, gold: 200, vsUndead: 3, text: '+3 против нежити.' },
+  { k: 'g-shovel', slot: 'two', name: 'Лопата прадеда', bonus: 3, gold: 400, text: 'Двуручная. Копала окопы и огороды.' },
+  { k: 'g-saw', slot: 'two', name: 'Бензопила «Дружба»', bonus: 4, gold: 600, text: 'Двуручная.' },
+  { k: 'g-mop', slot: 'two', name: 'Швабра уборщицы тёти Зины', bonus: 3, gold: 400, text: 'Двуручная. Тётя Зина её ищет.' },
+  { k: 'g-cat', slot: 'misc', name: 'Кот на плече', bonus: 1, gold: 300, text: 'Шипит на монстров. И на вас.' },
+  { k: 'g-cert', slot: 'misc', name: 'Справка, что не псих', bonus: 2, gold: 400, text: 'С печатью.' },
+  { k: 'g-garlic', slot: 'misc', name: 'Бусы из чеснока', bonus: 0, gold: 200, vsUndead: 4, text: '+4 против нежити.' },
+  { k: 'g-gopro', slot: 'misc', name: 'Экшн-камера', bonus: 1, gold: 300, escape: 1, text: '+1 к побегу: «я блогер, меня нельзя».' },
+  // one-shots: play in any fight for either side
+  { k: 'o-energy', type: 'oneshot', name: 'Энергетик со скидкой', power: 2, gold: 100, copies: 2 },
+  { k: 'o-pickle', type: 'oneshot', name: 'Огуречный рассол', power: 3, gold: 200, copies: 2 },
+  { k: 'o-brick', type: 'oneshot', name: 'Кирпич из окна', power: 4, gold: 200 },
+  { k: 'o-firework', type: 'oneshot', name: 'Китайская петарда', power: 3, gold: 200, copies: 2 },
+  { k: 'o-pies', type: 'oneshot', name: 'Бабушкины пирожки', power: 5, gold: 300, text: 'С капустой. Сила предков.' },
+  { k: 'o-holy', type: 'oneshot', name: 'Святая вода из-под крана', power: 2, undeadPower: 6, gold: 300, text: '+6 против нежити, иначе +2.' },
+  { k: 'o-mother', type: 'oneshot', name: 'Звонок маме', power: 4, gold: 300, text: 'Монстр чувствует себя виноватым.' },
+  // levels
+  { k: 'l-blat', type: 'level', name: 'Блат в отделе кадров', text: '+1 уровень.', copies: 2 },
+  { k: 'l-lottery', type: 'level', name: 'Выигрыш в лотерею', text: '+1 уровень.' },
+  { k: 'l-bribe', type: 'level', name: 'Взятка экзаменатору', text: '+1 уровень. Совесть −1.' },
+  { k: 'l-exam', type: 'level', name: 'Сдал на права с первого раза', text: '+1 уровень. Никто не верит.' },
+].map((c) => ({ type: 'gear', deck: 'treasure', copies: 1, ...c, deck: 'treasure' }));
+
+const CARDS = {};
+for (const c of [...DOORS, ...TREASURES]) CARDS[c.k] = { copies: 1, ...c };
+
+const CLASS_NAMES = { brute: 'Громила', thief: 'Ловкач', mage: 'Колдун', healer: 'Знахарь' };
+const BAD_TEXT = {
+  lvl1: 'минус уровень', lvl2: 'минус 2 уровня', lvl3: 'минус 3 уровня', head: 'потеря головного убора', body: 'потеря брони',
+  feet: 'потеря обуви', hand: 'потеря оружия', item: 'потеря самой дорогой вещи', cards2: 'минус 2 карты с руки', death: 'смерть: всё снаряжение и карты теряются',
+};
+
+module.exports = { CARDS, CLASS_NAMES, BAD_TEXT };

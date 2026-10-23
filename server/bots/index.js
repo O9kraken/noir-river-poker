@@ -81,6 +81,7 @@ class BotDriver {
   _pending() {
     const t = this.table;
     if (this.kind === 'cap') return this._capPending();
+    if (this.kind === 'pt') { const d = t.botDelay(this.ids); return d == null ? null : this._pause(d * 0.8, d * 1.3); }
     if (this.kind === 'mf') return this._mfPending();
     if (this.kind === 'bg') {
       const bi = t.seats.findIndex((s) => s && this.ids.has(s.userId));
@@ -125,6 +126,7 @@ class BotDriver {
   _step() {
     const t = this.table;
     if (this.kind === 'cap') { this._capStep(); return; }
+    if (this.kind === 'pt') { t.botStep(this.ids, this.level, this.random); return; }
     if (this.kind === 'mf') { this._mfStep(); return; }
     if (this.kind === 'bg') {
       const bi = t.seats.findIndex((s) => s && this.ids.has(s.userId));
