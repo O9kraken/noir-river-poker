@@ -43,6 +43,13 @@ class CheckersTable {
     this._flow = null;
     this.reasons = REASONS;
     this.lastActivity = this.now();
+    // shaky connections: a move's network delay is credited back (up to maxLag), and the clock of a
+    // player whose connection dropped on their move stands still for up to freezeMs per game
+    this.maxLag = opts.maxLag ?? 1000;
+    this.freezeMs = opts.freezeMs ?? 60000;
+    this.chessClock = true;
+    this.frozen = null; // { color, since }
+    this.freezeLeft = { w: this.freezeMs, b: this.freezeMs };
   }
 
   /** Subclasses (chess) plug in their own game. */
@@ -84,7 +91,29 @@ class CheckersTable {
     const i = this.seatOf(userId);
     if (i === -1) return;
     this.seats[i].connected = connected;
+    if (this.chessClock && this.status === 'playing' && this.game && this.colorOf(i) === this.game.turn) {
+      if (!connected) this._freeze(); else this._unfreeze();
+    }
     this._update();
+  }
+
+  /** The player to move went offline: stop their clock for a while. */
+  _freeze() {
+    const color = this.game.turn;
+    if (this.frozen || this.freezeLeft[color] <= 500) return;
+    this._tick();
+    this.frozen = { color, since: this.now() };
+    this._clear('_clockTimer');
+    this._log(`${(this.seats[this.colors[color]] || {}).name || 'Игрок'} не в сети — часы остановлены`);
+    this._clockTimer = this.timers.set(() => { this._clockTimer = null; this._unfreeze(true); this._update(); }, this.freezeLeft[color]);
+  }
+  _unfreeze(expired) {
+    const f = this.frozen;
+    if (!f) return;
+    this.freezeLeft[f.color] = expired ? 0 : Math.max(0, this.freezeLeft[f.color] - (this.now() - f.since));
+    this.frozen = null;
+    this.clock.since = this.now();
+    if (this.status === 'playing') this._armClock();
   }
 
   setReady(userId, value) {
@@ -120,12 +149,20 @@ class CheckersTable {
     this.lastResult = null;
     this.lastMove = null;
     this.clock = { w: this.clockMs, b: this.clockMs, since: this.now() };
+    this.frozen = null;
+    this.freezeLeft = { w: this.freezeMs, b: this.freezeMs };
     this._log(`Партия №${this.gameNo}: белыми ${this.seats[this.colors.w].name}, чёрными ${this.seats[this.colors.b].name}. Банк ${this.pot}`);
     this._armClock();
     this._update();
   }
 
   _armClock() {
+    if (this.frozen) {
+      if (this.frozen.color === this.game.turn) return; // still waiting for the offline player
+      const f = this.frozen; this.freezeLeft[f.color] = Math.max(0, this.freezeLeft[f.color] - (this.now() - f.since)); this.frozen = null;
+    }
+    const mover = this.seats[this.colors[this.game.turn]];
+    if (this.chessClock && mover && !mover.connected && this.freezeLeft[this.game.turn] > 500) { this.clock.since = this.now(); this._freeze(); return; }
     this._clear('_clockTimer');
     const color = this.game.turn;
     this._clockTimer = this.timers.set(() => {
@@ -139,17 +176,25 @@ class CheckersTable {
 
   _tick() {
     const now = this.now();
+    if (this.frozen) { this.clock.since = now; return; }
     this.clock[this.game.turn] = Math.max(0, this.clock[this.game.turn] - (now - this.clock.since));
     this.clock.since = now;
   }
 
-  move(userId, path) {
+  /** Credit back the network delay of a move the client measured (capped). */
+  _lagCredit(color, lag) {
+    const ms = Math.max(0, Math.min(this.maxLag, Math.floor(Number(lag) || 0)));
+    if (ms) this.clock[color] += ms;
+  }
+
+  move(userId, path, lag) {
     const i = this.seatOf(userId);
     if (i === -1) throw new GameError('Вы не за доской');
     if (this.status !== 'playing') throw new GameError('Партия не идёт');
     const color = this.colorOf(i);
     if (!Array.isArray(path) || path.length < 2 || path.length > 20 || !path.every((x) => Number.isInteger(x) && x >= 0 && x < 64)) throw new GameError('Неверный ход');
     this._tick();
+    this._lagCredit(color, lag);
     if (this.clock[color] <= 0) { this._finish(other(color), 'time'); throw new GameError('Время вышло'); }
     let mv;
     try { mv = this.game.play(color, path); } catch (e) { throw new GameError(e.message); }
@@ -188,6 +233,7 @@ class CheckersTable {
   _finish(winner, reason) {
     if (this.status !== 'playing') return;
     this._clear('_clockTimer');
+    this.frozen = null;
     if (this.game) this.game.finish(winner, reason);
     const results = [];
     for (const color of ['w', 'b']) {
@@ -243,7 +289,7 @@ class CheckersTable {
     const me = this.seatOf(viewerId);
     const g = this.game;
     const myColor = me !== -1 ? this.colorOf(me) : null;
-    const running = this.status === 'playing' && g ? g.turn : null;
+    const running = this.status === 'playing' && g && !this.frozen ? g.turn : null;
     const clock = { ...this.clock };
     if (running) clock[running] = Math.max(0, clock[running] - (this.now() - clock.since));
     return {
@@ -261,6 +307,7 @@ class CheckersTable {
       moves: g ? g.moves.map((m) => m.text || m.san) : [],
       counts: g && g.count ? { w: g.count('w'), b: g.count('b'), wk: g.kings('w'), bk: g.kings('b') } : null,
       drawOffer: this.drawOffer,
+      waiting: this.frozen ? { color: this.frozen.color, name: (this.seats[this.colors[this.frozen.color]] || {}).name || '' } : null,
       result: this.lastResult,
       mySeat: me,
       myColor,

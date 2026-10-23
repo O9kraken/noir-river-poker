@@ -29,7 +29,7 @@ class ChessTable extends CheckersTable {
     return { legal: mine ? g.legal().filter((m) => !m.promo || m.promo === 'q').map((m) => ({ from: m.from, to: m.to, promo: !!m.promo })) : [], mustCapture: false };
   }
 
-  move(userId, mv) {
+  move(userId, mv, lag) {
     const i = this.seatOf(userId);
     if (i === -1) throw new GameError('Вы не за доской');
     if (this.status !== 'playing') throw new GameError('Партия не идёт');
@@ -39,6 +39,7 @@ class ChessTable extends CheckersTable {
     const promo = ['q', 'r', 'b', 'n'].includes(mv && mv.promo) ? mv.promo : undefined;
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from > 63 || to < 0 || to > 63) throw new GameError('Неверный ход');
     this._tick();
+    this._lagCredit(color, lag);
     if (this.clock[color] <= 0) { this._finish(other(color), 'time'); throw new GameError('Время вышло'); }
     let m;
     try { m = this.game.play(color, { from, to, promo }); } catch (e) { throw new GameError(e.message); }

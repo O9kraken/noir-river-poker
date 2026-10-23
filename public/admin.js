@@ -107,9 +107,48 @@
     return m < 60 ? `${m} мин` : `${Math.floor(m / 60)} ч ${m % 60} мин`;
   }
 
+  /** Where the data lives, and backups. */
+  function storageBlock(st) {
+    if (!st) return null;
+    const pg = st.kind === 'postgres';
+    const token = (() => { try { return localStorage.getItem('nr_token'); } catch (e) { return null; } })();
+    const download = async () => {
+      const res = await fetch('/api/admin/backup', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { toast('Не удалось скачать копию', true); return; }
+      const blob = await res.blob();
+      const a = h('a', { href: URL.createObjectURL(blob), download: `noir-river-${new Date().toISOString().slice(0, 10)}.json` });
+      document.body.append(a); a.click(); a.remove();
+    };
+    const file = h('input', { type: 'file', accept: 'application/json,.json', hidden: true, onchange: async () => {
+      const f = file.files[0];
+      file.value = '';
+      if (!f) return;
+      if (!confirm('Заменить ВСЕ аккаунты, балансы и статистику данными из файла? Текущие данные будут потеряны.')) return;
+      let body;
+      try { body = await f.text(); JSON.parse(body); } catch (e) { toast('Файл не читается как JSON', true); return; }
+      const res = await fetch('/api/admin/restore', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(out.error || 'Не удалось восстановить', true); return; }
+      toast(`Восстановлено аккаунтов: ${out.users}`);
+    } });
+    const when = st.lastOk ? new Date(st.lastOk).toLocaleTimeString('ru-RU') : '—';
+    return h('div', { class: 'adm-store ' + (st.ephemeral ? 'bad' : st.error ? 'warn' : 'ok') },
+      h('div', null,
+        h('b', null, pg ? (st.error ? 'PostgreSQL: ошибка записи' : 'Данные в PostgreSQL — переживут деплой') : st.ephemeral ? 'Данные НЕ сохраняются между деплоями' : 'Данные в файле на диске'),
+        h('p', { class: 'muted small' }, pg
+          ? (st.error ? `Последняя ошибка: ${st.error}. Сервер повторяет запись сам.` : `Последнее сохранение: ${when}`)
+          : st.ephemeral ? 'На Render файл стирается при каждом деплое и засыпании. Подключите бесплатный PostgreSQL (Neon) — переменная DATABASE_URL, инструкция в README. Перед этим скачайте копию.'
+            : `Последнее сохранение: ${when}. Делайте копии перед переездом на другой сервер.`)),
+      h('div', { class: 'adm-store-act' },
+        h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: download }, 'Скачать копию'),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => file.click() }, 'Восстановить из копии'),
+        file));
+  }
+
   function overview(d) {
     const s = d.stats;
     return [
+      storageBlock(s.storage),
       h('div', { class: 'adm-tiles' },
         tile('Онлайн', s.online, `из ${s.users} аккаунтов`),
         tile('На балансах', fmt(s.balances)),

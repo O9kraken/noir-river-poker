@@ -3,6 +3,7 @@ const { CheckersTable } = require('../checkers/table');
 const { GameError } = require('../engine/table');
 const { NardyGame, other } = require('./engine');
 const nardyAI = require('../bots/nardy-ai');
+const { TurnClock } = require('../turnclock');
 
 const REASONS = {
   oin: 'все шашки выброшены', mars: 'марс — соперник не успел выбросить ни одной шашки',
@@ -18,27 +19,38 @@ class NardyTable extends CheckersTable {
   constructor(cfg, deps = {}, opts = {}) {
     super(cfg, deps, opts);
     this.kind = 'bg';
+    this.chessClock = false; // nardy has a per-turn clock instead
     this.reasons = REASONS;
     this.turnMs = (cfg.turnSec || opts.turnSec || 45) * 1000;
     this.endDelay = opts.endDelay ?? 1100; // a moment to undo the last move before the turn passes
     this.noMoveDelay = opts.noMoveDelay ?? 1600; // time to see the dice when there is no move
     this.rng = opts.rng || Math.random;
-    this.turnEnds = 0;
+    this.tclock = new TurnClock({ timers: this.timers, now: this.now, grace: opts.seenGrace ?? Math.min(8000, Math.round(this.turnMs * 0.3)), pauseMs: opts.pauseMs ?? 60000, awayMs: 1500 });
     this.misses = { w: 0, b: 0 };
     this._endTimer = null;
   }
 
   _newGame() {
     this.misses = { w: 0, b: 0 };
+    this.tclock.resetBudgets();
     return new NardyGame('w', this.rng);
   }
   _legalView() { return {}; }
 
   // ---------- turn timer instead of chess clocks ----------
+  /** The turn clock: starts when the player's screen shows the turn, stops while their connection is down. */
   _armClock() {
-    this._clear('_clockTimer');
-    this.turnEnds = this.now() + this.turnMs;
-    this._clockTimer = this.timers.set(() => { this._clockTimer = null; this._timeout(); }, this.turnMs);
+    const seat = this.colors[this.game.turn];
+    const s = this.seats[seat];
+    this.tclock.start({ seat, ms: this.turnMs, connected: !!(s && s.connected), present: !!s, onTimeout: () => this._timeout() });
+  }
+  setConnected(userId, connected) {
+    const i = this.seatOf(userId);
+    if (i !== -1 && this.status === 'playing') this.tclock.connection(i, connected);
+    super.setConnected(userId, connected);
+  }
+  seen(userId, key) {
+    if (this.tclock.seen(this.seatOf(userId), key)) this._update();
   }
   _tick() {}
 
@@ -129,11 +141,12 @@ class NardyTable extends CheckersTable {
 
   _finish(winner, reason) {
     this._clear('_endTimer');
+    this.tclock.stop();
     if (this.status === 'playing' && winner && reason === 'mars') this._log('Марс!');
     super._finish(winner, reason);
   }
 
-  destroy() { this._clear('_endTimer'); super.destroy(); }
+  destroy() { this._clear('_endTimer'); this.tclock.stop(); super.destroy(); }
 
   offerDraw() { throw new GameError('В нардах ничьих нет'); }
 
@@ -159,7 +172,9 @@ class NardyTable extends CheckersTable {
       canUndo: !!(mine && g.played.length && !g.result),
       phase: this.status !== 'playing' ? 'over' : !g.dice ? 'roll' : g.done() ? 'done' : 'move',
       legal: mine && g.dice ? g.legal() : [],
-      turnLeft: this.status === 'playing' ? Math.max(0, this.turnEnds - this.now()) : 0,
+      turnLeft: this.status === 'playing' ? this.tclock.view().left : 0,
+      waiting: this.status === 'playing' && this.tclock.view().paused ? { seat: this.tclock.view().seat, name: (this.seats[this.tclock.view().seat] || {}).name || '' } : null,
+      turnKey: this.status === 'playing' && this.tclock.view().seat === st.mySeat ? this.tclock.view().key : null,
       turnMs: this.turnMs,
       lastTurn: g.lastTurn,
       misses: { ...this.misses },

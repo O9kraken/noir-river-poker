@@ -47,6 +47,8 @@
     render();
     if (flight) fly(flight);
     effects();
+    // my turn is on screen: the server starts my clock from here
+    if (n && n.turnKey && n.turnKey !== C.seenKey) { C.seenKey = n.turnKey; requestAnimationFrame(() => call('bg:seen', { tableId: C.id, key: n.turnKey }, true)); }
   }
 
   // ---------- the board ----------
@@ -198,6 +200,7 @@
     if (st.status === 'result') { el.textContent = 'Следующая партия — когда оба нажмут «Готов»'; return; }
     if (!n) { el.textContent = ''; return; }
     const mine = st.myColor && st.turn === st.myColor;
+    if (n.waiting) { el.textContent = n.waiting.seat === st.mySeat ? 'Связь восстановлена — ваш ход' : `${n.waiting.name}: связь прервалась, ждём…`; return; }
     el.textContent = mine ? (n.phase === 'roll' ? 'Ваш ход — бросайте кубики' : n.phase === 'done' ? 'Ход сделан' : 'Ваш ход') : st.myColor ? 'Ход соперника' : `Ход ${st.turn === 'w' ? 'белых' : 'чёрных'}`;
   }
 

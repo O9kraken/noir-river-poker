@@ -902,6 +902,40 @@ class Store {
     return this.backend.persist(this.data);
   }
 
+  /** Everything worth keeping, for a backup file (sessions are left out: everyone logs in again). */
+  backup() {
+    const { sessions, ...rest } = this.data;
+    void sessions;
+    return { format: 'noir-river-backup', version: 1, createdAt: new Date().toISOString(), data: JSON.parse(JSON.stringify(rest)) };
+  }
+
+  /** Replace accounts and club data with a backup. */
+  restore(file) {
+    const d = file && file.format === 'noir-river-backup' ? file.data : null;
+    if (!d || typeof d.users !== 'object' || !d.users) throw new StoreError('Это не файл резервной копии NOIR RIVER');
+    for (const u of Object.values(d.users)) {
+      if (!u || typeof u.id !== 'string' || typeof u.name !== 'string' || typeof u.hash !== 'string') throw new StoreError('Файл повреждён: в нём есть неполный аккаунт');
+    }
+    const keep = this.data.sessions;
+    this.data = { ...d, sessions: {} };
+    // sessions of accounts that exist in the backup stay valid
+    for (const [k, s] of Object.entries(keep)) if (this.data.users[s.userId]) this.data.sessions[k] = s;
+    this.data.adminLog ||= [];
+    if (this.data.announcement === undefined) this.data.announcement = null;
+    if (!Array.isArray(this.data.sngTemplates)) this.data.sngTemplates = [];
+    if (!this.data.dms || typeof this.data.dms !== 'object') this.data.dms = {};
+    if (!Array.isArray(this.data.seasonHistory)) this.data.seasonHistory = [];
+    if (!this.data.season || typeof this.data.season !== 'object') this.data.season = newSeason();
+    for (const u of Object.values(this.data.users)) {
+      this._upgrade(u);
+      const inPlay = Object.values(u.inPlay || {}).reduce((a, b) => a + b, 0);
+      if (inPlay) u.balance += inPlay;
+      u.inPlay = {};
+    }
+    this.saveNow();
+    return Object.keys(this.data.users).length;
+  }
+
   /** Write everything and wait for it (server shutdown). */
   async flush() {
     await this.saveNow();

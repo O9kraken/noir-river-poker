@@ -40,6 +40,8 @@ class MafiaTable {
       intro: opts.introMs ?? 9000, night: opts.nightMs ?? 35000, morning: opts.morningMs ?? 7000,
       day: opts.dayMs ?? 100000, vote: opts.voteMs ?? 30000, verdict: opts.verdictMs ?? 7000,
     };
+    this.lateMs = opts.lateMs ?? Math.min(1500, Math.round(this.ms.night * 0.05)); // see _phase
+    this.waitMs = opts.waitMs ?? Math.min(20000, Math.round(this.ms.night * 0.5)); // waiting once for a dropped player
     this.countdownMs = opts.countdown ?? 4000;
     this.resultPause = opts.resultPause ?? 12000;
     this.seats = Array(this.maxSeats).fill(null);
@@ -183,8 +185,40 @@ class MafiaTable {
     this._clear('_timer');
     g.deadline = this.now() + this.ms[name];
     g.phaseMs = this.ms[name];
-    this._timer = this.timers.set(() => { this._timer = null; this._next(); }, this.ms[name]);
+    g.extended = false;
+    // night moves and votes get a little extra so a choice sent at the last second on a slow line still counts
+    const late = name === 'night' || name === 'vote' ? this.lateMs : 0;
+    this._timer = this.timers.set(() => { this._timer = null; this._phaseEnd(); }, this.ms[name] + late);
     this._update();
+  }
+
+  /** Players who still owe a night move or a vote and whose connection is down. */
+  _pendingOffline() {
+    const g = this.g;
+    const n = g.night;
+    const owes = (p) => {
+      if (g.phase === 'vote') return g.votes[p.seat] === undefined;
+      if (g.phase !== 'night') return false;
+      return (MAFIA.has(p.role) && n.kills[p.seat] == null) || (p.role === 'don' && n.donCheck == null) || (p.role === 'com' && n.check == null) || (p.role === 'doc' && n.heal == null);
+    };
+    return this._alive().filter((p) => owes(p) && this.seats[p.seat] && !this.seats[p.seat].connected && !isBot(p.userId));
+  }
+
+  /** The phase time is up: once per phase, wait a little longer for someone whose connection dropped. */
+  _phaseEnd() {
+    const g = this.g;
+    if (this.status !== 'playing') return;
+    const away = (g.phase === 'night' || g.phase === 'vote') && !g.extended ? this._pendingOffline() : [];
+    if (away.length) {
+      g.extended = true;
+      g.deadline = this.now() + this.waitMs;
+      g.phaseMs = this.waitMs;
+      this._sys(`Ждём ${away.map((p) => p.name).join(', ')}: связь прервалась`);
+      this._timer = this.timers.set(() => { this._timer = null; this._next(); }, this.waitMs);
+      this._update();
+      return;
+    }
+    this._next();
   }
 
   _next() {

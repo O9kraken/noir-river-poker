@@ -22,7 +22,10 @@ class FileBackend {
     const tmp = this.file + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(data));
     fs.renameSync(tmp, this.file);
+    this.lastOk = Date.now();
   }
+
+  status() { return { kind: 'file', lastOk: this.lastOk || null, error: null }; }
 
   flush() { return Promise.resolve(); }
 }
@@ -44,8 +47,14 @@ class PgBackend {
     const { Pool } = require('pg');
     const local = /localhost|127\.0\.0\.1/.test(url);
     const ssl = local || /sslmode=disable/.test(url) ? false : { rejectUnauthorized: false };
-    return new PgBackend(new Pool({ connectionString: url, ssl, max: 4 }));
+    // Neon and other serverless databases close idle connections when they fall asleep:
+    // drop such connections quietly (an unhandled pool error would crash the server) and reconnect on demand
+    const pool = new Pool({ connectionString: url, ssl, max: 4, idleTimeoutMillis: 20000, connectionTimeoutMillis: 20000, keepAlive: true });
+    pool.on('error', (e) => console.error('[db] соединение закрыто базой:', e.message));
+    return new PgBackend(pool);
   }
+
+  status() { return { kind: 'postgres', lastOk: this.lastOk || null, error: this.failures ? this.lastError : null, failures: this.failures }; }
 
   async init() {
     await this.pool.query(`CREATE TABLE IF NOT EXISTS nr_users (id TEXT PRIMARY KEY, data JSONB NOT NULL)`);
@@ -55,7 +64,14 @@ class PgBackend {
 
   /** Read everything into the store's shape; null when the database is empty. */
   async load() {
-    await this.init();
+    // a sleeping database may need a few seconds to wake up
+    for (let k = 1; ; k++) {
+      try { await this.init(); break; } catch (e) {
+        if (k >= 6) throw e;
+        console.error(`[db] база не отвечает (${e.message}), попытка ${k} из 6…`);
+        await new Promise((r) => setTimeout(r, 2000 * k));
+      }
+    }
     const users = await this.pool.query('SELECT id, data FROM nr_users');
     const sessions = await this.pool.query('SELECT key, user_id, expires FROM nr_sessions');
     const meta = await this.pool.query('SELECT key, data FROM nr_meta');
@@ -89,8 +105,10 @@ class PgBackend {
         try {
           await this._write(d);
           this.failures = 0;
+          this.lastOk = Date.now();
         } catch (e) {
           this.failures += 1;
+          this.lastError = e.message;
           console.error('[db] не удалось сохранить:', e.message);
           // keep the data and retry a bit later
           await new Promise((r) => setTimeout(r, Math.min(30000, 1000 * this.failures)));

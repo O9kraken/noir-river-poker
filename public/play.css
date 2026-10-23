@@ -2149,3 +2149,17 @@ body.voice-on { padding-bottom: 74px; }
 @media (max-width: 640px) { .shop-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .shop-prev { height: 120px; } .shop-meta { flex-direction: column; align-items: flex-start; padding: 12px; } .shop-wallet { margin-left: 0; } .prev-back { --cw: 44px; } }
 .shop-tabs .tab { white-space: nowrap; }
 .shop-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+/* v15 connection quality */
+.net-badge { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 75; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 800; color: #FFE3A3; background: rgba(40, 30, 10, .92); border: 1px solid rgba(240, 190, 90, .5); box-shadow: 0 10px 26px rgba(0, 0, 0, .45); cursor: help; }
+.net-badge i { width: 8px; height: 8px; border-radius: 50%; background: #F0B84A; box-shadow: 0 0 8px #F0B84A; }
+.net-badge.bad { color: #FFC2C7; background: rgba(50, 12, 16, .92); border-color: rgba(224, 106, 114, .55); }
+.net-badge.bad i { background: #E06A72; box-shadow: 0 0 8px #E06A72; }
+@media (max-width: 640px) { .net-badge { right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); } }
+/* v17 admin: storage & backups */
+.adm-store { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; margin-bottom: 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(10, 13, 12, .5); }
+.adm-store b { font-size: 16px; }
+.adm-store p { margin: 4px 0 0; max-width: 640px; }
+.adm-store.ok { border-color: rgba(127, 214, 168, .45); } .adm-store.ok b { color: #A8EBC6; }
+.adm-store.warn { border-color: rgba(240, 184, 74, .55); } .adm-store.warn b { color: #FFE3A3; }
+.adm-store.bad { border-color: rgba(224, 106, 114, .7); background: rgba(70, 14, 20, .45); } .adm-store.bad b { color: #FFC2C7; }
+.adm-store-act { display: flex; gap: 8px; flex-wrap: wrap; }

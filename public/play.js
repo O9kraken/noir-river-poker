@@ -444,19 +444,49 @@
   // ================= socket =================
   function call(event, payload = {}, quiet = false) {
     return new Promise((resolve) => {
-      if (!S.socket || !S.socket.connected) { if (!quiet) toast('Нет соединения с сервером', true); return resolve(null); }
-      S.socket.timeout(8000).emit(event, payload, (err, res) => {
-        if (err) { if (!quiet) toast('Сервер не ответил', true); return resolve(null); }
+      if (!S.socket) { if (!quiet) toast('Нет соединения с сервером', true); return resolve(null); }
+      // while the connection is down the message waits and goes out as soon as it is back
+      S.socket.timeout(S.socket.connected ? 10000 : 15000).emit(event, payload, (err, res) => {
+        if (err) { if (!quiet) toast(S.socket.connected ? 'Сервер не ответил — проверьте интернет' : 'Нет соединения с сервером', true); return resolve(null); }
         if (res && res.error) { if (!quiet) toast(res.error, true); return resolve(null); }
         resolve(res);
       });
     });
   }
 
+  // ---------- connection quality ----------
+  // a ping every few seconds; a slow line gets a small badge so the player knows the delay is the network
+  const net = { samples: [], el: null };
+  function netShow(ms) {
+    if (!net.el) { net.el = h('div', { class: 'net-badge', id: 'net-badge', role: 'status', hidden: true }); document.body.append(net.el); }
+    const bad = ms != null && ms > 450;
+    net.el.hidden = !bad;
+    if (bad) {
+      net.el.className = 'net-badge' + (ms > 1200 ? ' bad' : '');
+      net.el.replaceChildren(h('i', { 'aria-hidden': 'true' }), `Медленная связь · ${ms > 9999 ? '10+ с' : `${Math.round(ms / 10) * 10} мс`}`);
+      net.el.title = 'Ход засчитывается с момента, когда раздача появилась у вас на экране, — задержка сети не съедает ваше время.';
+    }
+  }
+  /** One-way network delay estimate (ms): sent with clock moves so the delay is not charged to the player. */
+  const netLag = () => (net.samples.length ? Math.round(net.samples.reduce((a, b) => a + b, 0) / net.samples.length / 2) : 0);
+  setInterval(() => {
+    const sock = S.socket;
+    if (!sock || !sock.connected || document.hidden) return;
+    const t0 = performance.now();
+    sock.timeout(10000).emit('net:ping', {}, (err) => {
+      const ms = err ? 10000 : performance.now() - t0;
+      net.samples.push(ms); if (net.samples.length > 3) net.samples.shift();
+      const avg = net.samples.reduce((a, b) => a + b, 0) / net.samples.length;
+      netShow(avg);
+    });
+  }, 5000);
+
   function startApp() {
     $('#view-auth').hidden = true;
     $('#view-app').hidden = false;
-    const socket = io({ auth: { token: S.token } });
+    // straight to WebSocket (no long-polling round trips first), polling only if WebSocket is blocked;
+    // reconnect fast after a drop
+    const socket = io({ auth: { token: S.token }, transports: ['websocket', 'polling'], tryAllTransports: true, reconnectionDelay: 400, reconnectionDelayMax: 3000, timeout: 8000 });
     S.socket = socket;
 
     socket.on('connect', async () => {
@@ -497,6 +527,7 @@
       fillExtraForms();
       S.durakStakes = res.durakStakes || [];
       setAnnouncement(res.announcement);
+      if (res.storageWarning && !S.warnedStorage) { S.warnedStorage = true; setTimeout(() => toast('Админу: база данных не подключена — при деплое аккаунты и фишки сотрутся. Откройте админку.', true), 1500); }
       fillDurakForm();
       renderMe();
       renderLeaderboard();
@@ -504,6 +535,8 @@
       S.tableId = null; // force re-watch after reconnect
       if (window.DurakUI) window.DurakUI.reset();
       if (window.BjUI) window.BjUI.reset();
+      // the other game screens subscribe again too (a fresh connection has no rooms)
+      for (const ui of Object.values(EXTRA_VIEWS)) if (ui()) ui().close();
       route();
     });
     socket.on('connect_error', (err) => {
@@ -512,7 +545,7 @@
         if (err.message === 'banned') $('#auth-error').textContent = 'Аккаунт заблокирован администратором';
       } else $('#conn-banner').hidden = false;
     });
-    socket.on('disconnect', () => { $('#conn-banner').hidden = false; });
+    socket.on('disconnect', () => { $('#conn-banner').hidden = false; netShow(null); });
     socket.on('me', (me) => { S.me = me; renderMe(); if (window.Progress) window.Progress.onMe(me); });
     socket.on('lobby:tables', (tables) => { S.tables = tables; renderLobby(); });
     socket.on('lobby:sngs', (sngs) => { S.sngs = sngs; renderLobby(); });
@@ -1523,6 +1556,11 @@
     if (ts.mySeat >= 0) S.myTables.add(ts.id); else S.myTables.delete(ts.id);
     renderTable();
     maybeRunPreAction();
+    // my turn is on screen: the server starts my clock from here (fair on a slow connection)
+    if (ts.turnKey && ts.mySeat >= 0 && ts.toAct === ts.mySeat && ts.turnKey !== S.seenKey) {
+      S.seenKey = ts.turnKey;
+      requestAnimationFrame(() => call('table:seen', { tableId: ts.id, key: ts.turnKey }, true));
+    }
     if (S.sideTab === 'hands' && S.prevTs && S.prevTs.result == null && ts.result) loadHands();
   }
 
@@ -2183,7 +2221,7 @@
       } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cells[i].click(); }
     };
   }
-  window.NR = { applyLooks, boardKeys, $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
+  window.NR = { netLag, applyLooks, boardKeys, $, $$, h, fmt, clamp, anim, cardEl, toast, call, Sound, S, hueOf, initials, avatarEl, fillAvatar, chatNick, GAMES: () => GAMES, renderLobby: () => renderLobby(), route: () => route() };
 
   // ================= boot =================
   if (S.token) startApp(); else showAuth();

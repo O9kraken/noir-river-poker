@@ -32,6 +32,9 @@
     const snap = capture();
     render();
     effects(snap);
+    // tell the table the deal is on screen: on a slow connection the clock starts from here
+    const key = st.you && st.you.turn && st.you.turn.key;
+    if (key && key !== B.seenKey) { B.seenKey = key; requestAnimationFrame(() => call('bj:seen', { tableId: B.id, key }, true)); }
   }
 
   const send = (ev, extra = {}) => call(ev, { tableId: B.id, ...extra });
@@ -135,6 +138,7 @@
       text = st.turn.seat === st.mySeat
         ? (st.seats[st.mySeat].hands.length > 1 ? `Ваш ход — рука ${st.turn.hand + 1}` : 'Ваш ход')
         : `Ходит ${nameOf(st.turn.seat)}`;
+      if (st.waiting) text = st.waiting.seat === st.mySeat ? 'Связь восстановлена — ваш ход' : `${st.waiting.name}: связь прервалась, ждём…`;
     } else if (st.status === 'dealer') text = 'Дилер открывает карту и добирает…';
     else if (st.status === 'result') {
       const me = st.mySeat >= 0 ? st.seats[st.mySeat] : null;

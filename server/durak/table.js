@@ -26,8 +26,10 @@ class DurakTable {
 
     this.deps = deps;
     this.actionTime = opts.actionTime ?? 30000;
-    this.awayTime = opts.awayTime ?? 6000;
+    this.awayTime = opts.awayTime ?? 25000; // a dropped connection gets time to come back before the turn is played for them
     this.confirmTime = opts.confirmTime ?? 15000; // time to say "Бито" / "Пас" or throw more
+    // a slow connection: the card or the move reaches the player late, so each wait is a bit longer than it shows
+    this.lagGrace = opts.lagGrace ?? Math.min(4000, Math.round(this.actionTime * 0.15));
     this.countdownMs = opts.countdown ?? 3000;
     this.resultPause = opts.resultPause ?? 7000;
     this.roundPause = opts.roundPause ?? 1600; // the finished round stays on the table this long
@@ -223,7 +225,7 @@ class DurakTable {
     const ms = allAway ? this.awayTime : w.kind === 'throw' ? Math.min(this.confirmTime, this.actionTime) : this.actionTime;
     this.deadline = this.now() + ms;
     this.deadlineMs = ms;
-    this._timer = this.timers.set(() => { this._timer = null; this._timeout(); }, ms);
+    this._timer = this.timers.set(() => { this._timer = null; this._timeout(); }, ms + (allAway ? 0 : this.lagGrace));
   }
 
   _timeout() {

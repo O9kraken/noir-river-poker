@@ -45,6 +45,8 @@ class RouletteTable {
     this.now = opts.now || Date.now;
     this.randomInt = opts.randomInt || crypto.randomInt;
     this.bettingTime = opts.bettingTime ?? 15000;
+    // the countdown shows bettingTime, but chips that left a slow player's screen at the last second still count
+    this.lateMs = opts.lateMs ?? (this.bettingTime >= 5000 ? 1500 : 0);
     this.spinTime = opts.spinTime ?? 7000;
     this.resultPause = opts.resultPause ?? 5000;
     this.seats = Array(this.maxSeats).fill(null);
@@ -169,7 +171,7 @@ class RouletteTable {
   _startTimer() {
     if (this._bet) return;
     this.bettingEnds = this.now() + this.bettingTime;
-    this._bet = this.timers.set(() => { this._bet = null; this._spin(); }, this.bettingTime);
+    this._bet = this.timers.set(() => { this._bet = null; this._spin(); }, this.bettingTime + this.lateMs);
   }
 
   _maybeStopTimer() {

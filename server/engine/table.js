@@ -41,6 +41,7 @@ class Table {
     this.createdBy = cfg.createdBy || null;
 
     this.actionTime = opts.actionTime ?? 25000;
+    this.seenGrace = opts.seenGrace ?? Math.min(8000, Math.round(this.actionTime * 0.4)); // see BlackjackTable
     this.startDelay = opts.startDelay ?? 1500;
     this.pauseAfterHand = opts.pauseAfterHand ?? 4000;
     this.runoutDelay = opts.runoutDelay ?? 900;
@@ -418,8 +419,26 @@ class Table {
     const handNo = h.no;
     // an absent tournament player acts automatically after a short pause
     h.turnLimit = this.tournament && this.seats[i].sittingOut ? this.autoActDelay : this.actionTime;
-    this._turnTimer = this.timers.set(() => this._onTimeout(i, handNo), h.turnLimit);
+    h.turnSeq = (h.turnSeq || 0) + 1;
+    h.turnSeen = h.turnLimit !== this.actionTime; // auto-acting seats need no confirmation
+    // until the player's screen confirms their turn, allow a little extra for a slow connection
+    this._turnTimer = this.timers.set(() => this._onTimeout(i, handNo), h.turnLimit + (h.turnSeen ? 0 : this.seenGrace));
     if (!this.seats[i].connected && !(this.tournament && this.seats[i].sittingOut)) this._pauseTurn(i);
+    this.onUpdate(this);
+  }
+
+  /** The client of the player to act has their turn on screen: the full time counts from now. */
+  seen(userId, key) {
+    const h = this.hand;
+    if (!h || h.ended || h.paused || h.turnSeen || h.toAct === -1) return;
+    const i = this.seats.findIndex((s) => s && s.userId === userId);
+    if (i !== h.toAct || key !== `${h.no}:${h.turnSeq}`) return;
+    h.turnSeen = true;
+    const left = Math.max(1000, Math.min(h.turnLimit, h.turnLimit + this.seenGrace - (this.now() - h.turnStarted)));
+    if (this._turnTimer) { this.timers.clear(this._turnTimer); this._turnTimer = null; }
+    h.turnStarted = this.now() - (h.turnLimit - left);
+    const handNo = h.no;
+    this._turnTimer = this.timers.set(() => this._onTimeout(i, handNo), left);
     this.onUpdate(this);
   }
 
@@ -874,6 +893,7 @@ class Table {
       bbIdx: h ? h.bbIdx : -1,
       toAct: h && !h.ended ? h.toAct : -1,
       turnRemaining: h && !h.ended && h.toAct !== -1 ? (h.paused ? h.paused.remaining : Math.max(0, h.turnLimit - (this.now() - h.turnStarted))) : 0,
+      turnKey: h && !h.ended && h.toAct !== -1 ? `${h.no}:${h.turnSeq}` : null,
       paused: h && !h.ended && h.paused ? { seat: h.paused.seat, name: this.seats[h.paused.seat] ? this.seats[h.paused.seat].name : '', left: Math.max(0, h.paused.until - this.now()) } : null,
       actionTime: h && h.toAct !== -1 ? h.turnLimit : this.actionTime,
       currentBet: h ? h.currentBet : 0,

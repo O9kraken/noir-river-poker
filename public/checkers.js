@@ -82,7 +82,7 @@
     if (done.length && !more.length) {
       const path = C.sel;
       C.sel = [];
-      const res = await send('ck:move', { path });
+      const res = await send('ck:move', { path, lag: NR.netLag() });
       if (!res) render();
       return;
     }
@@ -223,6 +223,7 @@
       return;
     }
     if (st.status === 'result') { el.textContent = 'Следующая партия — когда оба нажмут «Готов»'; return; }
+    if (st.waiting) { el.textContent = `${st.waiting.name} не в сети — часы остановлены, ждём…`; return; }
     if (st.myColor && st.turn === st.myColor) el.textContent = st.mustCapture ? 'Ваш ход — бить обязательно' : 'Ваш ход';
     else if (st.myColor) el.textContent = 'Ход соперника';
     else el.textContent = `Ход ${st.turn === 'w' ? 'белых' : 'чёрных'}`;

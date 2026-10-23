@@ -85,6 +85,8 @@
     render();
     animateChanges();
     effects();
+    // my turn is on screen: my clock starts now (fair on a slow line)
+    if (g && g.turnKey && g.turnKey !== C.seenKey) { C.seenKey = g.turnKey; requestAnimationFrame(() => call('cap:seen', { tableId: C.id, key: g.turnKey }, true)); }
   }
 
   const me = () => { const st = C.st; return st && st.game ? st.game.players.find((p) => p.seat === st.mySeat) : null; };
@@ -263,7 +265,7 @@
       const flip = !REDUCE && since < 700;
       parts.push(h('div', { class: `cap-card ${g.card.deck}` + (flip ? ' flip' : ''), style: flip ? `--dt:${-Math.round(since)}ms` : '' }, h('small', null, g.card.deck === 'luck' ? 'Удача' : 'Фонд'), h('span', null, g.card.text)));
     }
-    const who = h('p', { class: 'cap-msg' }, h('i', { class: 'cap-dot', style: `background:${cur ? cur.color : '#888'}` }), myTurn ? 'Ваш ход' : `Ходит ${cur ? cur.name : '…'}`, h('span', { class: 'cap-timer', 'data-cap-timer': '' }));
+    const who = h('p', { class: 'cap-msg' }, h('i', { class: 'cap-dot', style: `background:${cur ? cur.color : '#888'}` }), g.waiting ? `${g.waiting.name}: связь прервалась, ждём…` : myTurn ? 'Ваш ход' : `Ходит ${cur ? cur.name : '…'}`, h('span', { class: 'cap-timer', 'data-cap-timer': '' }));
     parts.push(who);
     if (g.trade) {
       const from = playerBySeat(g.trade.from); const to = playerBySeat(g.trade.to);

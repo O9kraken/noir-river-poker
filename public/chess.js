@@ -72,7 +72,7 @@
         const f = C.sel;
         C.sel = null;
         render();
-        if (!(await send('ch:move', { from: f, to: sq }))) render();
+        if (!(await send('ch:move', { from: f, to: sq, lag: NR.netLag() }))) render();
         return;
       }
     }
@@ -87,7 +87,7 @@
     const white = C.st.myColor === 'w';
     box.replaceChildren(h('span', null, 'Превратить в:'), ...['q', 'r', 'b', 'n'].map((p) => h('button', {
       type: 'button', class: `ch-promo-btn ${white ? 'w' : 'b'}`, 'aria-label': NAMES[p],
-      onclick: async () => { hidePromo(); C.sel = null; render(); if (!(await send('ch:move', { from, to, promo: p }))) render(); },
+      onclick: async () => { hidePromo(); C.sel = null; render(); if (!(await send('ch:move', { from, to, promo: p, lag: NR.netLag() }))) render(); },
     }, GLYPH[p] + '︎')), h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { hidePromo(); } }, 'Отмена'));
     box.hidden = false;
     C.promo = { from, to };
@@ -240,6 +240,7 @@
     }
     if (st.status === 'result') { el.textContent = 'Следующая партия — когда оба нажмут «Готов»'; return; }
     const check = st.check ? ' · шах!' : '';
+    if (st.waiting) { el.textContent = `${st.waiting.name} не в сети — часы остановлены, ждём…`; return; }
     if (st.myColor && st.turn === st.myColor) el.textContent = `Ваш ход${check}`;
     else if (st.myColor) el.textContent = `Ход соперника${check}`;
     else el.textContent = `Ход ${st.turn === 'w' ? 'белых' : 'чёрных'}${check}`;

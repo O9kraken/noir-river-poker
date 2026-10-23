@@ -1,5 +1,6 @@
 'use strict';
 const crypto = require('crypto');
+const { TurnClock } = require('../turnclock');
 const { GameError } = require('../engine/table');
 const { GROUPS, CELLS, streetRent, PIER_RENT, LUCK, FUND } = require('./board');
 
@@ -36,6 +37,7 @@ class CapitalTable {
     this.randomInt = opts.randomInt || crypto.randomInt;
     this.turnMs = opts.turnMs ?? 30000;
     this.awayMs = opts.awayMs ?? 4000;
+    this.clock = new TurnClock({ timers: this.timers, now: this.now, grace: opts.seenGrace ?? Math.min(8000, Math.round(this.turnMs * 0.3)), pauseMs: opts.pauseMs ?? 45000, awayMs: this.awayMs });
     this.countdownMs = opts.countdown ?? 3000;
     this.resultPause = opts.resultPause ?? 9000;
     this.seats = Array(this.maxSeats).fill(null);
@@ -84,7 +86,7 @@ class CapitalTable {
     const i = this.seatOf(userId);
     if (i === -1) return;
     this.seats[i].connected = connected;
-    if (this.status === 'playing') this._arm();
+    if (this.status === 'playing') this.clock.connection(i, connected);
     this._update();
   }
 
@@ -141,6 +143,7 @@ class CapitalTable {
     };
     for (const i of seats) { this.seats[i].ready = false; this.deps.onInPlay && this.deps.onInPlay(this.seats[i].userId, this.stake); }
     this.status = 'playing';
+    this.clock.resetBudgets();
     this.result = null;
     this._log(`— Партия №${this.gameNo}: ${order.length} игрока, банк ${this.pot} фишек. Первым ходит ${this.g.players[0].name} —`);
     this._arm();
@@ -164,17 +167,19 @@ class CapitalTable {
     return p;
   }
 
+  /** The clock of whoever must act now (the player to move, or the one asked about a trade). */
   _arm() {
-    this._clear('_timer');
-    if (this.status !== 'playing') return;
+    if (this.status !== 'playing') { this.clock.stop(); return; }
     const g = this.g;
-    let who = g.trade ? this._player(g.trade.to) : this._current();
+    const who = g.trade ? this._player(g.trade.to) : this._current();
     const seat = who && this.seats[who.seat];
-    const away = !seat || !seat.connected;
-    const ms = away ? this.awayMs : this.turnMs;
-    g.deadline = this.now() + ms;
-    g.deadlineMs = ms;
-    this._timer = this.timers.set(() => { this._timer = null; this._timeout(); }, ms);
+    g.deadlineMs = this.turnMs;
+    this.clock.start({ seat: who ? who.seat : -1, ms: this.turnMs, connected: !!(seat && seat.connected), present: !!seat, onTimeout: () => this._timeout() });
+  }
+
+  /** The player's screen shows their turn. */
+  seen(userId, key) {
+    if (this.clock.seen(this.seatOf(userId), key)) this._update();
   }
 
   _timeout() {
@@ -556,7 +561,7 @@ class CapitalTable {
   _finish(reason) {
     if (this.status !== 'playing') return;
     const g = this.g;
-    this._clear('_timer');
+    this.clock.stop();
     const alive = this._alive().sort((a, b) => this.worth(b) - this.worth(a));
     const ranking = alive.concat(g.outOrder.slice().reverse().map((s) => this._player(s)));
     ranking.forEach((p, k) => { p.place = k + 1; });
@@ -583,7 +588,7 @@ class CapitalTable {
   }
 
   destroy() {
-    this._clear('_timer');
+    this.clock.stop();
     this._clear('_flow');
     if (this.status === 'playing') for (const p of this.g.players) { if (this.deps.pay) this.deps.pay(p.userId, this.stake); this.deps.onInPlay && this.deps.onInPlay(p.userId, 0); }
     this.status = 'waiting';
@@ -616,7 +621,9 @@ class CapitalTable {
         players: g.players.map((p) => ({ seat: p.seat, name: p.name, color: p.color, cash: p.cash, pos: p.pos, jail: p.jail, jailCards: p.jailCards, out: p.out, worth: this.worth(p), avatar: this.avatarOf ? this.avatarOf(p.userId) : null })),
         cells: g.cells.map((c, i) => ({ owner: c.owner, houses: c.houses, mortgaged: c.mortgaged, rent: c.owner != null ? this.rentOf(i) : 0 })),
         turn: cur ? cur.seat : null, phase: g.phase, dice: g.dice, pending: g.pending, card: g.card, trade: g.trade, moveNo: g.moveNo,
-        deadlineIn: this._timer ? Math.max(0, g.deadline - this.now()) : 0, turnMs: g.deadlineMs || this.turnMs,
+        deadlineIn: this.status === 'playing' ? this.clock.view().left : 0, turnMs: g.deadlineMs || this.turnMs,
+        waiting: this.clock.view().paused ? { seat: this.clock.view().seat, name: (this.seats[this.clock.view().seat] || {}).name || '' } : null,
+        turnKey: this.status === 'playing' && this.clock.view().seat === me ? this.clock.view().key : null,
         endsIn: g.endsAt ? Math.max(0, g.endsAt - this.now()) : null,
       };
     }

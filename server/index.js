@@ -53,7 +53,16 @@ function createServer({
   const store = givenStore || new Store(dataFile, { adminNames });
   const app = express();
   const server = http.createServer(app);
-  const io = new Server(server, { maxHttpBufferSize: 1e5 });
+  const io = new Server(server, {
+    maxHttpBufferSize: 1e5,
+    // notice a dead connection in ~20 s instead of ~45 s
+    pingInterval: 10000, pingTimeout: 10000,
+    // big table states are compressed: fewer bytes on a slow mobile link
+    perMessageDeflate: { threshold: 2048 },
+    httpCompression: { threshold: 2048 },
+    // a short drop (a tunnel, a lift, switching Wi-Fi → 4G) resumes the same session with the missed messages
+    connectionStateRecovery: { maxDisconnectionDuration: 2 * 60 * 1000, skipMiddlewares: true },
+  });
 
   app.disable('x-powered-by');
   // Real client IP from X-Forwarded-For: nginx on the same machine by default,
@@ -61,7 +70,8 @@ function createServer({
   const tp = process.env.TRUST_PROXY;
   app.set('trust proxy', tp === 'true' ? true : tp && !Number.isNaN(Number(tp)) ? Number(tp) : 'loopback');
   let avatarChangedHook = null;
-  app.use(express.json({ limit: '10kb' }));
+  const smallJson = express.json({ limit: '10kb' });
+  app.use((req, res, next) => (req.path === '/api/admin/restore' ? next() : smallJson(req, res, next)));
   app.use(compression({ threshold: 1024 }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -149,6 +159,31 @@ function createServer({
     if (err && err.type === 'entity.too.large') return res.status(413).json({ error: 'Картинка больше 1 МБ' });
     return next(err);
   });
+  // ----- backups: download everything / put a backup back (admins only) -----
+  const adminOf = (req) => { const u = bearer(req); return u && store.isAdmin(u.id) ? u : null; };
+  app.get('/api/admin/backup', (req, res) => {
+    const u = adminOf(req);
+    if (!u) return res.status(403).json({ error: 'Нет прав администратора' });
+    const day = new Date().toISOString().slice(0, 10);
+    res.set('Cache-Control', 'no-store');
+    res.set('Content-Disposition', `attachment; filename="noir-river-${day}.json"`);
+    store.logAdmin(u.name, 'Скачал резервную копию');
+    res.json(store.backup());
+  });
+  app.post('/api/admin/restore', express.json({ limit: '50mb' }), (req, res) => {
+    const u = adminOf(req);
+    if (!u) return res.status(403).json({ error: 'Нет прав администратора' });
+    const busy = allTables().some((t) => !t.practice && t.seats && t.seats.some((x) => x && !isBot(x.userId)));
+    if (busy) return res.status(409).json({ error: 'Сначала дождитесь, пока все встанут из-за столов' });
+    try {
+      const n = store.restore(req.body);
+      store.logAdmin(u.name, `Восстановил данные из резервной копии: ${n} аккаунтов`);
+      res.json({ ok: true, users: n });
+      // everyone reconnects and gets the restored balances
+      setTimeout(() => io.disconnectSockets(), 300);
+    } catch (e) { authError(res, e); }
+  });
+
   // who is signed in (the landing page shows the account in its header)
   app.get('/api/me', (req, res) => {
     const m = /^Bearer\s+(.+)$/.exec(req.get('authorization') || '');
@@ -893,6 +928,7 @@ function createServer({
     voice.attach(socket, on, GameError);
 
     on('hello', () => ({
+      storageWarning: store.isAdmin(userId) && store.backend.kind === 'file' && !!process.env.RENDER,
       me: store.profile(userId),
       tables: lobbyList(),
       myTables: [...tables.values()].filter((t) => t.seatOf(userId) !== -1).map((t) => t.id),
@@ -1264,6 +1300,10 @@ function createServer({
     on('bj:bet', ({ tableId, amount }) => { getBj(tableId).bet(userId, amount); });
     on('bj:clear', ({ tableId }) => { getBj(tableId).clearBet(userId); });
     on('bj:rebet', ({ tableId }) => { getBj(tableId).rebet(userId); });
+    // the client's screen shows the player's turn: start the clock from now (slow connections)
+    on('net:ping', () => ({ t: Date.now() }));
+    on('bj:seen', ({ tableId, key }) => { getBj(tableId).seen(userId, String(key || '')); });
+    on('table:seen', ({ tableId, key }) => { getTable(tableId).seen(userId, String(key || '')); });
     on('bj:act', ({ tableId, type }) => {
       if (!['hit', 'stand', 'double', 'split'].includes(type)) throw new GameError('Неизвестное действие');
       getBj(tableId).act(userId, type);
@@ -1345,7 +1385,7 @@ function createServer({
       return { tableId: t.id };
     });
     on('ch:ready', ({ tableId, value }) => { CH.get(tableId).setReady(userId, !!value); });
-    on('ch:move', ({ tableId, from, to, promo }) => { CH.get(tableId).move(userId, { from, to, promo }); });
+    on('ch:move', ({ tableId, from, to, promo, lag }) => { CH.get(tableId).move(userId, { from, to, promo }, lag); });
     on('ch:resign', ({ tableId }) => { CH.get(tableId).resign(userId); });
     on('ch:draw', ({ tableId }) => { CH.get(tableId).offerDraw(userId); });
     on('ch:declineDraw', ({ tableId }) => { CH.get(tableId).declineDraw(userId); });
@@ -1407,7 +1447,9 @@ function createServer({
     on('mf:night', ({ tableId, kind, target }) => { MF.get(tableId).nightAction(userId, String(kind), target); });
     on('mf:readyVote', ({ tableId }) => { MF.get(tableId).readyToVote(userId); });
     on('mf:vote', ({ tableId, target }) => { MF.get(tableId).vote(userId, target); });
-    on('ck:move', ({ tableId, path }) => { CK.get(tableId).move(userId, Array.isArray(path) ? path.slice(0, 20).map(Number) : []); });
+    on('ck:move', ({ tableId, path, lag }) => { CK.get(tableId).move(userId, Array.isArray(path) ? path.slice(0, 20).map(Number) : [], lag); });
+    on('bg:seen', ({ tableId, key }) => { BG.get(tableId).seen(userId, String(key || '')); });
+    on('cap:seen', ({ tableId, key }) => { CAP.get(tableId).seen(userId, String(key || '')); });
     on('ck:resign', ({ tableId }) => { CK.get(tableId).resign(userId); });
     on('ck:draw', ({ tableId }) => { CK.get(tableId).offerDraw(userId); });
     on('ck:declineDraw', ({ tableId }) => { CK.get(tableId).declineDraw(userId); });
@@ -1452,6 +1494,7 @@ function createServer({
           bjTables: bjTables.size,
           bjPlayers: [...bjTables.values()].reduce((a, t) => a + t.playerCount(), 0),
           uptimeMs: Date.now() - STARTED_AT,
+          storage: { ...(store.backend.status ? store.backend.status() : { kind: store.backend.kind }), ephemeral: store.backend.kind === 'file' && !!process.env.RENDER },
           memoryMb: Math.round(process.memoryUsage().rss / 1048576),
         },
         users,
@@ -1775,12 +1818,20 @@ async function start() {
   if (url) {
     const { PgBackend } = require('./persist');
     backend = PgBackend.fromUrl(url);
-    const data = await backend.load();
+    let data = await backend.load();
+    // first start with a fresh database: bring over the accounts from the JSON file, if there is one
+    if (!data && fs.existsSync(DATA_FILE)) {
+      try { data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); console.log(`Перенёс данные из ${DATA_FILE} в PostgreSQL`); } catch (e) { data = null; }
+    }
     store = new Store(null, { adminNames: ADMIN_NAMES, backend, initialData: data });
     await store.flush();
-    console.log(`База данных: PostgreSQL, игроков — ${Object.keys(store.data.users).length}`);
+    console.log(`База данных: PostgreSQL, игроков — ${Object.keys(store.data.users).length}. Аккаунты и фишки переживут деплой.`);
   } else {
     console.log(`База данных: файл ${DATA_FILE}`);
+    if (process.env.RENDER) {
+      console.warn('\n!!! ВНИМАНИЕ: DATABASE_URL не задан. На Render файл данных стирается при каждом деплое и засыпании —');
+      console.warn('!!! аккаунты, фишки и статистика пропадут. Подключите PostgreSQL (README → «Постоянная база данных»).\n');
+    }
   }
   const { server, shutdown } = createServer({ store });
   server.listen(PORT, () => console.log(`NOIR RIVER Poker: http://localhost:${PORT}`));

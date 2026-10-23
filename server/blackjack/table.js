@@ -28,6 +28,11 @@ class BlackjackTable {
     this.bettingTime = opts.bettingTime ?? 12000;
     this.allInDelay = opts.allInDelay ?? 1500; // everybody bet: deal sooner
     this.actionTime = opts.actionTime ?? 20000;
+    // on a slow connection the deal may reach a player late: their clock starts when their screen has it,
+    // but the table never waits more than this extra time for that confirmation
+    this.seenGrace = opts.seenGrace ?? Math.min(8000, Math.round(this.actionTime * 0.4));
+    this.pauseMs = opts.pauseMs ?? 45000; // per round: how long to wait for a player whose connection dropped
+    this.lateMs = opts.lateMs ?? (this.bettingTime >= 5000 ? 1500 : 0); // bets sent at the very end of the countdown on a slow line still make it
     this.dealerStepMs = opts.dealerStepMs ?? 750;
     this.resultPause = opts.resultPause ?? 5000;
 
@@ -97,6 +102,20 @@ class BlackjackTable {
     const i = this.seatOf(userId);
     if (i === -1) return;
     this.seats[i].connected = connected;
+    // their turn: wait for them (offline) or give the clock back (online again)
+    const t = this._turnInfo;
+    if (t && this.status === 'playing' && t.seat === i) this._armTurn(connected ? 'resume' : 'pause');
+    this._update();
+  }
+
+  /** The player's screen shows their turn (sent by the client): start their clock from now. */
+  seen(userId, key) {
+    const t = this._turnInfo;
+    const i = this.seatOf(userId);
+    if (!t || t.seen || t.seat !== i || t.key !== key || this.status !== 'playing' || t.paused) return;
+    t.seen = true;
+    const left = Math.min(this.actionTime, t.start + this.actionTime + this.seenGrace - this.now());
+    this._setTurnTimer(Math.max(1000, left));
     this._update();
   }
 
@@ -141,7 +160,7 @@ class BlackjackTable {
     if (this._bet && !(allIn && this.bettingEnds - this.now() > ms)) return;
     this._clear('_bet');
     this.bettingEnds = this.now() + ms;
-    this._bet = this.timers.set(() => { this._bet = null; this._startRound(); }, ms);
+    this._bet = this.timers.set(() => { this._bet = null; this._startRound(); }, ms + (allIn ? 0 : this.lateMs));
   }
 
   _maybeCancelBetting() {
@@ -182,6 +201,7 @@ class BlackjackTable {
     this._nameBySeat = new Map(entries.map((e) => [e.seat, this.seats[e.seat].name]));
     for (const e of entries) this._inPlay(this.seats[e.seat]);
     this.status = 'playing';
+    this._pauseLeft = new Map();
     if (this.round.dealerBlackjack) this._log('У дилера блэкджек');
     this._afterAction();
   }
@@ -228,23 +248,12 @@ class BlackjackTable {
     const r = this.round;
     if (r.phase === 'player') {
       const cur = r.current();
-      const seat = this.seats[cur.seat];
-      // a player who left or went offline does not hold the table up
-      const ms = !seat || seat.leaving || !seat.connected ? 1500 : this.actionTime;
-      this.deadline = this.now() + ms;
-      this.deadlineMs = ms;
-      const turnKey = `${cur.seat}:${cur.handIndex}:${cur.hand.cards.length}`;
-      this._turn = this.timers.set(() => {
-        this._turn = null;
-        const c = this.round && this.round.current();
-        if (!c || `${c.seat}:${c.handIndex}:${c.hand.cards.length}` !== turnKey) return;
-        this._log(`${this._name(c.seat)}: время вышло — хватит`);
-        this.round.stand(c.seat);
-        this._afterAction();
-      }, ms);
+      this._turnInfo = { seat: cur.seat, key: `${this.roundNo}:${cur.seat}:${cur.handIndex}:${cur.hand.cards.length}`, start: this.now(), seen: false, paused: null };
+      this._armTurn('start');
       this._update();
       return;
     }
+    this._turnInfo = null;
     if (r.phase === 'dealer') {
       this.status = 'dealer';
       this._update();
@@ -252,6 +261,54 @@ class BlackjackTable {
       return;
     }
     this._settle();
+  }
+
+  /**
+   * The clock of the player to act.
+   *  start  — a new decision: full time, plus a grace for the deal to reach a slow connection;
+   *  pause  — the player's connection dropped: wait for them, up to pauseMs per round;
+   *  resume — they are back: the full time again.
+   */
+  _armTurn(mode) {
+    const t = this._turnInfo;
+    const seat = this.seats[t.seat];
+    this._pauseLeft ||= new Map();
+    if (!this._pauseLeft.has(t.seat)) this._pauseLeft.set(t.seat, this.pauseMs);
+    if (t.paused) { // close the running pause
+      this._pauseLeft.set(t.seat, Math.max(0, this._pauseLeft.get(t.seat) - (this.now() - t.paused)));
+      t.paused = null;
+    }
+    if (!seat || seat.leaving) { this._setTurnTimer(1500); return; }
+    if (mode === 'pause' || !seat.connected) {
+      const budget = this._pauseLeft.get(t.seat);
+      if (budget > 500) {
+        t.paused = this.now();
+        if (mode === 'pause') this._log(`${seat.name} не в сети — ждём до ${Math.round(budget / 1000)} с`);
+        this._setTurnTimer(budget, true);
+        return;
+      }
+      this._setTurnTimer(1500);
+      return;
+    }
+    if (mode === 'resume') { t.seen = false; t.start = this.now(); this._log(`${seat.name} вернулся`); }
+    this._setTurnTimer(this.actionTime + (t.seen ? 0 : this.seenGrace));
+  }
+
+  _setTurnTimer(ms, paused = false) {
+    this._clear('_turn');
+    const t = this._turnInfo;
+    const key = t.key;
+    this.deadline = this.now() + ms;
+    this.deadlineMs = paused ? ms : this.actionTime;
+    this._turn = this.timers.set(() => {
+      this._turn = null;
+      const c = this.round && this.round.current();
+      if (!c || !this._turnInfo || this._turnInfo.key !== key) return;
+      this._log(`${this._name(c.seat)}: время вышло — хватит`);
+      this._turnInfo = null;
+      this.round.stand(c.seat);
+      this._afterAction();
+    }, ms);
   }
 
   _dealerStep() {
@@ -293,10 +350,15 @@ class BlackjackTable {
     this.bettingEnds = 0;
     this.seats.forEach((s, i) => {
       if (!s) return;
-      if (s.leaving || !s.connected) {
+      if (s.leaving) {
         if (s.bet) { this.deps.pay && this.deps.pay(s.userId, s.bet); }
         this.deps.onInPlay && this.deps.onInPlay(s.userId, 0);
         this.seats[i] = null;
+      } else if (!s.connected && s.bet) {
+        // offline between rounds: keep the seat for when they come back, but don't play their chips blind
+        this.deps.pay && this.deps.pay(s.userId, s.bet);
+        s.bet = 0;
+        this._inPlay(s);
       }
     });
     // chips put down during the result pause start the countdown now
@@ -368,7 +430,9 @@ class BlackjackTable {
       }),
       dealer: { cards: dealerCards, total: dv ? dv.total : 0, soft: dv ? dv.soft && dv.total < 21 : false, blackjack: !!(r && r.dealerBlackjack), revealed: !!(r && r.dealer.revealed) },
       turn: cur ? { seat: cur.seat, hand: cur.handIndex } : null,
-      deadlineIn: cur ? Math.max(0, this.deadline - this.now()) : 0,
+      // before the player's screen confirms the deal, show them (and everyone) the plain full time
+      deadlineIn: cur ? (this._turnInfo && !this._turnInfo.seen && !this._turnInfo.paused ? Math.min(this.actionTime, Math.max(0, this.deadline - this.now())) : Math.max(0, this.deadline - this.now())) : 0,
+      waiting: cur && this._turnInfo && this._turnInfo.paused ? { seat: cur.seat, name: this._name(cur.seat) } : null,
       actionTime: this.deadlineMs || this.actionTime,
       shoeLeft: this.shoe.length,
       mySeat: me,
@@ -382,7 +446,7 @@ class BlackjackTable {
         bet: this.seats[me].bet,
         lastBet: this.seats[me].lastBet,
         canBet: this.status === 'betting',
-        turn: mine ? { hit: r.canHit(), stand: true, double: r.canDouble(), split: r.canSplit(), bet: cur.hand.bet } : null,
+        turn: mine ? { hit: r.canHit(), stand: true, double: r.canDouble(), split: r.canSplit(), bet: cur.hand.bet, key: this._turnInfo ? this._turnInfo.key : null } : null,
       };
     }
     return st;
