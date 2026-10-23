@@ -8,7 +8,7 @@ const compression = require('compression');
 const { Server } = require('socket.io');
 const { Table, GameError } = require('./engine/table');
 const { GAMES, gameOf } = require('./engine/games');
-const { Store, StoreError, AVATAR_MAX_BYTES } = require('./store');
+const { Store, StoreError, AVATAR_MAX_BYTES, LEGAL_VERSION } = require('./store');
 const { SitAndGo, TEMPLATES, validateTemplate, DAY } = require('./tournament');
 const { DurakTable } = require('./durak/table');
 const { BlackjackTable } = require('./blackjack/table');
@@ -86,14 +86,21 @@ function createServer({
   // pages with share previews carry %ORIGIN% placeholders, filled in per request
   const page = (file) => {
     const html = fs.readFileSync(path.join(pub, file), 'utf8');
-    return (req, res) => { res.set('Cache-Control', 'no-cache'); res.type('html').send(html.replaceAll('%ORIGIN%', origin(req))); };
+    const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    const owner = esc(process.env.SITE_OWNER || 'Администрация клуба NOIR RIVER');
+    const mail = process.env.CONTACT_EMAIL;
+    const contact = mail ? `<a href="mailto:${esc(mail)}">${esc(mail)}</a>` : 'личным сообщением администратору клуба в игре или кнопкой «Пожаловаться»';
+    const filled = html.replaceAll('%OWNER%', owner).replaceAll('%CONTACT%', contact).replaceAll('%LEGAL_VERSION%', LEGAL_VERSION);
+    return (req, res) => { res.set('Cache-Control', 'no-cache'); res.type('html').send(filled.replaceAll('%ORIGIN%', origin(req))); };
   };
   app.get(['/', '/index.html'], page('index.html'));
   app.get(['/play', '/play.html'], page('play.html'));
+  app.get(['/privacy', '/privacy.html'], page('privacy.html'));
+  app.get(['/terms', '/terms.html'], page('terms.html'));
   app.get('/robots.txt', (req, res) => res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /avatar/\n\nSitemap: ${origin(req)}/sitemap.xml\n`));
   app.get('/sitemap.xml', (req, res) => {
     const day = new Date(STARTED_AT).toISOString().slice(0, 10);
-    const urls = [['/', '1.0'], ['/play', '0.8']].map(([u, pr]) => `  <url><loc>${origin(req)}${u}</loc><lastmod>${day}</lastmod><priority>${pr}</priority></url>`).join('\n');
+    const urls = [['/', '1.0'], ['/play', '0.8'], ['/terms', '0.3'], ['/privacy', '0.3']].map(([u, pr]) => `  <url><loc>${origin(req)}${u}</loc><lastmod>${day}</lastmod><priority>${pr}</priority></url>`).join('\n');
     res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
   });
   // art, fonts and icons rarely change: cache them for a month; pages, scripts and styles revalidate every time
@@ -115,12 +122,15 @@ function createServer({
     const arr = (hits.get(ip) || []).filter((t) => now - t < 60000);
     arr.push(now);
     hits.set(ip, arr);
+    // addresses are kept only for a minute (see the privacy policy)
+    if (hits.size > 50) for (const [k, v] of hits) if (!v.length || now - v[v.length - 1] >= 60000) hits.delete(k);
     return arr.length > 20;
   }
 
   app.post('/api/register', (req, res) => {
     if (limited(req.ip)) return res.status(429).json({ error: 'Слишком много попыток, подождите минуту' });
-    try { res.json(store.register(req.body?.name, req.body?.password)); } catch (e) { authError(res, e); }
+    if (req.body?.agree !== true) return res.status(400).json({ error: 'Подтвердите, что вам есть 18 лет и вы согласны с правилами и политикой' });
+    try { res.json(store.register(req.body?.name, req.body?.password, { agree: true })); } catch (e) { authError(res, e); }
   });
   app.post('/api/login', (req, res) => {
     if (limited(req.ip)) return res.status(429).json({ error: 'Слишком много попыток, подождите минуту' });
@@ -1190,6 +1200,22 @@ function createServer({
       const k = ['durak', 'chess', 'nardy'].includes(kind) ? kind : 'checkers';
       return { list: store.ratingTable(k), me: (store.get(userId).rating || {})[k] };
     });
+    on('legal:accept', () => { store.acceptLegal(userId); return { me: store.profile(userId) }; });
+    let lastReport = 0;
+    on('report:create', ({ name, reason, where, text }) => {
+      if (Date.now() - lastReport < 5000) throw new GameError('Подождите немного');
+      store.report(userId, { targetName: name, reason, where, text });
+      lastReport = Date.now();
+      return {};
+    });
+    on('account:delete', ({ password }) => {
+      if (!store.checkPassword(userId, password)) throw new GameError('Неверный пароль');
+      removeEverywhere(userId);
+      const name = store.deleteUser(userId);
+      store.logAdmin(name, 'Удалил свой аккаунт');
+      setTimeout(() => io.in('user:' + userId).disconnectSockets(true), 300);
+      return {};
+    });
     on('shop:get', () => ({ shop: store.shopView(userId) }));
     on('shop:buy', ({ id }) => { const shop = store.buy(userId, String(id || '')); pushProfile(userId); return { shop }; });
     on('shop:equip', ({ id }) => { const shop = store.equip(userId, String(id || '')); pushProfile(userId); return { shop }; });
@@ -1480,10 +1506,12 @@ function createServer({
       const cash = [...tables.values()].filter((t) => !t.tournament);
       return {
         me: userId,
+        reports: store.reports().slice(0, 200),
         stats: {
           online: online.size,
           users: users.length,
           balances: users.reduce((a, u) => a + u.balance, 0),
+          reportsOpen: store.reports().filter((r) => !r.done).length,
           inPlay: users.reduce((a, u) => a + u.inPlay, 0),
           cashTables: cash.length,
           activeHands: [...tables.values()].filter((t) => t.hand && !t.hand.ended).length,
@@ -1553,12 +1581,29 @@ function createServer({
           audit(`Сбросил пароль: ${u.name}`);
           return { password };
         }
+        case 'clearAvatar':
+          store.clearAvatarImage(u.id);
+          if (avatarChangedHook) avatarChangedHook(u.id);
+          pushProfile(u.id); notice(u.id, 'Администратор убрал вашу картинку аватара'); audit(`Убрал аватар: ${u.name}`); break;
+        case 'delete': {
+          if (u.id === userId) throw new GameError('Свой аккаунт удаляйте в профиле');
+          removeEverywhere(u.id);
+          io.in('user:' + u.id).disconnectSockets(true);
+          audit(`Удалил аккаунт: ${store.deleteUser(u.id)}`);
+          break;
+        }
         case 'makeAdmin': store.setRole(u.id, 'admin'); pushProfile(u.id); audit(`Назначил админом: ${u.name}`); break;
         case 'removeAdmin':
           if (u.id === userId) throw new GameError('Нельзя снять права с себя');
           store.setRole(u.id, 'player'); pushProfile(u.id); audit(`Снял права админа: ${u.name}`); break;
         default: throw new GameError('Неизвестное действие');
       }
+    });
+
+    admin('admin:reports', () => ({ reports: store.reports() }));
+    admin('admin:report', ({ id, action }) => {
+      if (action === 'resolve') store.resolveReport(String(id));
+      return { reports: store.reports() };
     });
 
     admin('admin:table', ({ tableId, action, sb, bb, every, target }) => {

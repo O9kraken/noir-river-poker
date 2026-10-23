@@ -94,7 +94,10 @@
     const main = $('#adm-main');
     const d = A.data;
     if (!d) return;
-    const view = { overview, users, tables, sng, durak, bj, extra, announce }[A.tab];
+    const open = (d.reports || []).filter((r) => !r.done).length;
+    const badge = $('#adm-rep-count');
+    badge.hidden = !open; badge.textContent = open;
+    const view = { overview, users, tables, sng, durak, bj, extra, announce, reports }[A.tab];
     main.replaceChildren(...[view(d)].flat().filter(Boolean));
   }
 
@@ -216,7 +219,37 @@
         me ? null : h('button', {
           type: 'button', class: 'btn btn-sm ' + (u.banned ? 'btn-ghost' : 'btn-red'),
           onclick: () => { if (u.banned || confirm(`Заблокировать ${u.name}? Его уберут со всех столов.`)) run('admin:user', { userId: u.id, action: u.banned ? 'unban' : 'ban' }); },
-        }, u.banned ? 'Разблокировать' : 'Заблокировать')));
+        }, u.banned ? 'Разблокировать' : 'Заблокировать'),
+        u.hasImg ? h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => run('admin:user', { userId: u.id, action: 'clearAvatar' }, 'Аватар убран') }, 'Убрать аватар') : null,
+        me ? null : h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => { if (confirm(`Удалить аккаунт ${u.name} навсегда? Фишки, статистика и переписка пропадут.`)) run('admin:user', { userId: u.id, action: 'delete' }, 'Аккаунт удалён'); } }, 'Удалить')));
+  }
+
+  // ---------- reports ----------
+  function reports(d) {
+    const list = d.reports || [];
+    if (!list.length) return h('div', { class: 'empty' }, 'Жалоб нет.');
+    const users = new Map((d.users || []).map((u) => [u.id, u]));
+    return [h('p', { class: 'muted small' }, 'Жалобы игроков из чатов, личных сообщений и профилей. Проверьте, примите меры и отметьте жалобу решённой.'),
+      ...list.map((r) => {
+        const u = users.get(r.targetId);
+        const act = (action, text, ask) => h('button', { type: 'button', class: 'btn btn-dark btn-sm', onclick: () => { if (!ask || confirm(ask)) run('admin:user', { userId: r.targetId, action }, text); } }, text);
+        return h('article', { class: 'adm-report' + (r.done ? ' done' : '') },
+          h('div', { class: 'rp-head' },
+            h('span', { class: 'rp-reason' }, r.reasonText),
+            h('b', null, r.targetName),
+            h('span', { class: 'muted small' }, `от ${r.fromName} · ${r.where || '—'} · ${new Date(r.t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`),
+            r.done ? h('span', { class: 'status finished' }, 'решена') : null),
+          r.text ? h('p', { class: 'report-quote' }, r.text) : null,
+          h('div', { class: 'rp-acts' },
+            h('a', { class: 'btn btn-ghost btn-sm', href: '/play#/profile/' + encodeURIComponent(r.targetName), target: '_blank', rel: 'noopener' }, 'Профиль'),
+            r.exists && u ? [
+              u.muted ? null : act('mute', 'Запретить чат'),
+              u.hasImg ? act('clearAvatar', 'Убрать аватар') : null,
+              u.banned ? null : act('ban', 'Заблокировать', `Заблокировать ${r.targetName}?`),
+              act('delete', 'Удалить аккаунт', `Удалить аккаунт ${r.targetName} навсегда?`),
+            ] : h('span', { class: 'muted small' }, 'аккаунт удалён'),
+            r.done ? null : h('button', { type: 'button', class: 'btn btn-gold btn-sm', onclick: () => run('admin:report', { id: r.id, action: 'resolve' }, 'Отмечено') }, 'Решено')));
+      })];
   }
 
   function select(name, options, value, label) {

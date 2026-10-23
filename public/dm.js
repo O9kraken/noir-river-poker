@@ -32,6 +32,12 @@
     setTimeout(() => { if (!D.open) el.hidden = true; }, 220);
   }
 
+  $('#dm-report').addEventListener('click', () => {
+    if (!D.friend || !window.Report) return;
+    const theirs = (D.msgs || []).filter((m) => m.from !== S.me.id).slice(-3).map((m) => m.text).join(' / ');
+    window.Report.open({ name: D.friend.name, where: 'Личные сообщения', text: theirs });
+  });
+
   async function openList() {
     D.with = null;
     show();

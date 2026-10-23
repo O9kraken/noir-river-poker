@@ -62,6 +62,10 @@ const SHOP = [
   { id: 'title-don', cat: 'title', name: 'Дон', price: 10000 },
   { id: 'title-legend', cat: 'title', name: 'Легенда клуба', price: 50000 },
 ];
+// the current version of the rules and the privacy policy: a new one asks everyone to accept again
+const LEGAL_VERSION = '2026-10-23';
+const REPORT_REASONS = { abuse: 'Оскорбления', spam: 'Спам или реклама', cheat: 'Нечестная игра', image: 'Недопустимый аватар', other: 'Другое' };
+
 const SHOP_DEFAULT = { frame: 'frame-none', back: 'back-classic', felt: 'felt-classic', title: 'title-none' };
 const titleOf = (u) => { const t = u.shop && u.shop.eq.title; const it = t && t !== 'title-none' ? SHOP.find((x) => x.id === t) : null; return it ? it.name : null; };
 
@@ -105,6 +109,7 @@ class Store {
     if (!Array.isArray(this.data.sngTemplates)) this.data.sngTemplates = [];
     if (!this.data.dms || typeof this.data.dms !== 'object') this.data.dms = {};
     if (!Array.isArray(this.data.seasonHistory)) this.data.seasonHistory = [];
+    if (!Array.isArray(this.data.reports)) this.data.reports = [];
     if (!this.data.season || typeof this.data.season !== 'object') this.data.season = newSeason();
     for (const u of Object.values(this.data.users)) this._upgrade(u);
     // Chips left on tables when the server stopped go back to balances.
@@ -133,7 +138,7 @@ class Store {
     return Object.values(this.data.users).find((u) => u.nameLower === lower);
   }
 
-  register(name, password) {
+  register(name, password, opts = {}) {
     name = String(name || '').trim().replace(/\s+/g, ' ');
     password = String(password || '');
     if (!NAME_RE.test(name)) throw new StoreError('Ник: 3–16 символов, буквы, цифры, пробел, _ или -');
@@ -149,6 +154,7 @@ class Store {
       id, name, nameLower: lower, salt, hash: this._hashPassword(password, salt), role, banned: false, muted: false,
       balance: START_BALANCE, inPlay: {}, lastBonus: 0, created: Date.now(), // the wheel is free on day one
       handsWon: 0, biggestPot: 0,
+      agreed: opts.agree ? { version: LEGAL_VERSION, at: Date.now() } : null,
     };
     this._upgrade(this.data.users[id]);
     this.save();
@@ -200,6 +206,7 @@ class Store {
       rewardsReady: this.rewardsReady(userId),
       dmUnread: this.dmUnread(userId),
       looks: { ...u.shop.eq }, title: titleOf(u),
+      needsAgree: !u.agreed || u.agreed.version !== LEGAL_VERSION,
     };
   }
 
@@ -619,6 +626,56 @@ class Store {
   }
 
   /** Move chips from balance to a table. */
+  // ---------- rules, consent, account deletion, reports ----------
+  acceptLegal(userId) {
+    const u = this.findUser(userId);
+    u.agreed = { version: LEGAL_VERSION, at: Date.now() };
+    this.save();
+  }
+
+  /** Remove an account and everything tied to it (at the player's request or by an admin). */
+  deleteUser(userId) {
+    const u = this.findUser(userId);
+    delete this.data.users[userId];
+    for (const [k, s] of Object.entries(this.data.sessions)) if (s.userId === userId) delete this.data.sessions[k];
+    for (const o of Object.values(this.data.users)) {
+      o.friends = (o.friends || []).filter((x) => x !== userId);
+      if (o.friendReq) { o.friendReq.in = o.friendReq.in.filter((x) => x !== userId); o.friendReq.out = o.friendReq.out.filter((x) => x !== userId); }
+    }
+    for (const k of Object.keys(this.data.dms || {})) if (k.split('|').includes(userId)) delete this.data.dms[k];
+    if (this.data.season && this.data.season.scores) delete this.data.season.scores[userId];
+    this.data.reports = (this.data.reports || []).filter((r) => r.targetId !== userId && r.fromId !== userId);
+    this.save();
+    return u.name;
+  }
+
+  checkPassword(userId, password) {
+    const u = this.findUser(userId);
+    return this._hashPassword(String(password || ''), u.salt) === u.hash;
+  }
+
+  /** A player reports another player or a message. */
+  report(fromId, { targetName, reason, where, text }) {
+    const from = this.findUser(fromId);
+    const target = this._findByName(String(targetName || ''));
+    if (!target) throw new StoreError('Игрок не найден');
+    if (target.id === fromId) throw new StoreError('На себя пожаловаться нельзя');
+    if (!REPORT_REASONS[reason]) throw new StoreError('Выберите причину');
+    const list = this.data.reports || (this.data.reports = []);
+    const recent = list.filter((r) => r.fromId === fromId && Date.now() - r.t < 3600 * 1000).length;
+    if (recent >= 10) throw new StoreError('Слишком много жалоб за час');
+    if (list.some((r) => r.fromId === fromId && r.targetId === target.id && !r.done && Date.now() - r.t < 600000)) throw new StoreError('Жалоба на этого игрока уже отправлена');
+    list.unshift({
+      id: crypto.randomUUID(), t: Date.now(), fromId, fromName: from.name, targetId: target.id, targetName: target.name,
+      reason, where: String(where || '').slice(0, 80), text: String(text || '').slice(0, 300), done: false,
+    });
+    if (list.length > 500) list.length = 500;
+    this.save();
+  }
+
+  reports() { return (this.data.reports || []).map((r) => ({ ...r, reasonText: REPORT_REASONS[r.reason] || r.reason, exists: !!this.data.users[r.targetId] })); }
+  resolveReport(id) { const r = (this.data.reports || []).find((x) => x.id === id); if (r) { r.done = true; this.save(); } }
+
   // ---------- shop ----------
   shopView(userId) {
     const u = this.findUser(userId);
@@ -829,7 +886,7 @@ class Store {
       id: u.id, name: u.name, balance: u.balance,
       inPlay: Object.values(u.inPlay || {}).reduce((a, b) => a + b, 0),
       role: u.role || 'player', banned: !!u.banned, muted: !!u.muted,
-      created: u.created, handsWon: u.stats.poker.won,
+      created: u.created, handsWon: u.stats.poker.won, hasImg: !!(u.avatar && u.avatar.img),
     })).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }
 
@@ -925,6 +982,7 @@ class Store {
     if (!Array.isArray(this.data.sngTemplates)) this.data.sngTemplates = [];
     if (!this.data.dms || typeof this.data.dms !== 'object') this.data.dms = {};
     if (!Array.isArray(this.data.seasonHistory)) this.data.seasonHistory = [];
+    if (!Array.isArray(this.data.reports)) this.data.reports = [];
     if (!this.data.season || typeof this.data.season !== 'object') this.data.season = newSeason();
     for (const u of Object.values(this.data.users)) {
       this._upgrade(u);
@@ -1026,4 +1084,4 @@ function achievements(u) {
   });
 }
 
-module.exports = { SHOP, Store, StoreError, START_BALANCE, DAILY_BONUS, WHEEL, RATED, SEASON_PRIZES, SEASON_MIN_GAMES, newSeason, AVATAR_SYMBOLS, AVATAR_MAX_BYTES, QUESTS, dayKey };
+module.exports = { LEGAL_VERSION, REPORT_REASONS, SHOP, Store, StoreError, START_BALANCE, DAILY_BONUS, WHEEL, RATED, SEASON_PRIZES, SEASON_MIN_GAMES, newSeason, AVATAR_SYMBOLS, AVATAR_MAX_BYTES, QUESTS, dayKey };

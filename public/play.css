@@ -2163,3 +2163,29 @@ body.voice-on { padding-bottom: 74px; }
 .adm-store.warn { border-color: rgba(240, 184, 74, .55); } .adm-store.warn b { color: #FFE3A3; }
 .adm-store.bad { border-color: rgba(224, 106, 114, .7); background: rgba(70, 14, 20, .45); } .adm-store.bad b { color: #FFC2C7; }
 .adm-store-act { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- v19: consent, reports, account deletion ---------- */
+.check.agree { align-items: flex-start; font-size: 13px; line-height: 1.45; text-align: left; margin: 2px 0 4px; }
+.check.agree input { flex: none; margin-top: 1px; }
+.check.agree a, .auth .legal a { color: var(--gold-2, #F0D48A); }
+.check.agree[hidden] { display: none; }
+.auth .legal a { text-decoration: underline; text-underline-offset: 2px; }
+.nick-menu { position: fixed; z-index: 90; min-width: 170px; padding: 6px; border-radius: 12px; background: #141917; border: 1px solid rgba(239, 234, 224, .14); box-shadow: 0 16px 40px rgba(0, 0, 0, .5); display: grid; gap: 2px; }
+.nick-menu button { all: unset; cursor: pointer; padding: 9px 12px; border-radius: 8px; color: var(--ivory, #EFEAE0); font-size: 14px; }
+.nick-menu button:hover, .nick-menu button:focus-visible { background: rgba(239, 234, 224, .08); }
+.nick-menu .danger { color: #F08A8A; }
+.report-reasons { display: grid; gap: 6px; margin: 4px 0 10px; }
+.report-target { color: var(--gold-2, #F0D48A); font-weight: 700; }
+.report-quote { font-size: 13px; color: var(--muted); border-left: 2px solid rgba(239, 234, 224, .2); padding: 4px 10px; margin: 0 0 10px; overflow-wrap: anywhere; }
+.btn-report { color: #F08A8A !important; }
+.danger-zone { margin-top: 22px; padding-top: 14px; border-top: 1px solid rgba(239, 234, 224, .1); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.danger-zone p { margin: 0; color: var(--muted); font-size: 13px; flex: 1 1 220px; }
+.adm-report { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid rgba(239, 234, 224, .1); border-radius: 12px; margin-bottom: 10px; }
+.adm-report.done { opacity: .55; }
+.adm-report .rp-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.adm-report .rp-reason { font-weight: 700; color: #F0B37E; }
+.adm-report .rp-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.adm-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: #C2453F; color: #fff; font-size: 12px; font-weight: 800; }
+.lobby-legal { margin: 12px 0 0; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; }
+.lobby-legal span { flex-basis: 100%; }
+.lobby-legal a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }

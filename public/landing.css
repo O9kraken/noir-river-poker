@@ -379,3 +379,5 @@ button { font: inherit; color: inherit; }
 .notif b { color: var(--ivory); font-size: 13.5px; }
 @media (max-width: 640px) { .b-app { flex-direction: column; align-items: stretch; } .notif { width: 100%; } }
 .show-tab { padding: 10px 16px; border-radius: 16px; } .show-tabs { gap: 6px; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.foot p a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

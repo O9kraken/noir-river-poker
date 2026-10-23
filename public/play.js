@@ -125,7 +125,8 @@
   /** Chat nickname in the colour of the player's avatar. */
   function chatNick(m) {
     const hue = m.hue != null ? m.hue : hueOf(m.name || '');
-    return h('b', { class: 'chat-nick', style: `--nick-hue:${hue}` }, m.name);
+    const other = m.name && !m.sys && !m.bot && !(S.me && m.name === S.me.name);
+    return h('b', { class: 'chat-nick', style: `--nick-hue:${hue}`, ...(other ? { 'data-name': m.name, 'data-msg': String(m.text || '').slice(0, 200), role: 'button', tabindex: '0', title: 'Профиль или жалоба' } : {}) }, m.name);
   }
   function avatarEl(name, av, cls = '') {
     return fillAvatar(h('span', { class: 'avatar ' + cls, 'aria-hidden': 'true' }), name, av);
@@ -393,6 +394,7 @@
       $('#auth-submit').textContent = authMode === 'login' ? 'Войти' : 'Создать аккаунт';
       $('#auth-form').password.autocomplete = authMode === 'login' ? 'current-password' : 'new-password';
       $('#auth-error').textContent = '';
+      $('#auth-agree').hidden = authMode === 'login';
     });
   });
 
@@ -400,13 +402,18 @@
     e.preventDefault();
     const f = e.target;
     const btn = $('#auth-submit');
-    btn.disabled = true;
     $('#auth-error').textContent = '';
+    if (authMode === 'register' && !f.agree.checked) {
+      $('#auth-error').textContent = 'Отметьте, что вам есть 18 лет и вы согласны с правилами';
+      f.agree.focus();
+      return;
+    }
+    btn.disabled = true;
     try {
       const res = await fetch(`/api/${authMode === 'login' ? 'login' : 'register'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: f.name.value, password: f.password.value }),
+        body: JSON.stringify({ name: f.name.value, password: f.password.value, ...(authMode === 'register' ? { agree: true } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ошибка');
@@ -419,6 +426,26 @@
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // accounts made before the rules existed (or before a new edition) confirm them once
+  function askLegal() {
+    const d = $('#modal-legal');
+    if (d.open) return;
+    d.querySelector('[name=agree]').checked = false;
+    $('#legal-error').textContent = '';
+    d.showModal();
+  }
+  $('#modal-legal').addEventListener('cancel', (e) => e.preventDefault());
+  $('#legal-out').addEventListener('click', () => { $('#modal-legal').close(); $('#logout-btn').click(); });
+  $('#legal-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    if (!f.agree.checked) { $('#legal-error').textContent = 'Отметьте галочку, чтобы продолжить'; return; }
+    const res = await call('legal:accept');
+    if (!res) return;
+    S.me = res.me;
+    $('#modal-legal').close();
   });
 
   function showAuth() {
@@ -494,6 +521,7 @@
       const res = await call('hello');
       if (!res) return;
       S.me = res.me;
+      if (S.me.needsAgree) askLegal();
       if (window.Progress) setTimeout(() => window.Progress.onMe(S.me), 0);
       S.tables = res.tables;
       S.sngs = res.sngs || [];

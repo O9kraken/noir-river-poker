@@ -193,7 +193,8 @@
         h('div', { class: 'phead-act' },
           relation,
           where ? h('a', { class: 'btn btn-dark btn-sm', href: where.href }, `Сейчас: ${where.name}`) : null,
-          p.me ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: toggleEditor }, 'Сменить аватар') : null)),
+          p.me ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: toggleEditor }, 'Сменить аватар') : null,
+          !p.me && window.Report ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm btn-report', onclick: () => window.Report.open({ name: p.name, where: 'Профиль' }) }, 'Пожаловаться') : null)),
       h('div', { class: 'phead-chips' },
         h('small', null, 'Фишек'), h('b', null, fmt(p.chips)), h('span', null, `${p.rank} место из ${p.players}`),
         p.seasonWins ? h('span', { class: 'phead-season' }, `🏆 чемпион недели × ${p.seasonWins}`) : null));
@@ -310,7 +311,10 @@
 
     view.replaceChildren(...[
       h('div', { class: 'profile-top' }, h('a', { href: '#/', class: 'btn btn-ghost btn-sm' }, '← Лобби')),
-      head, editor, games, h('div', { class: 'pgrid pgrid-2' }, chart, recent), achievements].filter(Boolean));
+      head, editor, games, h('div', { class: 'pgrid pgrid-2' }, chart, recent), achievements,
+      p.me && window.Report ? h('section', { class: 'danger-zone' },
+        h('p', null, 'Ваши данные: ник, хэш пароля, аватар, фишки и статистика. ', h('a', { href: '/privacy', target: '_blank', rel: 'noopener' }, 'Политика конфиденциальности'), '.'),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm btn-report', onclick: () => window.Report.deleteAccount() }, 'Удалить аккаунт')) : null].filter(Boolean));
   }
 
   // ---------- avatar editor ----------

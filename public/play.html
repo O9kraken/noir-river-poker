@@ -39,12 +39,16 @@
       <label class="field"><span>Пароль</span>
         <input name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="Минимум 6 символов">
       </label>
+      <label class="check agree" id="auth-agree" hidden>
+        <input type="checkbox" name="agree">
+        <span>Мне есть 18 лет, я принимаю <a href="/terms" target="_blank" rel="noopener">пользовательское соглашение</a> и даю согласие на обработку данных по <a href="/privacy" target="_blank" rel="noopener">политике конфиденциальности</a></span>
+      </label>
       <p class="form-error" id="auth-error" role="alert"></p>
       <button class="btn btn-gold btn-block" type="submit" id="auth-submit">Войти</button>
       <p class="form-note" id="auth-note">Новым игрокам — 10 000 игровых фишек.</p>
     </form>
   </div>
-  <p class="legal">Игра на игровые фишки без денежной стоимости. Только 18+.</p>
+  <p class="legal">Игра на игровые фишки без денежной стоимости. Только 18+. <a href="/terms">Соглашение</a> · <a href="/privacy">Конфиденциальность</a></p>
 </section>
 
 <!-- APP -->
@@ -335,6 +339,7 @@
       <section class="panel panel-quiet">
         <h2 class="h3">Правила</h2>
         <dl class="rules-list" id="rules-list"></dl>
+        <p class="lobby-legal small"><span>18+ · фишки без денежной стоимости</span> <a href="/terms" target="_blank" rel="noopener">Соглашение</a> · <a href="/privacy" target="_blank" rel="noopener">Конфиденциальность</a></p>
       </section>
     </aside>
   </main>
@@ -439,7 +444,7 @@
       </div>
       <div class="side-body">
         <div id="dk-chat-pane" class="side-pane">
-          <ul class="chat" id="dk-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Дурак" id="dk-chat" aria-live="polite"></ul>
           <form id="dk-chat-form" class="chat-form">
             <label class="sr-only" for="dk-chat-input">Сообщение</label>
             <input id="dk-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
@@ -504,7 +509,7 @@
       </div>
       <div class="side-body">
         <div id="bj-chat-pane" class="side-pane">
-          <ul class="chat" id="bj-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Блэкджек" id="bj-chat" aria-live="polite"></ul>
           <form id="bj-chat-form" class="chat-form">
             <label class="sr-only" for="bj-chat-input">Сообщение</label>
             <input id="bj-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
@@ -565,7 +570,7 @@
       </div>
       <div class="side-body">
         <div id="rl-chat-pane" class="side-pane">
-          <ul class="chat" id="rl-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Рулетка" id="rl-chat" aria-live="polite"></ul>
           <form id="rl-chat-form" class="chat-form">
             <label class="sr-only" for="rl-chat-input">Сообщение</label>
             <input id="rl-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
@@ -616,7 +621,7 @@
       </div>
       <div class="side-body">
         <div id="ck-chat-pane" class="side-pane">
-          <ul class="chat" id="ck-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Шашки" id="ck-chat" aria-live="polite"></ul>
           <form id="ck-chat-form" class="chat-form">
             <label class="sr-only" for="ck-chat-input">Сообщение</label>
             <input id="ck-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
@@ -670,7 +675,7 @@
       </div>
       <div class="side-body">
         <div id="ch-chat-pane" class="side-pane">
-          <ul class="chat" id="ch-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Шахматы" id="ch-chat" aria-live="polite"></ul>
           <form id="ch-chat-form" class="chat-form">
             <label class="sr-only" for="ch-chat-input">Сообщение</label>
             <input id="ch-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение сопернику…">
@@ -722,7 +727,7 @@
       </div>
       <div class="side-body">
         <div id="bg-chat-pane" class="side-pane">
-          <ul class="chat" id="bg-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Нарды" id="bg-chat" aria-live="polite"></ul>
           <form id="bg-chat-form" class="chat-form">
             <label class="sr-only" for="bg-chat-input">Сообщение</label>
             <input id="bg-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение сопернику…">
@@ -774,7 +779,7 @@
       <div class="side-body">
         <div id="cap-players-pane" class="side-pane cap-players"><div id="cap-players"></div></div>
         <div id="cap-chat-pane" class="side-pane" hidden>
-          <ul class="chat" id="cap-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Капитал" id="cap-chat" aria-live="polite"></ul>
           <form id="cap-chat-form" class="chat-form">
             <label class="sr-only" for="cap-chat-input">Сообщение</label>
             <input id="cap-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
@@ -824,7 +829,7 @@
       <div class="side-body">
         <div id="mf-chat-pane" class="side-pane">
           <p class="mf-channel" id="mf-channel" hidden></p>
-          <ul class="chat" id="mf-chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Мафия" id="mf-chat" aria-live="polite"></ul>
           <form id="mf-chat-form" class="chat-form">
             <label class="sr-only" for="mf-chat-input">Сообщение</label>
             <input id="mf-chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение городу…">
@@ -890,7 +895,7 @@
       </div>
       <div class="side-body">
         <div id="chat-pane" class="side-pane">
-          <ul class="chat" id="chat" aria-live="polite"></ul>
+          <ul class="chat" data-chat-where="Чат: Покер" id="chat" aria-live="polite"></ul>
           <form id="chat-form" class="chat-form">
             <label class="sr-only" for="chat-input">Сообщение</label>
             <input id="chat-input" maxlength="200" autocomplete="off" placeholder="Сообщение столу…">
@@ -922,6 +927,7 @@
     <header class="dm-head">
       <button type="button" class="icon-btn" id="dm-back" aria-label="Ко всем диалогам"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <a class="dm-who" id="dm-who"></a>
+      <button type="button" class="icon-btn" id="dm-report" aria-label="Пожаловаться на собеседника" title="Пожаловаться"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg></button>
       <button type="button" class="icon-btn" data-dm-close aria-label="Закрыть"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
     <div class="dm-msgs" id="dm-msgs" aria-live="polite"></div>
@@ -935,6 +941,19 @@
 </aside>
 
 <!-- MODALS -->
+<dialog id="modal-legal" class="modal" aria-labelledby="legal-title">
+  <form method="dialog" class="form" id="legal-form">
+    <h2 class="h2" id="legal-title">Правила клуба</h2>
+    <p class="muted">Мы оформили <a href="/terms" target="_blank" rel="noopener">пользовательское соглашение</a> и <a href="/privacy" target="_blank" rel="noopener">политику конфиденциальности</a>. Главное: клуб только для взрослых, фишки не имеют денежной стоимости, мы храним лишь ник, хэш пароля и игровую статистику.</p>
+    <label class="check agree"><input type="checkbox" name="agree"> <span>Мне есть 18 лет, я принимаю соглашение и даю согласие на обработку данных по политике</span></label>
+    <p class="form-error" id="legal-error" role="alert"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="legal-out">Выйти</button>
+      <button type="submit" class="btn btn-gold" value="ok">Продолжить</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="modal-create" class="modal">
   <form method="dialog" class="form" id="create-form">
     <h2 class="h2">Новый стол</h2>
@@ -1264,5 +1283,6 @@
 <script src="/wheel.js"></script>
 <script src="/ratings.js"></script>
 <script src="/shop.js"></script>
+<script src="/report.js"></script>
 </body>
 </html>
